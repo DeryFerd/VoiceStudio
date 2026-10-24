@@ -61,22 +61,37 @@ func catalogs() throws -> [String: Data] {
     let l10n = try L10n(catalogs: catalogs())
     let root = repository.appendingPathComponent("mobile/ios")
     let paths = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)!
-    let pattern = #""((?:mobile|common|privacy|player|themeAppearance)\.[a-zA-Z0-9_.]+)""#
+    let pattern = #""((?:mobile|common|consent|privacy|player|themeAppearance|sidebarTools)\.[a-zA-Z0-9_.-]+)""#
     let regex = try NSRegularExpression(pattern: pattern)
     let dynamic: [String: [String]] = [
+        "mobile.simple.": ["tts", "asr", "asr-stream", "clone", "translate"],
+        "mobile.local.": [],
+        "mobile.local.category.": ["commercial-ok", "conditional", "non-commercial", "unidentified"],
+        "mobile.local.right_": ["commercial", "outputs", "redistribution", "voice", "unknown", "restricted"],
         "mobile.settings.mode_": ThemeMode.allCases.map(\.rawValue),
-        "mobile.ios.dub_stages.": ["preparing", "transcribing", "translating", "rendering", "done", "failed", "cancelled"]
+        "mobile.ios.dub_stages.": ["preparing", "transcribing", "translating", "rendering", "done", "failed", "cancelled"],
+        "mobile.report.reasons.": ContentReportReason.allCases.map(\.rawValue)
     ]
     for case let file as URL in paths where file.pathExtension == "swift" && !file.path.contains("/.build/") && !file.path.contains("/.cache/") && !file.path.contains("/Tests/") && !file.path.contains("UITests/") {
         let source = try String(contentsOf: file, encoding: .utf8)
         for match in regex.matches(in: source, range: NSRange(source.startIndex..., in: source)) {
             let key = String(source[Range(match.range(at: 1), in: source)!])
             if let suffixes = dynamic[key] { for suffix in suffixes { #expect(l10n.contains(key + suffix), "Missing \(key + suffix)") } }
-            else { #expect(l10n.contains(key), "Missing \(key) in \(file.lastPathComponent)") }
+            else {
+                let exists = l10n.contains(key) || (l10n.contains(key + "_one") && l10n.contains(key + "_other"))
+                #expect(exists, "Missing \(key) in \(file.lastPathComponent)")
+            }
         }
     }
     let mobile = L10n.flatten(try JSONSerialization.jsonObject(with: Data(contentsOf: repository.appendingPathComponent("mobile/contract/strings.mobile.en.json"))))
     for key in mobile.keys { #expect(l10n.contains(key)) }
+}
+
+@Test func iosAdditionsDoNotOverrideSharedStrings() throws {
+    let contract = repository.appendingPathComponent("mobile/contract")
+    let shared = L10n.flatten(try JSONSerialization.jsonObject(with: Data(contentsOf: contract.appendingPathComponent("strings.mobile.en.json"))))
+    let additions = L10n.flatten(try JSONSerialization.jsonObject(with: Data(contentsOf: contract.appendingPathComponent("strings.ios-additions.en.json"))))
+    #expect(Set(shared.keys).intersection(additions.keys).isEmpty, "Use the shared mobile wording instead of platform overrides")
 }
 
 @Test(arguments: ["http://192.168.1.20:3900/?pin=012345", "https://studio.example/", "http://[fd12::1]:3900/?pin=123456", "http://100.64.0.1:3900", "http://box.tail.ts.net/"])

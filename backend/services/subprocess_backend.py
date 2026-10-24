@@ -776,9 +776,21 @@ class SubprocessBackend(TTSBackend):
                     except (TypeError, ValueError):
                         pass
                 return True, "pong"
-            return False, f"unexpected reply: {reply!r}"
+            result = (False, f"unexpected reply: {reply!r}")
         except Exception as exc:
-            return False, f"{type(exc).__name__}: {exc}"
+            result = (False, f"{type(exc).__name__}: {exc}")
+        self._log_health_failure(result[1])
+        return result
+
+    def _log_health_failure(self, message: str) -> None:
+        """Keep the reason in the local log. The HTTP route withholds engine
+        text from its response and log line, so without this a failed probe
+        could not be told apart from a missing install (#2837)."""
+        from core.scrub import scrub_text
+
+        logger.warning(
+            "[%s] health check failed: %s", self.id, scrub_text(str(message))[:_STDERR_TAIL_CHARS]
+        )
 
     def generate(self, text: str, **kw) -> torch.Tensor:
         """Synthesize one utterance through the sidecar.

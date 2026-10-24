@@ -8,7 +8,8 @@ import weakref
 import time
 import shutil
 import threading
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Literal, Optional
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -599,7 +600,7 @@ _REPLACE_AUDIO_SQL = (
     "language=COALESCE(?, language), personality=COALESCE(?, personality), "
     "locked_audio_path='', is_locked=0, seed=NULL, "
     "verified_own_voice=0, consent_text='', consent_audio_path='', "
-    "consent_recorded_at=NULL "
+    "consent_recorded_at=NULL, consent_basis='', consent_attested_at=NULL "
     "WHERE id=? AND COALESCE(kind, 'clone')='clone' AND ref_audio_path IS ?"
 )
 
@@ -1105,6 +1106,37 @@ async def record_consent(
         "verified_own_voice": True,
         "consent_recorded_at": recorded_at,
     }
+
+
+class AttestationBody(BaseModel):
+    basis: Literal["own_voice", "speaker_permission"]
+
+
+@router.post("/profiles/{profile_id}/attestation")
+def attest_consent(profile_id: str, body: AttestationBody):
+    """Record "This is my voice" / "I have the speaker's permission" (sync consent, S2)."""
+    attested_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with db_conn() as conn:
+        updated = conn.execute(
+            "UPDATE voice_profiles SET consent_basis=?, consent_attested_at=? WHERE id=?",
+            (body.basis, attested_at, profile_id),
+        ).rowcount
+    if not updated:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    event_bus.emit("profiles", {"action": "consent_attested", "id": profile_id})
+    return {"id": profile_id, "consent_basis": body.basis, "consent_attested_at": attested_at}
+
+
+@router.delete("/profiles/{profile_id}/attestation")
+def clear_attestation(profile_id: str):
+    with db_conn() as conn:
+        updated = conn.execute(
+            "UPDATE voice_profiles SET consent_basis='', consent_attested_at=NULL WHERE id=?", (profile_id,)
+        ).rowcount
+    if not updated:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    event_bus.emit("profiles", {"action": "consent_attestation_cleared", "id": profile_id})
+    return {"id": profile_id, "consent_basis": "", "consent_attested_at": None}
 
 
 @router.delete("/profiles/{profile_id}/consent")

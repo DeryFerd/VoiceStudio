@@ -1,35 +1,48 @@
-# VoiceStudio for iOS — M1 companion
+# VoiceStudio for iOS
 
-Native SwiftUI companion for a paired VoiceStudio desktop/server. iOS 17+, iPhone and iPad. No inference, accounts, telemetry transmission, push services, third-party packages, or app requests to services other than the paired host.
+Native SwiftUI app for iOS 17+, iPhone and iPad. Speak, voice cloning, Dictate and dubbing run downloaded models on the phone, offline. Pairing a VoiceStudio computer is optional and adds its engines. Every task remembers its own phone/computer choice; the segmented control appears only while paired. All five tabs work without pairing. Settings contains Connect and Models.
+## Build and checks
 
-## Prerequisites
+Swift 6 Command Line Tools, Python 3.9+ and CMake run the macOS package checks. XcodeGen 2.46 generates the app project. Full Xcode with the iOS SDK is required for the app, native xcframeworks and UI tests. Device signing uses your own development team. The root `package.json` supplies the app version; there is no mobile version mirror.
 
-- Swift 6 / Swift 6.2.3 Command Line Tools for the macOS package checks; Python 3 for resource generation and the real loopback mock-server test.
-- XcodeGen 2.46 (`brew install xcodegen`).
-- Full Xcode with the iOS SDK and an iOS 17+ simulator/device to compile/run the app and UI tests. Signing requires your own development team for a device.
-- A running VoiceStudio host with Network sharing, Tailscale, or an HTTPS URL enabled. The phone never enables host sharing or downloads models. Install required models and accept their licenses on the host.
-
-Run these from the repository root:
+Run from the repository root:
 
 ```sh
 mobile/ios/scripts/check-swift.sh build
 mobile/ios/scripts/check-swift.sh test
 mobile/ios/scripts/check-platform.sh
-xcodegen generate --spec mobile/ios/VoiceStudio/project.yml
 python3 mobile/ios/scripts/prepare_resources.py \
   --output mobile/ios/.generated/bundle \
   --info-output mobile/ios/.generated/Info.plist
+python3 mobile/ios/scripts/test_resources.py
 swiftc -frontend -parse mobile/ios/VoiceStudio/App/*.swift \
   mobile/ios/VoiceStudio/Features/*.swift mobile/ios/VoiceStudio/Platform/*.swift \
   mobile/ios/VoiceStudioUITests/*.swift
 ```
 
-`check-swift.sh` runs `swift build` / `swift test` with package and scratch paths under `mobile/ios/`, redirects module caches there, and disables SwiftPM's nested sandbox for restricted development environments. For CLT installations, it supplies the installed `Testing.framework` search/link/rpath flags, disables the missing optional `_Testing_Foundation` cross-import overlay, and selects Swift Testing without XCTest; no test dependency download is necessary. On ordinary Xcode installations, `cd mobile/ios/VoiceStudioKit && swift build && swift test` also works.
+`check-swift.sh` keeps build/module caches inside `mobile/ios/` and supplies the installed Testing.framework on CLT-only installations. Package tests do not download models. The optional `VOICESTUDIO_SWIFT_SCRATCH` selects a separate scratch directory. `check-platform.sh` type-checks the production host media loader, smoke transport and phone model coordinator against macOS; it does not compile SwiftUI/UIKit.
 
-With full Xcode:
+Explicit preparation and real inference (model terms are printed; test acceptance stays in the isolated fixture store):
 
 ```sh
-open mobile/ios/VoiceStudio/VoiceStudio.xcodeproj
+mobile/native/ios/build.sh macos-runtimes
+python3 mobile/ios/scripts/fetch-smoke-models.py --accept-test-licences
+mobile/ios/scripts/real-inference.sh
+mobile/ios/scripts/native-load-test.sh
+# Cloning, translation, phone voice creation and complete phone audio dubbing:
+python3 mobile/ios/scripts/fetch-smoke-models.py --accept-test-licences --extended
+mobile/ios/scripts/auxiliary-inference.sh
+```
+
+The smoke fetcher verifies every file's size and SHA-256 from the actual shared catalogue, then stores files under ignored `.cache/inference-models/`. Inference tests themselves use only these local files. Kitten produces actual audio, Whisper transcribes it back, and Zipformer emits incremental and final text. The same smoke cancels real TTS after observing native progress. The auxiliary script runs three real native workflows sequentially to limit peak memory: OmniVoice/Qwen adapters, phone reference creation through ASR followed by cloned Speak, and the full Whisper → Qwen → OmniVoice audio dub pipeline with verified export and completed-checkpoint resume. These tests do not grant acceptance in the app's model store.
+
+With full Xcode, prepare the native frameworks before generating or building the app:
+
+```sh
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+mobile/ios/scripts/check-swift.sh test
+mobile/native/ios/build.sh ios
+xcodegen generate --spec mobile/ios/VoiceStudio/project.yml
 xcodebuild -project mobile/ios/VoiceStudio/VoiceStudio.xcodeproj \
   -scheme VoiceStudio -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   CODE_SIGNING_ALLOWED=NO build
@@ -37,56 +50,148 @@ xcodebuild -project mobile/ios/VoiceStudio/VoiceStudio.xcodeproj \
   -scheme VoiceStudio -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
 
-Choose an installed simulator name (`xcrun simctl list devices available`). Run the VoiceStudio scheme, decline or accept the local analytics preference, then scan the desktop Network QR or enter the host URL/PIN/API key. API keys are exchanged once for an administrator session and never saved. A PIN authorizes HTTP consumption, not remote dictation; dictation needs a session or a host-configured trusted network.
+Choose an installed simulator name. The native build verifies pinned artifacts, builds missing simulator slices and exposes the frameworks expected by `project.yml`; see `mobile/native/ios/README.md` for integrity details and transitive checksum limits. No native libraries or model binaries are committed.
 
-## Layout
+## Phone inference and models
 
-- `VoiceStudioKit/`: Swift 6 package, iOS 17 and macOS 14. Typed HTTP client/models, redirect and cleartext policy, pairing parser, Keychain vault, observable session store, localization, theme resolution, dictation WebSocket, background upload/delegate/receipts, and persisted dub workflow.
-- `VoiceStudioKit/Tests/`: Swift Testing contract tests, mock-transport integration tests, and a real Python loopback HTTP server exercising URLSession.
-- `VoiceStudio/App/`: app lifecycle, Observation model, token-based native theme, consent and navigation.
-- `VoiceStudio/Features/`: Connect, Speak, Voices/clone, Dub, Dictate, Settings/Privacy/About/licenses.
-- `VoiceStudio/Platform/`: AVFoundation recording, PCM streaming, AVPlayer authenticated range loading and waveform extraction, AVCaptureSession QR, deterministic UI-smoke transport.
-- `VoiceStudioUITests/`: launch → consent → mocked pairing → generate a valid WAV → play; search empty states, compact history actions, and immediate tab content during delayed host inventory. `--ui-smoke` selects a transport that opens no sockets.
-- `scripts/prepare_resources.py`: build-phase resource and version generation.
+`VoiceStudioKit/LocalEngine` is the single feature-facing interface: synthesize, clone, transcribe, streamTranscribe and translate. C runtime handles remain on detached workers; an atomic cancellation token crosses tasks. The process-wide native permit and model file lease remain owned by that worker until native cleanup finishes, including after cancellation and for streaming. TTS uses sherpa Kitten/Kokoro, offline ASR uses Whisper, and streaming ASR uses the catalogue's Zipformer family. Streaming preserves endpoint finals, produces a final session transcript and rejects sample-rate changes. Whisper handles long input in 20-second windows while reusing the recognizer. Its native decode has no abort callback: cancellation is checked between windows and the current decode must return before cleanup. TTS and OmniVoice cancel through their native callbacks; llama checks between tokens and through its CPU abort callback. Progress reports loading/running/finished; native APIs without fractional callbacks remain indeterminate during the current step. Every locally generated WAV passes `markSynthetic`, which adds a synthetic-audio INFO comment.
 
-Speak includes backend engine/language and profile choices, playback, waveform/seeking, system share/save, history star/delete. Voices includes search, previews, consent-gated microphone/file cloning, rename/delete. Dub supports device media or host URL ingest, multiple target tracks, an explicit engine-preset or saved-profile voice choice, persisted job/event polling, abort/history/download/share. The picked file's original name is used in the source row, staged multipart filename, pending upload and job title. Remove deselects a picked source and its accessibility label names the file; it does not delete it. Dub history groups compact title/metadata rows with icon actions for Save to Files and system sharing. Picker labels keep their intrinsic width; current values fill the remaining width, align right and truncate to one line. At accessibility text sizes the value moves below its label. Every searchable list shows a localized no-match message. Pages render their forms immediately and show inline loading feedback while host data arrives.
+Speak, clone, Dictate and Dub remember independent This phone / Computer choices. Without a choice, a compatible installed and accepted phone model wins; otherwise a paired computer wins; otherwise a compact download card offers Get and links to Models. A remembered computer choice falls back to the phone or Models prompt while unpaired, matching Android, and applies again after pairing. Speak offers three compact pickers (voice, model, language), a text box, Generate and the existing playback, waveform, seeking, sharing and saving controls. Its phone voice picker includes presets and saved references; reference voices select OmniVoice rather than preset TTS. Phone generations persist locally and can be played or deleted in Recent. Dictate captures mono PCM16 at 16 kHz and sends it directly to `LocalEngine` on the phone route. Neither phone path requires a computer or makes a network request.
 
-Translation uses the host-selected ready engine explicitly; online engines and remote or undiscoverable LLM destinations require equal-weight Allow/Decline consent scoped to that host, job and provider. Verified host-loopback LLM endpoints do not require cloud consent. Dictate sends mono PCM16 at 16 kHz with single-use WebSocket tickets and EOF finalization. Utterance finals keep recording; the session summary replaces the live transcript. Stream termination is scoped to its own socket. Settings includes saved hosts, mode and independent light/dark palettes, system/desktop language choices, local notification permission, privacy, app/font licenses and a link to the paired host for model licenses.
+Models decodes the generated `mobile/contract/models.json`, bundled at build time alongside the locale catalogs. Unknown fields are ignored. Missing or blank product names, invalid revisions, hashes, unsafe file paths, sizes, duplicate IDs and runtime/capability mismatches are rejected. Cards show product name, size, localized capability and one Download/Cancel/Delete action. Feature screens and model cards hide IDs, repository names and licence codes; licence details are in the acceptance sheet. Languages, licence terms and per-model storage are in the licence sheet. Unsupported RAM requirements stay visible with an explanation and cannot download or load. Models has Download, Cancel, Delete, a total storage counter and an explicit mobile-data toggle.
 
-Permissions are requested at first use. InfoPlist localization uses the mobile permission keys. No Bonjour, APNs, FCM, analytics SDK or crash reporter is linked. Disconnect revokes an existing bearer session and clears local credentials even if the host is unavailable. PIN-only connections disconnect locally. Reconnecting preserves a saved server name unless a replacement name is entered; rejected pairing attempts leave the active server connected. Unreadable saved preferences use defaults, and unreadable credentials allow fresh pairing. Session/PIN secrets use Keychain with `AfterFirstUnlockThisDeviceOnly`; host metadata and job checkpoints stay in local preferences. Requests reject redirects and public cleartext; TLS uses system certificate validation. Reduced transparency uses opaque token surfaces throughout, and there are no custom motion effects. Inter uses Dynamic Type scaling; controls have at least 44-point targets and content scrolls at large sizes.
+Downloads start only from a user action. Four-MiB HTTP ranges persist across cancellation and relaunch; servers ignoring ranges can return a complete file. Hugging Face is attempted first, then hf-mirror.com. A dedicated cookie/credential-free session permits only HTTPS HF/mirror delivery domains (including signed HF CDN redirects); host credentials and referrers are never forwarded. Wi-Fi-only is enforced by both the local path check and URLSession's cellular/expensive-network policy unless mobile data was allowed. Files stay under private Application Support, excluded from backup. Each file is size/SHA-256 verified before installation. Native loads reuse per-file verification stamps containing size, modification time and catalogue identity; changed stamps or a native failure force fresh hashing. A relaunch verifies files on their first load. Resume checks storage only for bytes still needed in the current file, skipping verified completed files. Active leases prevent delete/replacement during inference. Downloads interrupted by suspension resume from persisted ranges when the user starts them again; continuous background model downloading is not promised.
 
-## Shared inputs and version
+Every non-commercial, conditional, unidentified or explicitly gated model requires acceptance before download and load. The phone shows all supplied licence metadata and full catalogue terms, records the supplied terms fingerprint, actual app version and time, and retains the latest 20 actions locally. Changed terms block loading again; withdrawal immediately blocks new use and downloads. Acceptance is independent of the computer. Delete removes weights and partial files, preserving licence history.
 
-Do not edit `VoiceStudioKit/Sources/VoiceStudioKit/Theme/Tokens.generated.swift`.
+OmniVoice's `tokenizer` role is its audio codec. The clone adapter takes mono 24-kHz reference audio plus its transcript. Translation uses the catalogue's prompt template and a bounded 2,048-token context. All features call this boundary; screens never invoke C runtimes directly.
 
-The maintainer regenerates shared inputs from the repository root:
+## Phone voices and dubbing
+
+Voices lists phone and computer voices together, with initials, a location badge, preview and rename/delete actions. The toolbar plus opens cloning: name, consent, record or pick a sample, Create clone. The consent details are behind an info button. Phone creation requires a downloaded, accepted Whisper model; it extracts mono 24-kHz reference audio (0.1–30 seconds), transcribes it and atomically publishes reference PCM/WAV plus transcript, creation time and consent time in private, backup-excluded storage. Empty speech and cancelled creation never publish a voice. Recording stops natively at 29 seconds, keeping the sample within the 30-second cloning limit even if UI timers are delayed. Decoding caps accepted duration-rounding tolerance to exactly 30 seconds. OmniVoice must be downloaded and accepted before Speak can synthesize with that reference. Renaming/deleting a phone voice never changes a computer voice.
+
+Phone Dub follows Source → Languages → Voice. Pick a local audio/video file, choose up to 20 target languages and either the original speaker or a saved phone voice, give voice permission and tap Dub. More contains model choices and audio-only export. Pasted links remain a computer workflow: phone processing never fetches media from a URL. The three required models (Whisper, Qwen translation and OmniVoice) must be installed, fit the device and have current licence acceptance.
+
+Extraction uses AVAssetReader with 24-kHz mono PCM, preserving gaps and soundtrack offsets. Uncompressed audio files use AVAudioFile/AVAudioConverter to stream and resample directly without a media-reader service. A disk-backed pipeline bounds native ASR input to 20 seconds; sherpa token timestamps define each window's speech envelope (falling back to the window duration when unavailable), matching Android. Each segment is translated with the catalogue prompt and cloned from at most eight seconds cut from the source; the reference clip gets its own matching ASR transcript, falling back to the segment transcript if the clip is quiet. Empty saved reference transcripts are repaired during resume. A chosen saved voice supplies its reference and transcript instead. Short speech is padded, long speech is compressed by waveform overlap-add, segments are mixed at their timestamps and clipped to the original duration. Tiny windows use interpolation. WAV output passes `markSynthetic`; video uses AVAssetWriter to retain the original video/rotation and replace the soundtrack with AAC, with synthetic provenance in MP4 metadata. The original music is not retained as a separate stem.
+
+Progress cards show stage, percent and Cancel. Backgrounding cancels ongoing work; Whisper's current native decode must finish before cancellation returns. Sources, exact model identities (including terms/configuration), original PCM, segment translations, reference transcripts, render hashes and outputs are checkpointed atomically under private storage. Resume on a pending card continues after interruption/relaunch without translating or mixing completed segments twice. Corrupt cached renders are rebuilt; corrupt completed outputs and changed catalogue identities are blocked. Licence permission is rechecked between stages and by each native load. Multiple target outputs commit separately. Phone history plays video/audio, shares, saves via the system document picker and deletes completed jobs. Completed phone dubs use the same opt-in local notifications setting as computer dubs. Pending jobs can also be deleted when idle. Deleting a job removes its source, checkpoints and outputs; files are retained until explicit deletion. Media is bounded to four hours, references to 30 seconds, and ASR state to 10,000 segments.
+
+The screen layout uses short labels and semantic icons with one primary action, compact history rows, a round dictation microphone, expandable manual pairing and grouped Settings rows. Each feature has one compact missing-model card: product name and size for one model, or feature, count and combined size for several. Get starts the required downloads and presents separate unchecked acceptance sheets for every gated model; declining or dismissing stops the remaining queue. Already installed models are not downloaded again after acceptance. Tap the card label or Settings → Models to manage models. Clone model selection is under More. Pickers mark their current selection; palettes show token-based color swatches and normal text colors. Dictate copy/share controls sit above the tab bar in a bottom safe-area inset. Explanations and privacy details are in info sheets; full legal terms remain visible in licence sheets.
+
+The app icon and launch logo are generated from `docs/logo.png` by `scripts/generate-brand-assets.swift` through `prepare_resources.py`. The icon is opaque; its canvas and the light/dark launch background come from shared tokens. XcodeGen prepares the ignored asset catalog before discovering resources, and each app build refreshes it. No generated artwork is committed. First-run consent says the choice is saved on this phone and sends nothing.
+
+## Computer workflows
+
+Connect accepts the desktop Network QR or manual URL/PIN/API key. Health validation rejects unrelated services. API keys are exchanged once for bearer sessions and never saved. Keychain uses `AfterFirstUnlockThisDeviceOnly`; host metadata and job checkpoints use local preferences. PIN-only pairing authorizes HTTP consumption, not remote dictation. Disconnect revokes bearer sessions and clears local credentials even when the host is unavailable. Failed pairing preserves the current host; host changes cancel old operations and clear host-scoped media/data. Redirects are rejected for every paired-host request. Public hosts require HTTPS and system certificate validation; private/LAN/Tailnet hosts may use HTTP.
+
+Computer Speak retains engine/language/profile choices, generation, authenticated playback, waveform/seeking, sharing/saving and history star/delete. Voices retains search, previews, consent-gated recording/file cloning, rename and delete. Dub retains device file/URL ingest, multiple target tracks, voice selection, persisted upload/job monitoring, abort/history/download/share and completion notifications. Computer Dictate uses authenticated WebSocket tickets, PCM16/16 kHz and EOF finalization. Remote or undiscoverable LLM translation destinations require equal-weight consent per host/job/provider; only verified host-loopback endpoints avoid this prompt.
+
+Background URLSession persists computer uploads and completion receipts through relaunch. A refused background session falls back to a foreground transfer with retained staging; that fallback needs app runtime. BGProcessing monitoring is opportunistic and resumes at the next foreground/granted runtime; there is no push relay or guarantee while force-quit. Original media filenames persist through picker display, multipart staging, checkpoints and history. The host pipeline follows upload/ingest → prep events → transcribe → translate → generate → render events; backend task IDs and dub media job IDs are distinct. A crash between host acceptance and client checkpoint persistence can require host inspection before retrying because render has no client idempotency key.
+
+## Resources, privacy and accessibility
+
+Theme roles are generated from Electron; never edit `Tokens.generated.swift`. The maintainer regenerates shared inputs with `bun scripts/export-mobile-tokens.ts`, `uv run python scripts/export_openapi.py` and `uv run python scripts/export_mobile_models.py`. These affect both platforms and are not iOS build steps. Resource preparation copies the actual Electron catalogs, shared/platform mobile additions, desktop language catalog and models catalogue. On-device screens use the canonical `mobile/contract/strings.mobile.en.json` keys; iOS needs no platform additions. Active-work errors reuse the desktop wait message. The microphone permission prompt combines the desktop microphone reason with the shared phone/computer privacy notice. Licence codes, categories, credits, terms and fingerprints appear only in the licence sheet, matching Android. Localization supports interpolation, plurals, language/English fallback and Chinese script/region selection. Package checks cover source key availability and reject platform overrides of shared strings.
+
+Settings, appearance and language work without pairing. Permissions are requested at first use. No analytics SDK, push service, Bonjour discovery, account or crash reporter is linked; analytics consent records only a local preference. On-device tasks send nothing; networking is limited to explicitly started model downloads and paired-host requests. Inter and the app/runtime licences are shown under About. Runtime notices include eSpeak NG (GPL-3.0) with pinned corresponding-source references, piper-phonemize, kaldi-native-fbank/KissFFT, kaldi-decoder/kaldifst/OpenFST/Eigen, simple-sentencepiece, JSON, hclust-cpp, ONNX Runtime, sherpa-onnx, OmniVoice and both ggml copies, and llama.cpp. These checked-in legal texts are bundled even without a local native build; resource checks verify their manifest and runtime pins. Compact error banners and Connect show a short heading plus the specific localized cause/recovery instruction. Corrupt voice, generation and dub records are skipped individually; model readiness refreshes independently. All colors come from theme tokens; controls use Dynamic Type, minimum 44-point targets, scrollable layouts and localized accessibility labels.
+
+## Verification limits and interpretations
+
+To exercise the linked iOS frameworks (including Metal), boot an isolated simulator,
+provision the test models as above, then run with full Xcode selected:
 
 ```sh
-bun scripts/export-mobile-tokens.ts
-uv run python scripts/export_openapi.py
+python3 mobile/ios/scripts/simulator-inference.py --device SIMULATOR_UDID
 ```
 
-Those commands update shared files and both platforms; they are intentionally not part of an iOS build. The package theme maps generated roles and falls back to the default palette for missing appearances. Dark/default is the initial preference.
+The `VoiceStudioNative` scheme hosts the package tests inside the app. The script
+runs runtime loading, video encoding/muxing, speech/recognition, cloning/translation,
+saved phone voices and resumable dubbing sequentially, and rejects skipped or empty
+test results. It never downloads models or accepts licences. `--test NAME` selects
+one workflow; result bundles remain under the selected derived-data directory.
+Simulator fixtures use the checkout's cached models; this is not a physical-device
+test harness. The video regression verifies rotation, duration, playable AAC and
+the synthetic-audio metadata using the platform's real encoder and decoder.
 
-Each app build copies the actual `electron/src/renderer/src/i18n/locales/*.json`, `mobile/contract/strings*.en.json`, and `electron/src/shared/languages.json` into `Catalogs/`; no catalog copies are committed. It also extracts the desktop `LANG_CODES` mapping from `electron/src/shared/utils/languages.js` into a derived `language-codes.json`. The same script creates localized permission descriptions and reads root `package.json` into the derived Info.plist `CFBundleShortVersionString`. There is no mobile version mirror. Existing translations use locale → language → English → key fallback. Chinese script/region tags select the desktop zh-CN or zh-TW catalog first; an explicit Hans/Hant script takes precedence over region. Catalogs are parsed once when the app model is created and reused for progress updates and notifications. New mobile strings fall back to the contract English until the maintainer merges translations into desktop catalogs. iOS additions live only in `mobile/contract/strings.ios-additions.en.json`.
+All six linked-framework workflows pass on iOS 27.1 with zero skips: native loading,
+video export, Kitten/Whisper/Zipformer inference and cancellation, OmniVoice cloning
+with French translation, persisted phone voices and cloned Speak, and complete
+audio dubbing with checkpoint reuse. OmniVoice executes on Metal; llama reports zero offloaded GPU
+layers and uses its CPU path in this simulator run. These results are separate from the macOS
+inference runs below and do not establish physical-phone memory or thermal limits.
 
-InterVariable.ttf is from the official [Inter 4.1 release](https://github.com/rsms/inter/releases/tag/v4.1). Its SIL OFL is bundled as `Resources/Licenses/OFL.txt`; VoiceStudio's AGPL license is bundled alongside it and both appear in About.
+Local validation on 2026-10-18 passes the Swift 6 package suite (optional inference tests run separately), resource checks, pinned iOS xcframework builds, SwiftUI compilation, the simulator app build, and the unsigned iPhone Release build. Shared contract, theme-token and contact-email checks also pass. Separate opt-in runs exercise all three actual native libraries, Kitten/Whisper/Zipformer inference, phone reference creation and cloned Speak, and the complete audio dub workflow with native translation/cloning and checkpoint reuse. The complete native audio dub smoke passes its French-output, marked export and checkpoint-reuse assertions. Standalone translation, voice creation and cloned Speak pass. The tiny Whisper model can misrecognize the short synthetic source; these tests verify execution and pipeline completion rather than transcription accuracy. The tiny Zipformer recognizes the ending phrase of the synthetic smoke sentence; this is an inference check, not a transcription-accuracy claim.
 
-## Verification and remaining device checks
+`VoiceStudioUITests/PhoneScreens.swift` covers unpaired screens, compact download cards, product names, licence consent, picker selection, dictation action placement and collapsed details; `ScreenshotTour` captures phone and computer screens plus palette/language pickers as retained Xcode test attachments. Validation on 2026-10-19 under full Xcode exercises 20 UI scenarios on the iPhone 17 Pro simulator with iOS 26.5 across a full run and targeted reruns, including Home navigation, collapsed-tab expansion, dark/light screenshots, destructive phone-history actions and remembered Clone routing. Targeted presentation checks also pass on iOS 27.1. The 116-test Kit suite also passes, with five opt-in inference scenarios skipped in that run. The tests cover consent, optional pairing, generation/playback, phone download and licence gates, voice/dub screens, keyboard handling, search, and theme selection. They support both bottom tabs and adaptive side navigation. Download cards preserve separate accessibility identities for opening Models and starting a download. Physical-device model RAM/thermal behavior, download/cellular transitions, microphone/local-network/QR permissions, VoiceOver across all screens, background uploads and real-host end-to-end workflows still require device validation. A signed development Release build was installed and launched on the connected iPhone running iOS 27.0.1 on 2026-10-19, with compact leading tab titles and Settings/Dictate visually checked. macOS inference does not prove iOS execution.
 
-Verified here: macOS Swift package build and 74 Swift Testing tests (several parameterized), strict-concurrency package compilation including the production upload coordinator, macOS type-checking of the media-loader and smoke-transport wrappers, all palette/role values against the contract JSON, interpolation/plural/fallback/key coverage, Chinese script/region mapping, QR/manual IPv4/IPv6 parsing, private/public cleartext boundaries, health fingerprint, PIN/session exchange/revoke/401 handling, corrupt-store recovery, reconnect labels, candidate-host failure isolation, upload refusal/cancellation classification, receipt consumption through relaunch, stale dictation termination, multipart TTS and dub upload, job progress, persisted multi-language dub pipeline, host-only redirect rejection, XcodeGen generation, resource/version generation and app-source syntax parsing. A real loopback server exercises the upload start/staging/delegate path with a file-backed foreground session: original filename reaches the host, successful completion is consumed once, and 401/500 responses produce actionable failure receipts. Package tests cover remote/loopback/undiscoverable LLM routing, per-job allow/decline and changed-endpoint reapproval, filename persistence, partial-file cleanup and history metadata.
+Contract interpretations: Get starts a queue with separate per-model acceptance; declining or dismissing stops the unstarted remainder while already authorized transfers continue. The compact card links to Models through its label. The optional catalogue `licence.terms` contains the full disclosure and is displayed when supplied; the fingerprint remains catalogue-authoritative. HF's signed delivery CDNs are allowed only within its HF-owned delivery domains, because normal model resolve URLs redirect there. Downloads resume at verified range boundaries rather than URLSession opaque resume blobs. The pinned llama prebuilt lacks a simulator slice, so that slice is built from the same pinned source. Missing transitive SHA-256 fields in shared pins are documented in the native README. For dubbing, “segments + timestamps” means one timed speech envelope per bounded Whisper window, matching Android; it does not imply diarization. A remembered computer route falls back while unpaired because its segmented control is hidden. A cancelled dub stays resumable; deletion is explicit. iOS background resume is a user-started Resume after foregrounding, not guaranteed background compute. The real iOS video regression verifies AVC/AAC muxing and compressed-source extraction; physical-device codec behavior remains a separate check.
 
-This machine has Command Line Tools only. The SwiftUI app and XCTest UI smoke have **not been compiled or run with an iOS SDK**. Full Xcode build, simulator smoke, real-device QR/microphone/local-network permission prompts, VoiceOver/largest Dynamic Type, Inter rendering, authenticated media playback, background upload/relaunch, task scheduling, notification delivery, and live-host end-to-end TTS/clone/dub/dictation remain unverified. Simulator/device testing is a release gate, not implied by syntax parsing.
+## Electron-style mobile Home
 
-## Contract interpretations and platform limits
+Home is the first workspace after consent, using Electron's bundled signal-field
+artwork, shared palette roles, Inter and card hierarchy. Speak, cloning, dubbing,
+dictation, models and computer pairing have working shortcut cards. Generated
+audio, saved voices and recent dubbing projects come from the actual phone
+libraries, with paired-computer entries alongside them. Audio opens its player,
+saved phone voices select the reference in Speak, and projects open their
+outputs and resume controls. Empty states are localized and downloads remain
+explicit. Home replaces Speak in the five-item navigation; Speak opens from Home.
+Desktop-only workspaces are not advertised as available mobile features.
 
-- Health has no named OpenAPI response schema: require `status=ok`, `device`, `version`, and the real backend's `x-omnivoice-backend` version marker (`backend/main.py`). This rejects unrelated `/health` services.
-- The session exchange returns `token`; the WebSocket ticket response returns **`ticket`**, which is sent under the **`ws_ticket`** query name. These loose-schema fields come from `backend/api/routers/auth.py`.
-- Non-streaming `/generate` returns WAV bytes and `X-Audio-Id`, not JSON. Recent WAV playback uses the actual `/audio/<id>.wav` StaticFiles mount in `backend/main.py`; static mounts are absent from FastAPI's OpenAPI. Using the documented `.ogg` conversion endpoint would require an additional decoder on iOS 17. WAV range requests keep credentials in headers.
-- There is no generic `/languages` endpoint. Both pickers use the bundled desktop language names in desktop order. Speak starts with Auto (omitted from the request) and accepts a profile language as either a name or ISO code. Dub excludes Auto; target codes come from desktop `LANG_CODES`, with ISO names resolved by Foundation for the remaining languages. Names without a resolvable code remain visible but disabled with an explanation; the app does not invent codes. The host validates model and translation compatibility.
-- There is no single “start dub” endpoint. The app follows upload/ingest → persisted prep-job events → transcribe → translate → generate per target → persisted render-job events. The polling key is the returned **task ID**, distinct from the dub media job ID. Acknowledged transitions and event sequence cursors are saved. The backend has no client idempotency key for render; termination between host acceptance and checkpoint persistence can require host-side inspection before retrying.
-- iOS background URLSession continues file upload and persists completion receipts through relaunch. If the OS refuses the background session, the staged file and pending job survive while the app retries using a foreground URLSession. That fallback needs app runtime and does not promise upload continuation after suspension or termination. Cancelling an upload clears its pending state without a failure receipt. Receipts are consumed once for their paired host, so a failure is not redisplayed after foregrounding or relaunch. Host generation runs independently. BGProcessing submission refusal leaves the host job intact and foreground monitoring available. BGProcessing is opportunistic: iOS does not promise continuous polling or an immediate completion notification while suspended/force-quit. Monitoring and local completion notifications resume at the next granted runtime/foreground launch. There is no push relay.
-- The translation inventory has a loose OpenAPI response. Its `active`, `engines`, `category`, `installed`, `ready`, `display_name`, and `configured_via` fields follow `backend/api/routers/engines.py` and `backend/services/translation_engines.py`. Missing readiness never implies permission to translate. For category `llm`, the app reads `/api/settings/llm-skills` and `/api/settings/llm-providers` to resolve the `dub_translation` override and effective base URL; an inventory identifying the legacy env fallback uses `/api/settings/llm-endpoint`. These read-only endpoints are in OpenAPI; their loose response fields follow `settings.py`, `llm_skills.py` and `llm_providers.py`. A provider's `local` label alone is insufficient because its endpoint can be overridden. Only HTTP(S) loopback endpoints on an OpenAI-compatible transport are treated as local. Private LAN/Tailnet destinations still require consent. If desktop admin restrictions, missing fields or discovery errors hide the destination, the app asks for per-job consent using the available provider/engine name. Cancellation and 401 retain their normal handling. LLM approval also covers a hash of the resolved provider and endpoint, so an observed route change asks again; raw endpoint credentials are not persisted. Existing checkpoints without matching approval require confirmation. Host settings can change after discovery; these endpoints do not provide an atomic route-and-translate operation.
-- `/dub/history` is a loose schema returning database rows from `dub_core.py`. Title and metadata use `filename`, `language`/`language_code`, `duration` (seconds) and `created_at` (Unix seconds), as written by `dub_pipeline.py`. Older rows lacking metadata remain readable.
-- The synchronous `/dub/transcribe/{job_id}` path does not prepare source-speaker references. An empty profile selects the engine preset; a saved profile sends its ID. Source-voice cloning is not offered by this flow.
-- Model-license navigation opens the paired host interface; M1 does not accept licenses or install models from the phone.
+## Native iOS presentation
+
+The app supports iOS 17 and later, using system navigation and tab-bar materials, semantic system
+text styles, native capsule buttons, grouped Settings/Models forms and platform
+sheet geometry. The Home wordmark and bundled Electron artwork retain VoiceStudio's
+identity and generated palette choices. Content scrolls behind native chrome;
+All five tabs use compact leading navigation titles, with Home aligned opposite
+Projects, and a smaller, Dynamic Type-aware Home wordmark.
+Speak and Dictate keep their main actions inside the bottom safe area. Clone
+creation and QR scanning use full-screen workspaces.
+
+Voices presents the library with one creation action; search appears when voices
+exist, and model setup belongs to the creation flow. Clone groups related inputs into
+native form sections. Dub uses one source picker and a compact group for target
+languages, voice and permission, with advanced settings collapsed and one standard
+native Start dubbing action. Speak uses labeled voice/model/language rows with
+readable values and an overlaid editor placeholder, and Dictate groups recording,
+copying and sharing in one bottom control row. Model download notices use compact
+name/size summaries. Clone remembers its phone/computer choice between presentations.
+Newer native toolbar and tab-bar APIs are guarded at both compiler and runtime
+boundaries so older supported Xcode SDKs can still build the app.
+
+Model licence review keeps the exact terms readable in a large sheet. Technical
+fingerprints are expandable, confirmation starts unchecked and Accept stays
+visible but disabled until confirmation. Close never accepts or starts a download.
+Language pickers have Cancel/Confirm actions and discard unconfirmed drafts.
+Large Dynamic Type, native reduced-transparency behavior and reduced-motion
+recording feedback are supported.
+Newer system materials follow the installed iOS version; tab-bar minimization is
+enabled on iOS 26 and later. Content radii and the Home wordmark size are exported
+from Electron's theme alongside the shared palette. Smoke networking and credentials
+are compiled only into Debug builds for UI automation.
+
+References: [Apple's Liquid Glass adoption guide](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass),
+[Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets),
+[Layout](https://developer.apple.com/design/human-interface-guidelines/layout) and
+[Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility).
+
+## Home and Dub
+
+Home leads with the "VoiceStudio.sh Open Source" title and Electron's tapered cluster of
+GitHub contributor avatars (more than 10 commits, ending with "All"). The avatars are
+bundled in `Resources/Contributors.xcassets`, mirror
+`electron/src/renderer/src/features/home/home-contributors-data.ts` (guarded by
+`tests/test_mobile_contract.py`) and are never fetched at runtime; tapping one opens the
+profile in the browser. Dub is one big source card with an animated vector mark
+(`DubGlyph`, static under Reduce Motion), language and voice tiles, a consent row and live
+job cards. The bottom dock is icon-only; tab names remain accessibility labels.
+
+## Live previews
+
+`App/Previews.swift` (debug builds only) adds Xcode canvas previews for Home, Dub (dark, light and large
+text), Models, the licence sheet and the dub glyph. They run the same offline mock host as the UI tests
+(`AppModel(mock: true)`), so screens render with realistic data and update as you edit. Open a view file
+and press Option-Command-Return; Run (Command-R) is still a full rebuild.
+
+Home identifies debpalash and velixio with a small core-maintainer star on their
+avatars; VoiceOver announces the localized role.

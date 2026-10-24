@@ -6,7 +6,8 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [.library(name: "VoiceStudioKit", targets: ["VoiceStudioKit"])],
     targets: [
-        .target(name: "VoiceStudioKit"),
+        .target(name: "VSNative", publicHeadersPath: "include"),
+        .target(name: "VoiceStudioKit", dependencies: ["VSNative"]),
         .testTarget(name: "VoiceStudioKitTests", dependencies: ["VoiceStudioKit"])
     ],
     swiftLanguageModes: [.v6]

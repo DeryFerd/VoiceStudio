@@ -51,17 +51,23 @@ try {
   await nav.getByRole('button', { name: 'Voice', exact: true }).click();
   await page.getByRole('link', { name: 'Clone', exact: true }).click();
   await page.waitForURL('**/#/clone');
+  // Clone brings its library as a context pane, so navigation stays a rail beside it.
+  await page.getByRole('tab', { name: 'Saved voices', exact: true }).waitFor();
+  assert.equal(await compactSidebar.count(), 1);
+  // One click on the rail's toggle opens the full navigation.
+  await compactSidebar.getByRole('button', { name: 'Toggle Sidebar' }).click();
   await compactSidebar.waitFor({ state: 'detached' });
-  const expandedSidebar = page.locator('.brand-sidebar').filter({ hasText: 'Saved voices' });
+  const expandedSidebar = page.locator('.brand-sidebar:not([data-slot=compact-main-sidebar])');
   await expandedSidebar.waitFor();
-  assert.ok((await expandedSidebar.boundingBox()).width >= 220);
+  const expandedWidth = (await expandedSidebar.boundingBox()).width;
+  assert.ok(expandedWidth >= 196 && expandedWidth <= 288, `Expanded navigation width ${expandedWidth}`);
   assert.equal(
     await expandedSidebar.getByRole('navigation', { name: 'Workspaces', exact: true }).count(),
     1,
   );
   assert.deepEqual(errors, [], `Workspace routes emitted renderer errors:\n${errors.join('\n')}`);
   console.log(
-    'Shared compact rail stays mounted across all nine secondary workspaces and Clone restores the full library.',
+    'Shared compact rail stays mounted across all nine secondary workspaces; Clone keeps it beside the library and one click opens the full navigation.',
   );
 } finally {
   await browser.close();

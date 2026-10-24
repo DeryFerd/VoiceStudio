@@ -410,3 +410,11 @@ def test_fit_fingerprint_is_stable():
         json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
     ).hexdigest()[:16]
     assert fit_fingerprint({}) == expected
+
+
+def test_fit_fingerprint_min_audio_rate_only_counts_when_not_default():
+    # Tracks fitted before the knob existed must not look stale after upgrade.
+    assert fit_fingerprint({"min_audio_rate": 0.85}) == fit_fingerprint({})
+    assert fit_fingerprint({"min_audio_rate": None}) == fit_fingerprint({})
+    assert fit_fingerprint({"min_audio_rate": 0.6}) != fit_fingerprint({})
+    assert fit_fingerprint({"min_audio_rate": 0.6}) == fit_fingerprint({"min_audio_rate": 0.60})

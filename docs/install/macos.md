@@ -90,6 +90,11 @@ one-time confirmation per install; afterwards it launches by double-click.
 > Trash"** with no Open option, the download was corrupted or it's a pre-signing
 > build — re-download the latest release, or use the Terminal fallback below.
 
+> Builds after this fix are signed ad hoc by the release build (`identity: '-'`),
+> so they show the friendlier dialog above instead of "damaged". The shell
+> installer also clears quarantine and repairs the signature of older releases
+> for you.
+
 **Fix — Terminal:** after dragging the app into `/Applications`, run:
 
 ```bash
@@ -168,7 +173,7 @@ The default install works without a token, but diarization (the
 `pyannote/speaker-diarization-3.1` model) is gated and the larger
 voice-design engines also download faster with a token attached.
 
-- Open **Settings → API Keys** in the app.
+- Open **Settings → Credentials** in the app.
 - Or set the env var `export HF_TOKEN=hf_…` in `~/.zshrc`.
 
 Full details: [docs/setup/huggingface-token.md](../setup/huggingface-token.md).

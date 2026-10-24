@@ -70,6 +70,7 @@ RUN python3 -m pip install --no-cache-dir uv
 # Copy python packaging specs (README.md required by hatchling metadata)
 COPY pyproject.toml uv.lock README.md ./
 COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
+COPY deploy/uv-overrides.txt ./deploy/uv-overrides.txt
 
 # Install the project (non-editable — no need for -e in containers).
 # Uses `uv` for exponentially faster resolution than plain pip.
@@ -91,8 +92,20 @@ COPY deploy/torch-constraints.txt ./deploy/torch-constraints.txt
 # stays put — an ABI mismatch at import (#1357). The pins carry no local
 # segment, so they match the base image's +cu128 / +rocm6.4 builds rather than
 # replacing them.
+#
+# --override: `[tool.uv] override-dependencies` lifts caps that block security
+# releases (gradio's `pillow<13`), but `uv pip install` applies it only when run
+# from the project directory with a recent uv; pass it explicitly (#3275).
 RUN uv pip install --python "$(command -v python3)" --no-cache \
-    --constraint deploy/torch-constraints.txt .
+    --constraint deploy/torch-constraints.txt \
+    --override deploy/uv-overrides.txt .
+
+# Guard: every security override must be what the image actually installed.
+RUN python3 -c "from importlib.metadata import version; from packaging.requirements import Requirement; \
+    reqs = [Requirement(l) for l in open('deploy/uv-overrides.txt') if l.strip() and not l.lstrip().startswith('#')]; \
+    bad = [f'{r.name} {version(r.name)} does not satisfy {r}' for r in reqs if not r.specifier.contains(version(r.name), prereleases=True)]; \
+    assert not bad, bad; \
+    print('uv overrides applied:', ', '.join(f'{r.name} {version(r.name)}' for r in reqs))"
 
 # Guard (fails the build, not the user at runtime): assert the dependency
 # install did NOT replace the base image's GPU torch. A future dep bump that
@@ -117,8 +130,10 @@ RUN python3 -c "import os, torch, torchaudio, torchvision; \
 # cudnn8.py looks for <sys.prefix>/lib/pythonX.Y/site-packages/cudnn8_compat,
 # and sys.prefix differs between the conda-based CUDA image and the ROCm venv.
 # --no-deps keeps this to the cuDNN wheels alone, leaving the base image's torch
-# stack untouched. Skipped for ROCm, which does not use cuDNN.
-RUN if [ "$GPU_FLAVOR" = "cuda" ]; then \
+# stack untouched. Skipped for ROCm, which does not use cuDNN, and on aarch64
+# (DGX Spark / GH200 builds, #2831): NVIDIA publishes no aarch64 wheel of
+# nvidia-cudnn-cu12==8.9.7.29, so CTranslate2 ASR engines stay unavailable there.
+RUN if [ "$GPU_FLAVOR" = "cuda" ] && [ "$(uname -m)" != "aarch64" ]; then \
       target="$(python3 -c "import os, sys; print(os.path.join(sys.prefix, 'lib', 'python%d.%d' % sys.version_info[:2], 'site-packages', 'cudnn8_compat'))")" && \
       uv pip install --python "$(command -v python3)" --no-cache --no-deps \
         --target "$target" nvidia-cudnn-cu12==8.9.7.29 && \
@@ -155,4 +170,8 @@ VOLUME ["/app/omnivoice_data"]
 # Bind to 0.0.0.0 for external access. The entrypoint reads the manifest default
 # (or OMNIVOICE_PORT) and forwards any explicit Uvicorn options after the image.
 ENV OMNIVOICE_BIND_HOST=0.0.0.0
+# Late on purpose: a new commit changes this arg every build, and nothing above may
+# be invalidated by it. Shown in bug reports to tell builds of one version apart.
+ARG BUILD_COMMIT=unknown
+ENV OMNIVOICE_BUILD_COMMIT=${BUILD_COMMIT}
 ENTRYPOINT ["python3", "backend/docker_entrypoint.py"]

@@ -18,7 +18,7 @@ Design notes (single source of truth for the choices):
   ``pip install git+https://…`` path was rejected because the engine
   *directory* must exist on disk anyway: the sidecar resolves its venv
   and model weights relative to it.
-* **Managed install root:** ``DATA_DIR/engines/<engine_id>/`` — always
+* **Managed install root:** ``DATA_DIR/engines/<engine_id>/`` (or ``$OMNIVOICE_ENGINES_DIR/<engine_id>/``) — always
   user-writable (works in frozen/packaged builds where ``backend/`` is
   read-only), survives app updates, and never collides with a user's own
   clone. A user-managed install (env var already pointing at their clone)
@@ -60,7 +60,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, NamedTuple, Optional
 
-from core.config import DATA_DIR
+from core.config import DATA_DIR, get_engines_dir
 from core.contained_subprocess import OwnedPopen, WindowsJobPopen, spawn_owned
 
 logger = logging.getLogger("omnivoice.sidecar_install")
@@ -747,7 +747,7 @@ def persistent_env_vars() -> set[str]:
 
 def managed_root(spec: SidecarSpec) -> Path:
     """Per-engine managed install root (checkout lives inside it)."""
-    return Path(DATA_DIR) / "engines" / spec.engine_id
+    return Path(get_engines_dir(DATA_DIR)) / spec.engine_id
 
 
 def managed_checkout(spec: SidecarSpec) -> Path:
@@ -1600,7 +1600,7 @@ def _step_create_venv(spec: SidecarSpec, job: dict) -> None:
     # Keep uv's cache on the engines volume (D:-install class) — see
     # uv_subprocess_env. The cache parent is the shared engines root, so
     # every sidecar engine reuses one cache.
-    uv_env = uv_subprocess_env(Path(DATA_DIR) / "engines")
+    uv_env = uv_subprocess_env(Path(get_engines_dir(DATA_DIR)))
     rc = _run_logged(job, [uv, "venv", str(venv_dir), *spec.venv_args],
                      timeout=_UV_VENV_TIMEOUT_S, env=uv_env)
     if rc != 0 or not py.is_file():
@@ -1648,7 +1648,7 @@ def _step_install_deps(spec: SidecarSpec, job: dict) -> None:
         job,
         [uv, "pip", "install", "--python", str(py), *target],
         timeout=_UV_PIP_INSTALL_TIMEOUT_S,
-        env=uv_subprocess_env(Path(DATA_DIR) / "engines"),
+        env=uv_subprocess_env(Path(get_engines_dir(DATA_DIR))),
     )
     if rc != 0:
         if _output_shows_disk_full(job.get("_last_run_output") or ()):

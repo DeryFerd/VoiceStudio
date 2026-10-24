@@ -16,23 +16,26 @@ const SECONDARY_ROUTES = new Set([
   '/calls',
   '/settings',
 ]);
-// A local-controls pane needs enough room for the actual workspace. At the
-// default desktop window, preserve navigation as a rail and restore the full
-// voice library automatically once both it and a local-controls pane leave a
-// useful editing canvas. Browser zoom and Windows display scaling are included
-// in the CSS viewport width, so this threshold also covers high-DPI layouts.
-const COMPACT_QUERY = '(max-width: 1680px)';
+// Voice-section routes whose context pane is the shared library (ContextSidebar).
+export const LIBRARY_ROUTES = new Set(['/', '/clone']);
+// Rail + context panel, as in VS Code, Slack and Linear: a section that brings its
+// own pane keeps navigation to an icon rail so the window never shows two wide
+// sidebars. The full navigation stays one click (or the Keep-expanded
+// preference) away. A genuinely narrow window always uses the rail.
+// Browser zoom and Windows display scaling are included in the CSS viewport
+// width, so this threshold also covers high-DPI layouts.
+const COMPACT_QUERY = '(max-width: 1200px)';
 
-function routeHasSecondarySidebar(pathname: string): boolean {
-  const normalized = pathname.replace(/\/+$/, '') || '/';
-  return [...SECONDARY_ROUTES].some(
-    (route) => normalized === route || normalized.startsWith(`${route}/`),
-  );
+function normalize(pathname: string): string {
+  return pathname.replace(/\/+$/, '') || '/';
 }
 
-function routeOwnsVoiceLibrary(pathname: string): boolean {
-  const normalized = pathname.replace(/\/+$/, '') || '/';
-  return normalized === '/personas' || normalized.startsWith('/personas/');
+function routeHasSecondarySidebar(pathname: string): boolean {
+  const normalized = normalize(pathname);
+  return (
+    LIBRARY_ROUTES.has(normalized) ||
+    [...SECONDARY_ROUTES].some((route) => normalized === route || normalized.startsWith(`${route}/`))
+  );
 }
 
 function useCompactViewport(): boolean {
@@ -54,13 +57,10 @@ export function useWorkspaceSidebarState() {
   const compactContext = `${pathname}:${compactViewport}`;
   const forceExpanded = expandedLibraryContext === compactContext;
   // Auto-collapse is a preference (Settings → Appearance → Keep sidebar
-  // expanded): off means a secondary workspace on a narrow window keeps the
-  // full sidebar. A workspace that shows the voice library itself still
-  // collapses the duplicate.
+  // expanded): off keeps the full navigation beside a section's own pane.
   const autoCollapse =
-    autoCollapseSidebar !== false && compactViewport && routeHasSecondarySidebar(pathname);
-  const compact =
-    !libraryOpen || ((routeOwnsVoiceLibrary(pathname) || autoCollapse) && !forceExpanded);
+    autoCollapseSidebar !== false && (routeHasSecondarySidebar(pathname) || compactViewport);
+  const compact = !libraryOpen || (autoCollapse && !forceExpanded);
   const setOpen = (open: boolean) =>
     setWorkspace({ libraryOpen: open, expandedLibraryContext: open ? compactContext : null });
   return {

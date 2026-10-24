@@ -104,9 +104,7 @@
     "dub": "Translate and dub audio or video.",
     "stories": "Create scenes with multiple voices.",
     "audiobook": "Build audiobooks with chapters.",
-    "transcribe": "Turn recordings into text.",
-    "collapseFooter": "Collapse footer",
-    "expandFooter": "Expand footer"
+    "transcribe": "Turn recordings into text."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Projects couldn't be loaded",
@@ -3219,13 +3217,6 @@
     "progress": "{{done}} / {{total}} segments validated",
     "cancelled": "Cancelled",
     "fitting": "Adjusting timing"
-  },
-  "sponsorSlot": {
-    "book": "Book your slot",
-    "preview": "Sponsor preview",
-    "message": "Your brand, website & message",
-    "email_app": "Open email app",
-    "copy_email": "Copy email"
   },
   "supportPlans": {
     "remove": "Remove sponsor bar",

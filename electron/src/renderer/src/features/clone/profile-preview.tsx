@@ -69,7 +69,7 @@ export function ProfilePreview({
       announceDroppedSpeech(result.dropped);
       setUrl(URL.createObjectURL(result.blob));
       setTake(result.id ? { id: result.id, seed: result.seed } : null);
-      toast.success(t('tts.generationComplete'));
+      toast.success(t('tts.generationComplete'), { position: 'top-right' });
       void client.invalidateQueries({ queryKey: queryKeys.history });
       void client.invalidateQueries({
         queryKey: ['profile-usage', profile.id],

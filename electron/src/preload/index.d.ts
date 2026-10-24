@@ -1,3 +1,4 @@
+import type { HostSnapshotLike } from '../shared/utils/hostSnapshot';
 /**
  * The contextBridge surface exposed to the renderer as `window.voicestudio`.
  *
@@ -35,6 +36,8 @@ export interface BackendStatus {
   setupRequiredGib?: number;
   /** A prior explicit install stopped after creating its resumable project/cache. */
   runtimeInterrupted?: boolean;
+  /** Automatic repair of a lost Python environment already ran this launch and failed. */
+  runtimeRepairFailed?: boolean;
   setupPhase?: 'checking' | 'downloading_uv' | 'installing_deps' | 'verifying';
   setupProgress?: {
     resolvedPackages?: number;
@@ -77,6 +80,8 @@ export interface BackendStatus {
   runtimePath?: string;
   runtimeCustom?: boolean;
   runtimeRegion?: RuntimeRegion;
+  /** Where data, models and temp files go when the location was chosen during setup. */
+  runtimeStorage?: { data: string; models: string; temp: string };
 }
 
 export type RuntimeRegion = 'auto' | 'global' | 'china' | 'russia' | 'restricted';
@@ -101,9 +106,12 @@ export type UpdateStatus =
   | 'downloading'
   | 'downloaded'
   | 'error';
+export type UpdateChannel = 'stable' | 'beta';
 export interface UpdateState {
   status: UpdateStatus;
   currentVersion: string;
+  /** Absent when this build cannot switch channels (Store builds, dev runs). */
+  channel?: UpdateChannel;
   availableVersion?: string;
   notes?: string | null;
   progress: number;
@@ -283,7 +291,61 @@ export interface UninstallTarget {
   shared: boolean;
 }
 
+export interface AccountPublicState {
+  available: boolean;
+  accountEnabled: boolean;
+  syncEnabled: boolean;
+  prompted: boolean;
+  /** False when the OS keyring is unavailable: sign-in lasts until the app quits. */
+  remembered: boolean;
+  signedIn: boolean;
+  signingIn: boolean;
+  notice: 'signed_out_expired' | 'sign_in_failed' | 'offline' | null;
+  profile: {
+    email: string | null;
+    displayName: string | null;
+    avatarUrl: string | null;
+    personalOrganizationId: string | null;
+    organizations: Array<{
+      id: string;
+      slug: string;
+      displayName: string;
+      role: string;
+      kind: string;
+    }>;
+  } | null;
+  /** Why the account details could not be loaded (an HTTP status, or "offline"); null when fine. */
+  profileError: string | null;
+  /** The personal Organization's plan and storage (entitlements); null when signed out. */
+  plan: {
+    planCode: string;
+    planName: string;
+    /** When the plan ends (a yearly plan or a grant); null for no end. */
+    planEndsAt: string | null;
+    storageUsedBytes: number;
+    storageLimitBytes: number;
+    /** What the plan includes; null when the entitlements could not be read. */
+    settingsSync: boolean | null;
+    proDesktop: boolean | null;
+  } | null;
+  /** Dashboard pages for managing the profile and the plan; null when signed out. */
+  links: { profile: string; plan: string } | null;
+}
+
 export interface VoiceStudioBridge {
+  /** VoiceStudio Cloud account; never carries a token. */
+  account: {
+    get(): Promise<AccountPublicState>;
+    signIn(): Promise<void>;
+    cancelSignIn(): Promise<void>;
+    signOut(): Promise<void>;
+    setSwitches(patch: {
+      accountEnabled?: boolean;
+      syncEnabled?: boolean;
+    }): Promise<AccountPublicState>;
+    updateProfile(patch: { display_name?: string }): Promise<AccountPublicState>;
+    onState(cb: (state: AccountPublicState) => void): () => void;
+  };
   browser: import('../shared/site-browser').SiteBrowserBridge;
   repair: {
     /** Cached for a short TTL; `refresh` rescans for CLIs installed since. */
@@ -306,6 +368,7 @@ export interface VoiceStudioBridge {
     check(): Promise<UpdateState>;
     download(): Promise<UpdateState>;
     dismiss(): Promise<UpdateState>;
+    setChannel(channel: UpdateChannel): Promise<UpdateState>;
     install(): Promise<void>;
     listReleases(): Promise<UpdateReleaseInfo[]>;
     onState(cb: (state: UpdateState) => void): () => void;
@@ -331,6 +394,9 @@ export interface VoiceStudioBridge {
     platform: NodeJS.Platform;
     isDev: boolean;
     onNavigate(callback: (path: string) => void): () => void;
+    /** Native fullscreen state (macOS hides the traffic lights there); the callback fires on every change. */
+    isFullScreen(): Promise<boolean>;
+    onFullScreen(callback: (fullscreen: boolean) => void): () => void;
     onPersistenceFlush(callback: () => void | Promise<void>): () => void;
   };
   backend: {
@@ -346,6 +412,7 @@ export interface VoiceStudioBridge {
     chooseRuntimeLocation(title: string): Promise<RuntimeLocation | null>;
     useDefaultRuntimeLocation(): Promise<RuntimeLocation>;
     getConnection(): Promise<BackendConnection>;
+    getHostSnapshot(): Promise<HostSnapshotLike>;
     testRemote(input: { url: string; apiKey: string }): Promise<RemoteBackendProbe>;
     useRemote(input: { url: string; apiKey: string }): Promise<RemoteBackendProbe>;
     useLocal(): Promise<BackendConnection>;

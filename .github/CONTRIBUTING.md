@@ -155,14 +155,16 @@ Open an [issue](https://github.com/debpalash/VoiceStudio/issues/new) with:
 2. **Keep PRs focused** — one feature or fix per PR
 3. **Run tests** before pushing:
    ```bash
-   # Backend tests (the same two runs as CI)
-   uv run pytest tests/ -q
+   # Backend tests (the same two runs as CI; -n auto runs tests/ in parallel,
+   # optional locally, it is about 4x faster on 4 cores)
+   uv run pytest tests/ -q -n auto
    uv run pytest backend/tests/ -q
 
    # Frontend build check
    bun run check:electron
    ```
 4. **Write a clear PR title** — it becomes the squash-merge commit message
+5. **Add a changelog fragment** if users will notice the change: one line in `changelog.d/<PR#>.<type>.md` (see [`changelog.d/README.md`](../changelog.d/README.md)). Don't edit `CHANGELOG.md` directly, so your PR never conflicts with others
 5. **Don't include** local machine stats, file paths, or private system info in PR descriptions
 
 ### Adding a New TTS Engine
@@ -313,8 +315,35 @@ OMNIVOICE_PORT=3999 bun run --cwd electron smoke:server &
 OMNIVOICE_PORT=3999 VOICESTUDIO_UI_URL=http://localhost:3912 PLAYWRIGHT_CHANNEL=chromium \
   node electron/tests/run-renderer-smokes.mjs [name-filter ...]
 
+# UI crawler (the "UI crawler (n/3)" CI jobs, VOICESTUDIO_CRAWL_SHARD=n/3), against the same smoke server:
+# clicks every enabled button on every route, then the buttons a filled-in form
+# enables, then one level into each dialog, while API writes answer normally,
+# with 500, with a network error, or with broken JSON. It fails on a spinner
+# left after requests settle, a button still greyed out after its write failed,
+# a failed write with no visible feedback, an uncaught error, or a
+# console.error. Fix the button; KNOWN_FINDINGS stays empty.
+OMNIVOICE_PORT=3999 VOICESTUDIO_UI_URL=http://localhost:3912 \
+  VOICESTUDIO_CRAWL_MODES=http-500 VOICESTUDIO_CRAWL_ROUTES=/clone \
+  node electron/tests/ui-crawler.mjs
+
 # Shared native helper, when changed
 cargo check --manifest-path native/desktop-bridge/Cargo.toml
+```
+
+### Cached local checks (Dagger, optional)
+
+[Dagger](https://docs.dagger.io/install) runs the frontend tests, the mobile
+token check and both backend pytest suites in containers whose steps are cached
+by content, so a re-run after an unrelated edit takes seconds. It needs Docker.
+The first run downloads container images and dependencies (as CI does); after
+that your code and results stay on your machine. CI is unchanged: `ci.yml`
+stays the gate.
+
+```bash
+dagger call check             # all of the above, in parallel
+dagger call check --git=.git  # also run tests that read real git history
+                              # (in a linked worktree: --git=$(git rev-parse --git-common-dir))
+dagger call frontend-tests    # or: mobile-tokens, python-tests
 ```
 
 ---
@@ -369,6 +398,26 @@ hard rules from the first prompt.
 
 ## Quality gates your PR must pass
 
+- **CI scope:** the Electron-only jobs (UI crawler, Desktop UI, Linux native
+  package, and `Tests (Electron)` plus `Electron renderer smokes`, the Electron halves of `Tests (backend + frontend)`) are skipped on a
+  pull request whose every changed file is an *edit or addition* under `backend/`
+  (except `backend/assets/`), `omnivoice/`, `docs/` or `mobile/`, a Python file under `tests/` or `scripts/`,
+  a root `*.md`, `Makefile`, `uv.lock`, or a workflow other than `ci.yml` and
+  `electron-*.yml`. Any other path (including `pyproject.toml`, `package.json`,
+  `bun.lock` and shared test fixtures), any file that is not a plain edit or addition (**deleted, renamed**, copied or type-changed), 3,000 or
+  more files, and every push to `main` run the full matrix; so does a failed
+  detection. Skipped jobs show as skipped in the PR. The rule is the `changes`
+  job in `.github/workflows/ci.yml`.
+  The `Security` workflow works the same way: CodeQL, bandit and the dependency
+  audits are skipped for a PR that only edits files under `docs/` or `mobile/` or
+  Markdown, while the secret scan always runs (rule: its own `changes` job).
+  The Docker image build on `main` skips merges that only touch `docs/`, `mobile/`,
+  `changelog.d/` or `CHANGELOG.md`.
+- **Closed PRs stop their CI:** merging or closing a PR cancels its queued and
+  running pull-request workflows (`.github/workflows/cancel-closed-pr-runs.yml`);
+  the repository is capped at 20 concurrent jobs, so they would only delay others.
+  Maintainers can run the same cleanup for the whole repository from the Actions
+  tab (`cancel-closed-pr-runs`, dry run by default).
 - **Cross-platform parity (hard rule):** anything that ships in default mode
   must behave identically on macOS, Windows, and Linux. Platform-specific
   *implementation* is fine; platform-divergent *default behavior* is a P0.
@@ -404,7 +453,22 @@ hard rules from the first prompt.
     the user (`electron/src/main/updater.ts`).
   - **yt-dlp updates** from PyPI, only when the user clicks update
     (`backend/services/media_tools.py`).
+  - **VoiceStudio Cloud account features, only after the user turns them on**
+    (first-run setup or Settings → Account; off by default, skipping = off):
+    browser sign-in against `voicestudio.sh/identity` and the account API at
+    `appapi.voicestudio.sh` from Electron main (`electron/src/main/account/`),
+    and, only after the user also turns cloud sync on, settings sync with
+    `appapi.voicestudio.sh/v1/sync` from the backend
+    (`backend/services/cloud_sync/`), which can call only with a token main
+    hands out. Turning either off stops every request at once; switching
+    account features off sends one best-effort token revocation. Hidden in
+    packaged builds until VoiceStudio Cloud launches.
   - Bug reports as prefilled GitHub Issue URLs opened in the user's browser.
+  - **Phone content reports, only when the user taps Send** in a generated
+    result's Report sheet: `appapi.voicestudio.sh/v1/content-reports` with the
+    reason, optional note and typed text, app version and model; no audio,
+    account or device identifier (`mobile/contract/SPEC.md` → Reporting
+    generated content; required by Google Play's AI-generated content policy).
   - PostHog analytics only after a yes at the first-run consent prompt
     (`backend/core/analytics.py`, allowlisted content-free metadata).
   - The GitHub star count (no credentials or referrer, refreshed every 20

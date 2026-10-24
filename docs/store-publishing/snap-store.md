@@ -3,16 +3,15 @@
 ## Current status
 
 - Branch: `feat/snap-store`, based on `feat/store-publishing-foundation`.
-- Lifecycle: packaging prepared; no store revision has been uploaded.
+- Lifecycle: every `v*` tag uploads to `candidate`; stable is a manual promote.
 - Package: Electron x64 Snap alongside the existing AppImage and Debian packages.
 - Confinement: `strict`, using the `core22` base supported by the pinned
   electron-builder. Recheck the supported bases before the first submission.
 - Update owner: Snap Store. The in-app updater is unavailable in this build.
-- Expected Snap name: `voicestudio`; the owner must reserve and confirm it
-  before any upload workflow is added or run.
+- Snap name: `voicestudio` (`SNAP_NAME` in the workflow).
 
-No store credentials, listing changes, uploads or releases are part of the
-build-only rehearsal workflow.
+The workflow never changes listing copy, visibility or the `stable` channel on
+its own.
 
 ## Package and interface contract
 
@@ -49,8 +48,8 @@ permissions.
 
 ## Build and inspect
 
-Run the build-only GitHub workflow `.github/workflows/snap-store.yml`, or on an
-x64 Linux builder:
+Dispatch `.github/workflows/snap-store.yml` from any branch to build without
+uploading, or on an x64 Linux builder:
 
 ```bash
 export VOICESTUDIO_DISTRIBUTION=snap-store
@@ -136,11 +135,31 @@ do not switch to classic confinement merely to pass the test.
 
 ## Submission and evidence
 
-The owner must first reserve the name, approve visibility and listing answers,
-and add narrowly scoped Snapcraft credentials as a repository secret. Upload
-the validated artifact without releasing it, record the assigned revision, then
-release that exact revision to `candidate`. Stable promotion requires a separate
-owner approval after independent install, refresh and rollback verification.
+One-time setup, by the owner:
+
+1. Register the name and confirm the Snapcraft account controls it:
+   `snapcraft register voicestudio`, then `snapcraft status voicestudio`.
+2. Create a GitHub environment named `snap-store` (optionally with required
+   reviewers) and store upload credentials in it as
+   `SNAPCRAFT_STORE_CREDENTIALS`:
+
+   ```bash
+   snapcraft export-login --snaps=voicestudio \
+     --acls=package_access,package_push,package_update,package_release \
+     --expires=<date> credentials.txt
+   ```
+
+Pushing a final `vX.Y.Z` tag then builds the Snap, checks the tag matches `package.json`,
+uploads it and releases it to `candidate`. The workflow uploads first and checks
+the newest `v*` tag just before releasing, so an older tag's revision is
+uploaded without moving `candidate`. The run
+summary records the Store revision and channel. A tag build can be retried by dispatching the workflow from the tag
+with `upload` enabled.
+
+Stable promotion requires a separate owner approval after independent install,
+refresh and rollback verification: the repository owner dispatches the
+workflow with `promote_revision` set to the verified candidate revision. The
+job refuses any other triggering account.
 
 Before promoting to stable, obtain Store auto-connect approval for
 `audio-record` and verify recording on a fresh Store installation. The

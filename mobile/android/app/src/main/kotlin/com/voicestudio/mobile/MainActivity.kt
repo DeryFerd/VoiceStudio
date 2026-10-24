@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -34,17 +35,22 @@ import com.voicestudio.mobile.features.voices.VoicesScreen
 import com.voicestudio.mobile.features.dub.DubScreen
 import com.voicestudio.mobile.features.dictate.DictateScreen
 import com.voicestudio.mobile.features.settings.SettingsScreen
+import com.voicestudio.mobile.network.ContentReportClient
 import java.util.Locale
 
 class VoiceStudioApplication:Application()
 class MainActivity:ComponentActivity() {
     override fun onCreate(savedInstanceState:Bundle?) {
+        setTheme(R.style.AppTheme)
         super.onCreate(savedInstanceState);enableEdgeToEdge()
         setContent {StudioApp()}
     }
 }
 
-@Composable fun StudioApp(vm:StudioViewModel = viewModel()) {
+/** Reports go to VoiceStudio's app API: the dev server for debug builds, production for release. */
+fun contentReportClient()=ContentReportClient(BuildConfig.CONTENT_REPORTS_URL,BuildConfig.VERSION_NAME)
+
+@Composable fun StudioApp(vm:StudioViewModel = viewModel(), reportClient:ContentReportClient? = remember {contentReportClient()}) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val state by vm.state.collectAsStateWithLifecycle()
     val context=LocalContext.current
@@ -61,63 +67,75 @@ class MainActivity:ComponentActivity() {
         }
     }
     val direction=if(Locale.forLanguageTag(locale).language=="ar") LayoutDirection.Rtl else LayoutDirection.Ltr
-    CompositionLocalProvider(LocalL10n provides l,LocalLayoutDirection provides direction) {
+    val snackbars=remember {SnackbarHostState()}
+    CompositionLocalProvider(LocalL10n provides l,LocalLayoutDirection provides direction,LocalContentReportClient provides reportClient) {
         VoiceStudioTheme(ThemePreferences(prefs.mode,prefs.lightPalette,prefs.darkPalette)) {
+            CompositionLocalProvider(LocalScreenTitleProvided provides true) {
             key(state.connectionId) {
+            val initialRoute=remember {if(state.error?.key=="mobile.connect.error_session_expired") "connect" else "home"}
             val nav=rememberNavController()
             val back by nav.currentBackStackEntryAsState()
-            val route=back?.destination?.route ?: "connect"
+            val route=back?.destination?.route ?: "home"
+            var activeWorkspace by rememberSaveable {mutableStateOf("home")}
+            LaunchedEffect(route) {if(isWorkspace(route)) activeWorkspace=route}
             val dismissKeyboard=rememberKeyboardDismiss()
-            LaunchedEffect(state.connected,state.loading,back!=null) {
-                // Scaffold subcomposes its content after root effects are installed.
-                // A back-stack entry proves NavHost has actually installed the graph.
-                if(!state.loading&&back!=null) nav.navigate(if(state.connected) "speak" else "connect") {popUpTo(nav.graph.id) {inclusive=true};launchSingleTop=true}
-            }
-            Scaffold(containerColor=role("canvas"),bottomBar={
-                NavigationBar(containerColor=role("chrome"),contentColor=role("toolbarForeground")) {
-                    val tabs=if(state.connected) listOf("speak","voices","dub","dictate","settings") else listOf("connect","settings")
-                    tabs.forEach {tab ->
-                        val label=if(tab=="connect") l.t("mobile.tabs.connect") else l.t("mobile.tabs.$tab")
-                        NavigationBarItem(selected=route==tab,onClick={dismissKeyboard();nav.navigate(tab) {popUpTo(nav.graph.startDestinationId) {saveState=true};launchSingleTop=true;restoreState=true}},
-                            icon={Icon(when(tab) {"speak" -> Icons.Default.PlayArrow;"voices" -> Icons.Default.Person;"dub" -> Icons.AutoMirrored.Filled.List;"dictate" -> Icons.Default.Edit;"connect" -> Icons.Default.Add;else -> Icons.Default.Settings},contentDescription=label)},
-                            label=if(LocalDensity.current.fontScale<=1.5f) {{Text(label)}} else null,
-                            colors=NavigationBarItemDefaults.colors(indicatorColor=role("messageSurface"),selectedIconColor=role("messageAction"),selectedTextColor=role("toolbarForeground"),unselectedIconColor=role("textMuted"),unselectedTextColor=role("textMuted")))
-                    }
-                }
-            }) {padding ->
+            Scaffold(containerColor=role("canvas"),snackbarHost={SnackbarHost(snackbars)},
+                topBar={StudioTopBar(route,onBack={dismissKeyboard();nav.navigateUp()},onProjects={dismissKeyboard();nav.navigate("projects")})},
+                bottomBar={StudioDock(if(isWorkspace(route)) route else activeWorkspace) {tab -> dismissKeyboard();activeWorkspace=tab;nav.navigate(tab) {popUpTo(nav.graph.startDestinationId) {saveState=true};launchSingleTop=true;restoreState=tab!="home"}}}) {padding ->
                 Surface(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).dismissKeyboardOnTap(),color=role("canvas")) {
                     Column {
                     state.error?.let {error ->
                         Surface(color=role("errorSurface"),shape=MaterialTheme.shapes.large,modifier=Modifier.fillMaxWidth().padding(VSTheme.inset)) {
                             Column(Modifier.padding(VSTheme.inset)) {
-                                Text(l.t(error.key,error.params),color=role("errorForeground"),modifier=Modifier.heightIn(max=VSTheme.touchTarget*4).verticalScroll(rememberScrollState()))
-                                TextButton(shape=MaterialTheme.shapes.small,onClick=vm::clearError) {Text(tr("common.close"))}
-                                if(error.key=="mobile.permissions.denied") TextButton(shape=MaterialTheme.shapes.small,onClick={vm.clearError();openSystemSettings(context)}) {Text(tr("mobile.permissions.open_settings"))}
+                                ErrorMessage(error.key,error.params,color=role("errorForeground"),modifier=Modifier.fillMaxWidth())
+                                val models=error.key.split('.').take(2)==listOf("mobile","local")||error.key.contains("model")||error.key.contains("licence")
+                                val connection=error.key.split('.').take(2)==listOf("mobile","connect")||error.key=="mobile.errors.offline"
+                                val action=when {error.key=="mobile.permissions.denied" -> "mobile.permissions.open_settings";models -> "mobile.simple.download_models";connection -> "mobile.simple.reconnect";state.canRetry -> "mobile.simple.retry";else -> "common.close"}
+                                TextButton(shape=MaterialTheme.shapes.small,onClick={
+                                    when {error.key=="mobile.permissions.denied" -> {vm.clearError();openSystemSettings(context)}
+                                        models -> {
+                                            vm.clearError()
+                                            if(error.key.split('.').take(2)==listOf("mobile","local")||vm.api==null) nav.navigate("models")
+                                            else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse(vm.api!!.address.baseUrl.toString())))
+                                        }
+                                        connection -> {vm.clearError();nav.navigate("connect")}
+                                        state.canRetry -> vm.retryError()
+                                        else -> vm.clearError()}
+                                }) {Text(tr(action))}
                             }
                         }
                     }
                     if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                     Box(Modifier.weight(1f)) {
                     if(state.loading) Screen {Text(tr("common.loading"));LinearProgressIndicator()}
-                    else NavHost(navController=nav,startDestination="connect",
+                    else NavHost(navController=nav,startDestination=initialRoute,
                         enterTransition={androidx.compose.animation.EnterTransition.None}, exitTransition={androidx.compose.animation.ExitTransition.None},
                         popEnterTransition={androidx.compose.animation.EnterTransition.None}, popExitTransition={androidx.compose.animation.ExitTransition.None}) {
                         composable("connect") {ConnectScreen(vm)}
-                        composable("settings") {SettingsScreen(vm,BuildConfig.VERSION_NAME)}
-                        composable("speak") {if(state.connected) SpeakScreen(vm)}
-                        composable("voices") {if(state.connected) VoicesScreen(vm)}
-                        composable("dub") {if(state.connected) DubScreen(vm)}
-                        composable("dictate") {if(state.connected) DictateScreen(vm)}
+                        composable("settings") {SettingsScreen(vm,BuildConfig.VERSION_NAME,onConnect={nav.navigate("connect")},onModels={nav.navigate("models")})}
+                        composable("models") {com.voicestudio.mobile.features.models.ModelsScreen(vm)}
+                        composable("home") {HomeScreen(vm) {nav.navigate(it)}}
+                        composable("host-dubs") {com.voicestudio.mobile.features.dub.ComputerDubScreen(vm)}
+                        composable("projects") {com.voicestudio.mobile.features.dub.PhoneProjectScreen(vm)}
+                        composable("project/{id}") {entry -> com.voicestudio.mobile.features.dub.PhoneProjectScreen(vm,entry.arguments?.getString("id"))}
+                        composable("host-voice/{id}") {entry -> SpeakScreen(vm,initialComputerVoiceID=entry.arguments?.getString("id"))}
+                        composable("voice/{id}") {entry -> SpeakScreen(vm,entry.arguments?.getString("id"))}
+                        composable("speak") {SpeakScreen(vm)}
+                        composable("voices") {VoicesScreen(vm)}
+                        composable("dub") {DubScreen(vm)}
+                        composable("dictate") {DictateScreen(vm)}
                     }
                     }
                     }
                 }
             }
             }
+            }
             if(!state.loading&&prefs.consent==null) AlertDialog(shape=MaterialTheme.shapes.large,onDismissRequest={vm.consent(false)},title={Text(tr("consent.title"))},
-                text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(VSTheme.gap)) {Text(tr("consent.body"));Text(tr("mobile.android.analytics_local"))}},
+                text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(VSTheme.gap)) {Text(tr("consent.body"));Text(tr("mobile.consent.phone_note"))}},
                 confirmButton={TextButton(shape=MaterialTheme.shapes.small,onClick={vm.consent(true)}) {Text(tr("consent.yes"))}},
                 dismissButton={TextButton(shape=MaterialTheme.shapes.small,onClick={vm.consent(false)}) {Text(tr("consent.no"))}})
+            ContentReportHost(vm,snackbars)
         }
     }
 }

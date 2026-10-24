@@ -67,3 +67,23 @@ it('does not offer a nested private model directory as a separately shared targe
   });
   expect(targets.some((target) => target.key === 'models')).toBe(false);
 });
+
+it('lists a setup-chosen location by its runtime folders so data and models stay separate choices (#2971)', async () => {
+  const roots = await fixture();
+  const chosen = join(roots.root, 'E', 'VoiceStudio');
+  const data = join(chosen, 'data');
+  const entries = [join(chosen, 'project'), join(chosen, '.uv-cache')];
+  for (const path of [data, ...entries]) await mkdir(path, { recursive: true });
+  const targets = await scanUninstallTargets({
+    ...roots,
+    data,
+    models: join(chosen, 'models'),
+    runtimeEnvironment: entries,
+  });
+  const paths = targets.map((target) => target.path);
+  expect(paths).toEqual(expect.arrayContaining([data, ...entries]));
+  expect(paths).not.toContain(chosen);
+  const plan = await createUninstallPlan(targets.filter((t) => t.path !== data), false, null);
+  expect(plan.paths).toEqual(expect.arrayContaining(entries));
+  expect(plan.paths).not.toContain(data);
+});

@@ -336,7 +336,7 @@ export function SavedVoices({
                     </p>
                   )}
                 </div>
-                <div className="absolute right-2 z-20 flex items-center gap-0.5 rounded-md bg-sidebar-accent/90 p-0.5 opacity-0 shadow-sm ring-1 ring-sidebar-border/50 backdrop-blur-xl transition-opacity duration-150 group-hover/profile:opacity-100 group-focus-within/profile:opacity-100">
+                <div className="absolute right-2 z-20 flex items-center gap-0.5 rounded-md bg-sidebar bg-[linear-gradient(var(--sidebar-accent),var(--sidebar-accent))] p-0.5 opacity-0 shadow-sm ring-1 ring-sidebar-border/50 transition-opacity duration-150 group-hover/profile:opacity-100 group-focus-within/profile:opacity-100">
                   {profile.ref_audio_path ||
                   profile.locked_audio_path ||
                   profile.kind === 'design' ? (
@@ -450,7 +450,7 @@ function TakeRow({ item, onStar, onReuse, onDelete }: TakeRowProps) {
         )}
         <span className="truncate">{displayTitle(item.text)}</span>
       </button>
-      <div className="pointer-events-none absolute right-1 z-10 flex items-center gap-0.5 rounded-md bg-sidebar-accent/95 p-0.5 opacity-0 backdrop-blur-xl transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+      <div className="pointer-events-none absolute right-1 z-10 flex items-center gap-0.5 rounded-md bg-sidebar bg-[linear-gradient(var(--sidebar-accent),var(--sidebar-accent))] p-0.5 opacity-0 shadow-sm ring-1 ring-sidebar-border/50 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
         {item.audio_path && (
           <AudioPreviewButton src={audioUrl(item.audio_path)} source={'take-' + item.id} />
         )}
@@ -654,6 +654,8 @@ export function VoicesSidebar({
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'voices' | 'takes'>(initialTab);
+  // The tab can also be chosen from outside (command palette, shortcuts) without remounting the list.
+  useEffect(() => setTab(initialTab), [initialTab]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -675,33 +677,17 @@ export function VoicesSidebar({
               value="voices"
               title={t('clone.saved_profiles')}
               aria-label={t('clone.saved_profiles')}
-              className="min-w-0 flex-none data-active:flex-1 @[300px]/library:flex-1 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent/50 data-active:bg-[var(--sidebar-row-active)] data-active:text-sidebar-foreground dark:data-active:border-transparent dark:data-active:bg-[var(--sidebar-row-active)] dark:data-active:text-sidebar-foreground"
+              className="min-w-0 flex-1 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent/50 data-active:bg-[var(--sidebar-row-active)] data-active:text-sidebar-foreground dark:data-active:border-transparent dark:data-active:bg-[var(--sidebar-row-active)] dark:data-active:text-sidebar-foreground"
             >
-              <FingerprintIcon data-icon="inline-start" />
-              <span
-                className={cn(
-                  'min-w-0 truncate',
-                  tab !== 'voices' && 'hidden @[300px]/library:inline',
-                )}
-              >
-                {t('clone.saved_profiles')}
-              </span>
+              <span className="min-w-0 truncate">{t('clone.saved_profiles')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="takes"
               title={t('clone.history_title')}
               aria-label={t('clone.history_title')}
-              className="min-w-0 flex-none data-active:flex-1 @[300px]/library:flex-1 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent/50 data-active:bg-[var(--sidebar-row-active)] data-active:text-sidebar-foreground dark:data-active:border-transparent dark:data-active:bg-[var(--sidebar-row-active)] dark:data-active:text-sidebar-foreground"
+              className="min-w-0 flex-1 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent/50 data-active:bg-[var(--sidebar-row-active)] data-active:text-sidebar-foreground dark:data-active:border-transparent dark:data-active:bg-[var(--sidebar-row-active)] dark:data-active:text-sidebar-foreground"
             >
-              <HistoryIcon data-icon="inline-start" />
-              <span
-                className={cn(
-                  'min-w-0 truncate',
-                  tab !== 'takes' && 'hidden @[300px]/library:inline',
-                )}
-              >
-                {t('clone.history_title')}
-              </span>
+              <span className="min-w-0 truncate">{t('clone.history_title')}</span>
             </TabsTrigger>
           </TabsList>
         </div>

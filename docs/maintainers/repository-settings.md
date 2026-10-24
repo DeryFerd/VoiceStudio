@@ -64,7 +64,7 @@ inside the administrative trust boundary.
 
 The `context` values must match the check names shown on a pull request:
 
-- `Tests (backend + frontend)`: the `name:` of the `test` job in `.github/workflows/ci.yml`.
+- `Tests (backend + frontend)`: the `name:` of the `test` job in `.github/workflows/ci.yml`. It is a gate that waits for the `test-python` and `test-electron` jobs, so keep this name when changing either.
 - `Commit identities`: the native job in `.github/workflows/commit-identity.yml`.
   It runs only base-owned code through `pull_request_target` and fails on API,
   fetch, or policy-execution errors. PR commits are fetched as git objects;

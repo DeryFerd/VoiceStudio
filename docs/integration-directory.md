@@ -2,7 +2,7 @@
 
 Directory entries are not paid sponsors or endorsements. The app lists only entries with a completed built-in setup block or setup panel. Each carries the **Works with VoiceStudio** badge and capability chips (MCP server, Speech API, Transcription API, Workflow template, Self-hosted, Local language model, Phone calls). Catalog metadata alone never creates a card or a routable detail page. Setup blocks and panels live in one registry keyed by the catalog slug (`electron/src/renderer/src/features/integrations/setup-registry.ts`), so a connector becomes visible only when its wiring is added there. The provider's website opens from the detail page's **Website** card. Icons are bundled locally so viewing the directory sends no logo requests to providers. Brand marks belong to their respective owners. Every visible entry must ship a real brand mark; a test fails if one falls back to the generic placeholder.
 
-The compact footer’s Integrations button opens the directory. Each visible detail page offers the provider's website as a separate action. Featured sponsors without completed integration wiring do not receive placeholder detail pages.
+The sidebar's Integrations entry opens the directory. Each visible detail page offers the provider's website as a separate action. Featured sponsors without completed integration wiring do not receive placeholder detail pages.
 
 | Company | Official source | Icon source |
 |---|---|---|

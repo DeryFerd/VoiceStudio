@@ -47,8 +47,19 @@ it('does not carry a forced expansion to another workspace', () => {
   rerender();
   expect(result.current.compact).toBe(true);
 });
-it('keeps the clone workspace toggle in sync with explicit collapse', () => {
+it('uses the icon rail beside a section pane, including the Clone and Home library', () => {
+  state.narrow = false;
+  for (const path of ['/clone', '/', '/design']) {
+    state.path = path;
+    const { result } = renderHook(useWorkspaceSidebarState);
+    expect(result.current.compact, path).toBe(true);
+  }
+  state.layout.autoCollapseSidebar = false;
   state.path = '/clone';
+  expect(renderHook(useWorkspaceSidebarState).result.current.compact).toBe(false);
+});
+it('keeps the full navigation where a page has no pane of its own and syncs explicit collapse', () => {
+  state.path = '/integrations';
   state.narrow = false;
   const { result, rerender } = renderHook(useWorkspaceSidebarState);
   expect(result.current.compact).toBe(false);
@@ -64,10 +75,10 @@ it('keeps the full sidebar on a secondary workspace when auto-collapse is off', 
   state.path = '/projects';
   rerender();
   expect(result.current.compact).toBe(false);
-  // A workspace that shows the voice library itself still collapses the duplicate.
+  // The library no longer lives in the navigation column, so there is no duplicate to hide.
   state.path = '/personas';
   rerender();
-  expect(result.current.compact).toBe(true);
+  expect(result.current.compact).toBe(false);
   // The explicit close still works.
   state.path = '/tools';
   act(() => result.current.setOpen(false));

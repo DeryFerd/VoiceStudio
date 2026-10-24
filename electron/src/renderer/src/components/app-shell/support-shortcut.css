@@ -40,10 +40,11 @@
   transform: translateX(35%);
 }
 .github-star-shortcut {
-  border: 1px solid color-mix(in oklab, #d9b36a 22%, var(--border));
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, #d9b36a 28%, var(--border));
   border-radius: 9px;
-  color: color-mix(in oklab, #d9b36a 18%, var(--foreground));
-  background: linear-gradient(120deg, color-mix(in oklab, #d9b36a 5%, var(--card)), var(--card));
+  color: color-mix(in oklab, #d9b36a 22%, var(--foreground));
+  background: linear-gradient(120deg, color-mix(in oklab, #d9b36a 7%, var(--card)), var(--card));
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--foreground) 5%, transparent);
   transition:
     border-color 180ms ease,
@@ -51,28 +52,45 @@
 }
 .github-star-shortcut:hover,
 .github-star-shortcut:focus-visible {
-  border-color: color-mix(in oklab, #d9b36a 50%, var(--border));
-  box-shadow: 0 0 14px rgb(217 179 106 / 9%);
+  border-color: color-mix(in oklab, #d9b36a 60%, var(--border));
+  box-shadow: 0 0 16px rgb(217 179 106 / 14%);
+}
+.github-star-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+}
+.github-star-label svg {
+  color: color-mix(in oklab, #d9b36a 85%, var(--foreground));
+  fill: color-mix(in srgb, #d9b36a 25%, transparent);
+  transition:
+    fill 180ms ease,
+    transform 260ms ease;
+}
+.github-star-shortcut:hover .github-star-label svg,
+.github-star-shortcut:focus-visible .github-star-label svg {
+  fill: #d9b36a;
+  transform: rotate(72deg) scale(1.12);
 }
 .github-star-count {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 2px;
-  padding: 3px 6px;
-  border-radius: 5px;
-  background: color-mix(in oklab, #d9b36a 9%, transparent);
+  padding: 0 10px;
+  border-left: 1px solid color-mix(in oklab, #d9b36a 22%, var(--border));
+  background: color-mix(in oklab, #d9b36a 10%, transparent);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-}
-.github-star-count svg {
-  color: color-mix(in oklab, #d9b36a 70%, var(--foreground));
-  fill: color-mix(in srgb, #d9b36a 22%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .support-shortcut,
   .support-shortcut::before,
-  .github-star-shortcut {
+  .github-star-shortcut,
+  .github-star-label svg {
     transition: none;
+  }
+  .github-star-shortcut:hover .github-star-label svg,
+  .github-star-shortcut:focus-visible .github-star-label svg {
+    transform: none;
   }
 }

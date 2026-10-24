@@ -60,6 +60,7 @@ export const CHANNELS = {
   backendChooseRuntimeLocation: 'backend:chooseRuntimeLocation',
   backendUseDefaultRuntimeLocation: 'backend:useDefaultRuntimeLocation',
   backendGetConnection: 'backend:getConnection',
+  backendHostSnapshot: 'backend:hostSnapshot',
   backendTestRemote: 'backend:testRemote',
   backendUseRemote: 'backend:useRemote',
   backendUseLocal: 'backend:useLocal',
@@ -164,7 +165,7 @@ function assertSaveDataRequest(value: unknown): SaveDataRequest {
   };
 }
 
-function assertTrustedMainFrame(
+export function assertTrustedMainFrame(
   event: IpcMainInvokeEvent,
   owner: BrowserWindow | null,
 ): asserts owner is BrowserWindow {
@@ -302,7 +303,7 @@ async function uninstallRoots(supervisor: BackendSupervisor): Promise<UninstallR
   return {
     data: roots.data,
     environment: app.getPath('userData'),
-    runtimeEnvironment: supervisor.ownedRuntimeRoot,
+    runtimeEnvironment: supervisor.ownedRuntimeEntries,
     logs: app.getPath('logs'),
     userEnvironment: join(homedir(), '.config', 'omnivoice'),
     models: roots.models,
@@ -354,6 +355,11 @@ export function registerIpc(
     return supervisor.acknowledgeLastCrash();
   });
   ipcMain.handle(CHANNELS.backendGetConnection, () => supervisor.connection);
+  ipcMain.handle(CHANNELS.backendHostSnapshot, (event) => {
+    const owner = getMainWindow();
+    assertTrustedMainFrame(event, owner);
+    return supervisor.hostSnapshot();
+  });
   ipcMain.handle(CHANNELS.backendTestRemote, async (event, raw: unknown) => {
     const owner = getMainWindow();
     assertTrustedMainFrame(event, owner);

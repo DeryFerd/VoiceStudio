@@ -19,6 +19,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     api(project(":core:network"))
+    api(project(":core:local"))
     api(project(":core:l10n"))
     implementation(libs.datastore)
     api(libs.work)

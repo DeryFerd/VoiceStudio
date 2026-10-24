@@ -15,6 +15,7 @@
 
 export type BackendHintKey =
   | 'backend.hint_spawn_blocked'
+  | 'backend.hint_smart_app_control'
   | 'backend.hint_slow_start'
   | 'backend.hint_synced_folder';
 
@@ -37,7 +38,12 @@ export function backendFailureHints(message: string | undefined): BackendHintKey
   // The OS refused to run the program: libuv reports a blocked executable on
   // Windows as the bare `spawn UNKNOWN`, and EPERM/EACCES elsewhere.
   if (/\bCould not start\b.*\b(spawn UNKNOWN|UNKNOWN|EPERM|EACCES)\b/s.test(message)) {
-    hints.push('backend.hint_spawn_blocked');
+    // Smart App Control has no exclusions, so the antivirus advice would send the user nowhere.
+    hints.push(
+      /Smart App Control/.test(message)
+        ? 'backend.hint_smart_app_control'
+        : 'backend.hint_spawn_blocked',
+    );
   }
   // The readiness wait ran out on a launch that was not obviously dead.
   if (/did not answer on port \d+ within \d+ s/.test(message)) {

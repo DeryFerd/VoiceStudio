@@ -62,7 +62,7 @@ class PickerRegressionTest {
         compose.onNodeWithText("KittenTTS").assertExists()
         assertEquals("active",value)
     }
-    @Test fun dubPickerSearchSelectCloseAndRemoveChip() {
+    @Test fun dubPickerSearchConfirmAndRemoveChip() {
         val choices=LanguageCatalog.load(context).dubChoices()
         assertFalse(choices.any {it.second=="Auto"})
         content {
@@ -72,7 +72,7 @@ class PickerRegressionTest {
         compose.onNodeWithText("Target languages").performClick()
         compose.onNodeWithText("Search").performTextInput("French")
         compose.onNode(hasText("French") and !hasSetTextAction()).performClick()
-        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithText("Confirm").performClick()
         compose.onNodeWithContentDescription("Remove French").assertExists().performClick()
         compose.onNodeWithContentDescription("Remove French").assertDoesNotExist()
     }
@@ -85,8 +85,8 @@ class PickerRegressionTest {
             Action("mobile.speak.generate",onClick={})
         }
         compose.waitForIdle()
-        assertEquals(RoundedCornerShape(VSTokens.RADIUS_CONTROL.dp),control)
-        assertEquals(RoundedCornerShape(VSTokens.RADIUS_LG.dp),card)
+        assertEquals(RoundedCornerShape(VSTokens.IOS_FIELD_RADIUS.dp),control)
+        assertEquals(RoundedCornerShape(VSTokens.IOS_CARD_RADIUS.dp),card)
     }
     @Test fun searchWithoutMatchesExplainsEmptyChoiceAndMultiChoiceLists() {
         content {ChoicePicker("mobile.speak.voice","one",listOf(Choice("one","Sample voice"))) {}}

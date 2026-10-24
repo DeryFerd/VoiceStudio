@@ -1,0 +1,262 @@
+# Mobile release — builds the signed Android APK/AAB and iOS IPA and gathers
+# them, with an unsigned IPA for sideloading, into a DRAFT GitHub prerelease for
+# the owner to review and publish. Store uploads stay in android-play-internal.yml
+# and ios-testflight.yml. The app version is the root package.json version; each
+# signed Android build shares a clock-based code with Play; iOS uses the run number.
+# Secrets live in the protected
+# `mobile-release` environment; see docs/mobile.md → Releasing.
+
+name: mobile-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      android:
+        description: Build Android
+        type: boolean
+        default: true
+      ios:
+        description: Build iOS
+        type: boolean
+        default: true
+  push:
+    tags: ["mobile-v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
+jobs:
+  android:
+    if: github.event_name == 'push' || inputs.android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: mobile-release
+    concurrency:
+      group: signed-android-builds
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: mobile/android
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@42ebad84b0585498c0413b0967cf4e80ec0e1d19 # v4.4.1
+
+      - name: SDK location
+        run: printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+
+      - name: NDK and CMake
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.1.12297006" "cmake;3.22.1" > /dev/null
+
+      - name: Cache native runtimes
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: mobile/native/android/build
+          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**') }}
+
+      - name: Decode keystore
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+        run: |
+          test -n "$KEYSTORE" || { echo "::error::ANDROID_UPLOAD_KEYSTORE is not set in the mobile-release environment"; exit 1; }
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+      - name: Build signed APK and AAB
+        env:
+          VOICESTUDIO_ANDROID_KEYSTORE: ${{ runner.temp }}/release.keystore
+          VOICESTUDIO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          VOICESTUDIO_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          VOICESTUDIO_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          # Shared clock and serialized builds keep codes increasing across both release workflows.
+          export VOICESTUDIO_ANDROID_VERSION_CODE="$(python3 "$GITHUB_WORKSPACE/scripts/android_version_code.py")"
+          test -n "$VOICESTUDIO_ANDROID_VERSION_CODE"
+          ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+
+      - name: Collect outputs
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          cp app/build/outputs/apk/release/*.apk "$RUNNER_TEMP/out/VoiceStudio.apk"
+          cp app/build/outputs/bundle/release/*.aab "$RUNNER_TEMP/out/VoiceStudio.aab"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: VoiceStudio-android-release
+          path: ${{ runner.temp }}/out
+          retention-days: 30
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+
+  ios:
+    if: github.event_name == 'push' || inputs.ios
+    runs-on: macos-26
+    timeout-minutes: 80
+    environment: mobile-release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Restore native runtimes
+        id: native-cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: mobile/native/ios/build
+          key: ios-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/ios/**', '!mobile/native/ios/build/**') }}
+
+      - name: Build native runtimes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          brew install cmake ninja 2>/dev/null || true
+          bash mobile/native/ios/build.sh ios
+
+      - name: Save native runtimes
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: mobile/native/ios/build
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec mobile/ios/VoiceStudio/project.yml
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          test -n "$ASC_KEY" || { echo "::error::APP_STORE_CONNECT_API_KEY is not set in the mobile-release environment"; exit 1; }
+          umask 077
+          printf '%s\n' "$ASC_KEY" > "$RUNNER_TEMP/asc_api_key.p8"
+
+      # Automatic signing with the API key creates the cloud-managed Apple
+      # Distribution certificate and App Store profile; no .p12 is stored.
+      - name: Archive
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VOICESTUDIO_IOS_BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+        run: |
+          xcodebuild -project mobile/ios/VoiceStudio/VoiceStudio.xcodeproj \
+            -scheme VoiceStudio -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/VoiceStudio.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc_api_key.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            archive
+
+      - name: Export IPA
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          /usr/libexec/PlistBuddy -c 'Add :method string app-store-connect' \
+            -c 'Add :destination string export' \
+            -c "Add :teamID string $TEAM_ID" \
+            -c 'Add :signingStyle string automatic' \
+            "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/VoiceStudio.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/ipa" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc_api_key.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          ls "$RUNNER_TEMP/ipa"/*.ipa
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: VoiceStudio-ios-release
+          path: ${{ runner.temp }}/ipa/*.ipa
+          retention-days: 30
+
+      # Unsigned device build for people who sideload with their own Apple ID
+      # (the store IPA above is signed for App Store Connect and will not install
+      # outside TestFlight).
+      - name: Unsigned iPhone build for sideloading
+        run: |
+          xcodebuild -project mobile/ios/VoiceStudio/VoiceStudio.xcodeproj \
+            -scheme VoiceStudio -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/device" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir -p "$RUNNER_TEMP/unsigned/Payload"
+          cp -R "$RUNNER_TEMP/device/Build/Products/Release-iphoneos/VoiceStudio.app" "$RUNNER_TEMP/unsigned/Payload/"
+          (cd "$RUNNER_TEMP/unsigned" && zip -qry "$RUNNER_TEMP/VoiceStudio-unsigned.ipa" Payload)
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: VoiceStudio-ios-unsigned
+          path: ${{ runner.temp }}/VoiceStudio-unsigned.ipa
+          retention-days: 30
+
+      - name: Remove API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc_api_key.p8"
+
+  # Tag builds gather every binary into a draft prerelease; nothing is public until
+  # the owner publishes it. Skipped for manual runs, which only produce artifacts.
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mobile-v')
+    needs: [android, ios]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: assets
+
+      - name: Draft prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          mkdir -p out
+          cp assets/VoiceStudio-android-release/VoiceStudio.apk "out/VoiceStudio-${TAG}.apk"
+          cp assets/VoiceStudio-android-release/VoiceStudio.aab "out/VoiceStudio-${TAG}.aab"
+          cp assets/VoiceStudio-ios-release/*.ipa "out/VoiceStudio-${TAG}-appstore.ipa"
+          cp assets/VoiceStudio-ios-unsigned/VoiceStudio-unsigned.ipa "out/VoiceStudio-${TAG}-unsigned.ipa"
+          (cd out && sha256sum * > SHA256SUMS.txt)
+          cat > notes.md <<NOTES
+          VoiceStudio phone apps ${TAG}. Preview builds; they run models on the phone.
+
+          | File | Use |
+          |---|---|
+          | \`VoiceStudio-${TAG}.apk\` | Android: install directly (allow installs from this source) |
+          | \`VoiceStudio-${TAG}.aab\` | Android App Bundle for Google Play |
+          | \`VoiceStudio-${TAG}-unsigned.ipa\` | iPhone: sideload with your own Apple ID (for example Sideloadly) |
+          | \`VoiceStudio-${TAG}-appstore.ipa\` | App Store Connect build; it only installs through TestFlight |
+
+          Verify downloads against \`SHA256SUMS.txt\`. Details: docs/mobile.md.
+          NOTES
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            test "$(gh release view "$TAG" --repo "$REPO" --json isDraft --jq .isDraft)" = true || { echo "Refusing to replace a published release"; exit 1; }
+            gh release upload "$TAG" out/* --repo "$REPO" --clobber
+          else
+            gh release create "$TAG" out/* --repo "$REPO" --verify-tag --draft --prerelease --title "$TAG — VoiceStudio mobile" --notes-file notes.md
+          fi

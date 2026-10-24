@@ -19,7 +19,7 @@ import subprocess
 import shlex
 
 from core.config import OUTPUTS_DIR, DATA_DIR, CRASH_LOG_PATH, LOG_PATH, IDLE_TIMEOUT_SECONDS
-from core.version import APP_VERSION
+from core.version import APP_VERSION, build_commit
 from core.browser_guard import reject_cross_site_get
 from core.logging_utils import log_safe
 from core.poll_guard import PollGuard
@@ -355,6 +355,7 @@ def system_info():
         )
         return {
             "app_version": APP_VERSION,
+            "build_commit": build_commit(),
             "generate_timeout_s": _mm.GPU_JOB_TIMEOUT_S,
             "cpu_generate_timeout_s": _mm.CPU_JOB_TIMEOUT_S,
             # #1787 review fix: a saved prefs.json value for either key can be
@@ -402,6 +403,7 @@ def system_info():
         logger.exception("system_info failed — returning safe defaults")
         return {
             "app_version": APP_VERSION,
+            "build_commit": build_commit(),
             "generate_timeout_s": 300.0,
             "cpu_generate_timeout_s": 600.0,
             "generate_timeout_shadowed": False,

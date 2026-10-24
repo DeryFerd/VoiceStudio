@@ -57,6 +57,9 @@ class FitOptions(BaseModel):
     audio_rate_cap: Optional[float] = None       # default 1.5
     video_slow_cap: Optional[float] = None       # default 2.0
     gap_guard_s: Optional[float] = None          # default 0.05
+    # Floor for slowing a short line toward its slot; 1.0 turns the fill off.
+    # Default is the server's OMNIVOICE_UNDERRUN_MIN_RATE (0.85).
+    min_audio_rate: Optional[float] = Field(default=None, ge=0.5, le=1.0)
     allow_video_retime: Optional[bool] = None    # default True
 
 class DubRequest(BaseModel):

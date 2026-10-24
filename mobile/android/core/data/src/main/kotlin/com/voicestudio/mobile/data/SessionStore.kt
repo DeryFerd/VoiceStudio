@@ -30,7 +30,7 @@ internal val StoreJson = Json { ignoreUnknownKeys = true; coerceInputValues = tr
 @Serializable data class SavedHost(val url: String, val label: String, val lastSeen: Long)
 @Serializable data class Secret(val token: String? = null, val pin: String? = null)
 @Serializable data class Preferences(val consent: Boolean? = null, val activeUrl: String? = null, val hosts: List<SavedHost> = emptyList(),
-    val mode: String = "dark", val lightPalette: String = "default", val darkPalette: String = "default", val locale: String = "system", val notifications: Boolean = false)
+    val mode: String = "dark", val lightPalette: String = "default", val darkPalette: String = "default", val locale: String = "system", val notifications: Boolean = false, val runLocations: Map<String,String> = emptyMap(), val phoneModels: Map<String,String> = emptyMap(), val allowMobileModels: Boolean = false)
 @Serializable data class DubCheckpoint(val uploaded: Boolean = false, val prepTask: String = "", val segments: List<Segment> = emptyList(),
     val source: String? = null, val nextLanguage: Int = 0, val renderTask: String = "")
 

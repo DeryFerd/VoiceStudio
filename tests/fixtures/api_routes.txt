@@ -20,10 +20,15 @@ DELETE /marketplace/{filename}
 DELETE /models/licenses/receipts/{plan_digest}
 DELETE /models/{repo_id:path}
 DELETE /profiles/{profile_id}
+DELETE /profiles/{profile_id}/attestation
 DELETE /profiles/{profile_id}/consent
 DELETE /projects/{project_id}
 DELETE /pronunciation/{entry_id}
 GET /.well-known/voicestudio-speech
+GET /api/cloud-sync/devices
+GET /api/cloud-sync/local
+GET /api/cloud-sync/local/keys
+GET /api/cloud-sync/status
 GET /api/integrations/twilio/state
 GET /api/mcp/bindings
 GET /api/settings/analytics
@@ -179,6 +184,14 @@ PATCH /gallery/voices/{voice_id}
 PATCH /projects/{project_id}
 POST /api/auth/session
 POST /api/auth/ws-ticket
+POST /api/cloud-sync/confirm-deletes
+POST /api/cloud-sync/devices/{device_id}/revoke
+POST /api/cloud-sync/off
+POST /api/cloud-sync/on
+POST /api/cloud-sync/run
+POST /api/cloud-sync/start
+POST /api/cloud-sync/stop
+POST /api/cloud-sync/use-choices-of/{device_id}
 POST /api/integrations/twilio/test
 POST /api/settings/asr-openai-compat/test
 POST /api/settings/hf-mirror/test
@@ -271,6 +284,7 @@ POST /personas/import
 POST /personas/inspect
 POST /preview/upload
 POST /profiles
+POST /profiles/{profile_id}/attestation
 POST /profiles/{profile_id}/consent
 POST /profiles/{profile_id}/lock
 POST /profiles/{profile_id}/unlock
@@ -305,6 +319,8 @@ POST /v1/audio/transcriptions
 POST /v1/audio/translations
 POST /watermark/detect
 POST /watermark/settings
+PUT /api/cloud-sync/choices
+PUT /api/cloud-sync/local
 PUT /api/integrations/twilio/config
 PUT /api/mcp/bindings
 PUT /api/settings/analytics

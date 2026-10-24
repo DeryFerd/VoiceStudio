@@ -314,6 +314,13 @@ def set_text(key: str, value: str) -> None:
             "VALUES (?, ?, ?)",
             (key, value, time.time()),
         )
+    _announce(key)
+
+
+def _announce(key: str) -> None:
+    from core import change_hooks
+
+    change_hooks.notify("settings", key)
 
 
 def clear_text(key: str) -> None:
@@ -327,6 +334,7 @@ def clear_text(key: str) -> None:
 
     with db_conn() as conn:
         conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+    _announce(key)
 
 
 # ── Phase 4 Plan 04-01 (GGUF-04): per-engine quant override ────────────────

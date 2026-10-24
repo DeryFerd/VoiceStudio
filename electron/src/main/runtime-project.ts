@@ -76,8 +76,42 @@ export const CPU_TORCH_ARGS = [
 export const WIN_ARM64_PYTHON_REQUEST = 'cpython-3.11-windows-x86_64';
 export const RUNTIME_REPAIR_PACKAGES = ['torch', 'torchaudio', 'torchvision'] as const;
 export const RUNTIME_NATIVE_IMPORT_PROBE = 'import torch, torchaudio, torchvision';
-export const RUNTIME_IMPORT_PROBE =
-  'import fastapi, uvicorn, omnivoice, faster_whisper, sentencepiece, torch, torchaudio, torchvision';
+const RUNTIME_IMPORT_MODULES = [
+  'fastapi',
+  'uvicorn',
+  'omnivoice',
+  'faster_whisper',
+  'sentencepiece',
+  'torch',
+  'torchaudio',
+  'torchvision',
+] as const;
+const IMPORT_MARKER = 'VOICESTUDIO_IMPORT=';
+/**
+ * Imports every runtime module, announcing each one first. A native import that
+ * dies with an access violation (exit code 3221225477) leaves no traceback, so
+ * the last announcement is the only evidence of which module crashed (#3293).
+ */
+export const RUNTIME_IMPORT_PROBE = RUNTIME_IMPORT_MODULES.map(
+  (name) => `print('${IMPORT_MARKER}${name}', flush=True)\nimport ${name}`,
+).join('\n');
+/** The module an import probe was loading when its output stopped, if it said. */
+export function lastImportAttempted(output: unknown): string | null {
+  const marked = String(output ?? '')
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith(IMPORT_MARKER))
+    .at(-1);
+  return marked ? marked.slice(IMPORT_MARKER.length).trim() || null : null;
+}
+function importFailure(error: unknown): Error {
+  const failure = error as { code?: unknown; message?: unknown; stdout?: unknown } | null;
+  const module = lastImportAttempted(failure?.stdout);
+  if (!module) return error instanceof Error ? error : new Error(String(error));
+  return Object.assign(
+    new Error(`${String(failure?.message)}; the import check stopped while importing "${module}"`),
+    { code: failure?.code, stdout: failure?.stdout },
+  );
+}
 const RUNTIME_SCHEMA = 'electron-runtime-v2-cudnn8';
 const CUDNN8_PROBE_PREFIX = 'VOICESTUDIO_CUDNN8_PROBE=';
 const REQUIRED_ENV_BYTES = 9 * 1024 ** 3;
@@ -291,9 +325,25 @@ async function ensureCudnn8Compat(
           '    pass',
         ]
       : [`device = '${variant === 'rocm' ? 'hip' : 'none'}'`]),
-    `print('${CUDNN8_PROBE_PREFIX}' + json.dumps({'device': device, 'sitePackages': sysconfig.get_paths()['purelib']}))`,
+    `print('${CUDNN8_PROBE_PREFIX}' + json.dumps({'device': device, 'sitePackages': sysconfig.get_paths()['purelib']}), flush=True)`,
+    // Skip interpreter teardown: unloading native Torch/CUDA DLLs at exit is
+    // where Windows access violations (0xC0000005) surface after the result
+    // has already been printed (#2942).
+    'import os',
+    'os._exit(0)',
   ].join('\n');
-  const probe = parseCudnn8Probe(await run(python, ['-c', script], project, env));
+  // The probe is advisory. A native crash inside it must never abort runtime
+  // setup: fall back to "no CUDA compat libraries needed" and let the real
+  // import verification below decide whether the runtime works.
+  let probeOutput: string | void;
+  try {
+    probeOutput = await run(python, ['-c', script], project, env);
+  } catch (error) {
+    signal.throwIfAborted();
+    probeOutput = (error as { stdout?: string }).stdout;
+    if (!parseCudnn8Probe(probeOutput)) return;
+  }
+  const probe = parseCudnn8Probe(probeOutput);
   signal.throwIfAborted();
   if (!probe) return;
   await clearCtranslate2ExecutableStack(probe.sitePackages);
@@ -402,9 +452,13 @@ export async function runtimeDependenciesReady(
         maxBuffer: 256 * 1024,
         env,
       },
-      (error, _stdout, stderr) => {
+      (error, stdout, stderr) => {
         const ready = !error || probeTimedOut(error);
-        if (!ready) onFailure?.(probeFailureDetail(error, stderr));
+        if (!ready) {
+          const module = lastImportAttempted(stdout);
+          const detail = probeFailureDetail(error, stderr);
+          onFailure?.(module && !String(stderr ?? '').trim() ? `${detail} (importing ${module})` : detail);
+        }
         resolve(ready);
       },
     );
@@ -464,8 +518,34 @@ export async function runtimeCompatible(bundle: string, project: string): Promis
   }
 }
 
+const LOCKED = new Set(['EPERM', 'EACCES', 'EBUSY']);
+
+/** Mirror `source` onto `target` file by file, for a folder Windows will not rename
+ *  (a scanner, OneDrive or a lingering backend holds a handle inside it, #3010, #2669).
+ *  Files can be overwritten where a folder rename cannot; files the new bundle no
+ *  longer ships are pruned best-effort. */
+async function mirrorInPlace(source: string, target: string): Promise<void> {
+  await cp(source, target, { recursive: true, force: true });
+  const walk = async (rel: string): Promise<void> => {
+    for (const entry of await readdir(join(target, rel), { withFileTypes: true })) {
+      const next = join(rel, entry.name);
+      const kept = await stat(join(source, next)).then(
+        () => true,
+        () => false,
+      );
+      if (!kept) await rm(join(target, next), { recursive: true, force: true }).catch(() => {});
+      else if (entry.isDirectory()) await walk(next);
+    }
+  };
+  await walk('').catch(() => {});
+}
+
 /** Replace only bundled code. The interpreter, models and user data are never removed. */
-export async function stageRuntimeSources(bundle: string, project: string): Promise<void> {
+export async function stageRuntimeSources(
+  bundle: string,
+  project: string,
+  renameDirectory: typeof renameWithRetry = renameWithRetry,
+): Promise<void> {
   await mkdir(project, { recursive: true });
   for (const name of SOURCES) {
     const target = join(project, name);
@@ -477,20 +557,26 @@ export async function stageRuntimeSources(bundle: string, project: string): Prom
       filter: (source) => !source.split(/[\\/]/).includes('__pycache__'),
     });
     await rm(previous, { recursive: true, force: true });
-    let moved = false;
     try {
-      await renameWithRetry(target, previous, DIRECTORY_RENAME);
-      moved = true;
+      let moved = false;
+      try {
+        await renameDirectory(target, previous, DIRECTORY_RENAME);
+        moved = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+      try {
+        await renameDirectory(pending, target, DIRECTORY_RENAME);
+      } catch (error) {
+        if (moved) await renameDirectory(previous, target, DIRECTORY_RENAME);
+        throw error;
+      }
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      if (!LOCKED.has((error as NodeJS.ErrnoException).code ?? '')) throw error;
+      await mirrorInPlace(pending, target);
     }
-    try {
-      await renameWithRetry(pending, target, DIRECTORY_RENAME);
-    } catch (error) {
-      if (moved) await renameWithRetry(previous, target, DIRECTORY_RENAME);
-      throw error;
-    }
-    await rm(previous, { recursive: true, force: true });
+    await rm(pending, { recursive: true, force: true }).catch(() => {});
+    await rm(previous, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -542,6 +628,10 @@ export async function installRuntime(
     ))
   )
     uv = privateUv;
+  // #2971: uv and pip unpack wheels into the temp dir. Left at the system default
+  // it fills the system drive even when the runtime was placed on another one.
+  const scratch = join(project, '..', '.tmp');
+  await mkdir(scratch, { recursive: true });
   const env: NodeJS.ProcessEnv = {
     ...downloadProxyEnv(),
     ...(await runtimeDownloadEnv(region, signal)),
@@ -550,6 +640,9 @@ export async function installRuntime(
     // rebuild a broken venv without paying the multi-gigabyte transfer twice.
     UV_CACHE_DIR: join(project, '..', '.uv-cache'),
     UV_PYTHON_INSTALL_DIR: join(project, '..', '.python'),
+    TEMP: scratch,
+    TMP: scratch,
+    TMPDIR: scratch,
   };
   if (!uv) {
     phase('downloading_uv');
@@ -709,7 +802,11 @@ export async function installRuntime(
   // startup on a non-UTF-8 Windows code page (#1783).
   await asciiSafePthFiles(join(project, '.venv')).catch(() => []);
   phase('verifying');
-  await run(runtimePython(project), ['-c', RUNTIME_IMPORT_PROBE], project);
+  try {
+    await run(runtimePython(project), ['-c', RUNTIME_IMPORT_PROBE], project);
+  } catch (error) {
+    throw importFailure(error);
+  }
   signal.throwIfAborted();
   await writeFile(join(project, '.runtime-ready'), await dependencyStamp(bundle, torch.variant));
   await rm(join(project, '.runtime-installing'), { force: true });

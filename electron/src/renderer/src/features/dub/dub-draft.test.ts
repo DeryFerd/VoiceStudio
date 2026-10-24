@@ -187,3 +187,14 @@ it('restores the project translation brief without changing its wording', () => 
   const result = restoreDubDraft(JSON.stringify({ ...defaults, translationInstructions }), defaults);
   expect(result?.translationInstructions).toBe(translationInstructions);
 });
+
+it('restores a valid Smart Fit slowest-speed floor and drops out-of-range overrides', () => {
+  const restore = (fitOptions: object) =>
+    restoreDubDraft(JSON.stringify({ ...defaults, fitOptions }), defaults).fitOptions;
+  expect(restore({ min_audio_rate: 0.7, audio_rate_cap: 1.3 })).toEqual({
+    min_audio_rate: 0.7,
+    audio_rate_cap: 1.3,
+  });
+  expect(restore({ min_audio_rate: 0.2 })).toEqual({});
+  expect(restore({ min_audio_rate: 1.4, audio_rate_cap: 0.9 })).toEqual({});
+});

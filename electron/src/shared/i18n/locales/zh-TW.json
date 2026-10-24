@@ -104,9 +104,7 @@
     "dub": "翻譯並配音音訊或影片。",
     "stories": "用多種聲音創作場景。",
     "audiobook": "製作分章節的有聲書。",
-    "transcribe": "將錄音轉成文字。",
-    "collapseFooter": "收合底欄",
-    "expandFooter": "展開底欄"
+    "transcribe": "將錄音轉成文字。"
   },
   "longformPersistence": {
     "storage_unavailable_title": "無法載入專案",
@@ -2749,13 +2747,6 @@
     "progress": "已驗證 {{done}} / {{total}} 個片段",
     "cancelled": "已取消",
     "fitting": "正在調整時間"
-  },
-  "sponsorSlot": {
-    "book": "預訂展示位",
-    "preview": "贊助商展示預覽",
-    "message": "您的品牌、網站和留言",
-    "email_app": "開啟郵件應用程式",
-    "copy_email": "複製信箱"
   },
   "supportPlans": {
     "remove": "移除贊助商列",

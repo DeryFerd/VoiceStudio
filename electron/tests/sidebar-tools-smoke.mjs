@@ -21,6 +21,11 @@ try {
         ({ platform, locale }) => {
           localStorage.setItem('voicestudio.setup.complete.v1', '1');
           localStorage.setItem('voicestudio.locale', locale);
+          // The expanded navigation is under test, so keep it open beside the library.
+          localStorage.setItem(
+            'voicestudio.workspace-layout',
+            JSON.stringify({ autoCollapseSidebar: false }),
+          );
           window.voicestudio = {
             app: {
               version: 'test',
@@ -53,21 +58,31 @@ try {
       );
       await page.goto(ui + '/#/clone');
       const sidebar = page.locator('aside').first();
-      await sidebar.locator('[data-slot=engine-view-toggle]').waitFor();
+      const footer = sidebar.locator('footer');
+      await footer.getByRole('slider', { name: strings.performanceProfile.title, exact: true }).waitFor();
+      // The three-way view switch lives in the popover that the speed/quality label opens.
       const chooseView = async (level) => {
-        await sidebar
-          .getByRole('radiogroup', { name: strings.sidebarTools.title, exact: true })
+        const group = page.getByRole('radiogroup', { name: strings.sidebarTools.title, exact: true });
+        if (!(await group.isVisible())) {
+          await footer.locator('[data-slot=performance-trigger]').click();
+          await group.waitFor();
+        }
+        await group
           .getByRole('radio', {
             name: level === 'models' ? strings.modelSettings.models : strings.sidebarTools[level],
             exact: true,
           })
           .click();
+        const popup = page.locator('[data-slot=popover-content]');
+        if (await popup.count()) {
+          await page.keyboard.press('Escape');
+          await popup.waitFor({ state: 'hidden' });
+        }
       };
-      const footer = sidebar.locator('footer');
       assert.equal(
         await footer.locator('[data-slot=engine-row]').count(),
-        1,
-        'Simple starts collapsed to voice readiness',
+        0,
+        'Simple keeps the sidebar bottom to the slider; engines open from its popover',
       );
       await chooseView('models');
       for (const family of ['tts', 'asr', 'llm', 'translation', 'dictation', 'diarisation']) {
@@ -85,27 +100,27 @@ try {
       assert.ok(await speech.evaluate((el) => el === document.activeElement));
       assert.equal(await page.locator('[data-slot=tooltip-content][data-open]').count(), 0);
       await speech.blur();
-      // Speed / quality is a radiogroup of tiers (Fast/Balanced/Quality/Max) with an Auto toggle.
-      const tiers = footer.getByRole('radiogroup', {
+      // Speed / quality is a four-notch slider (Fast/Balanced/Quality/Max) with an Auto toggle.
+      const tier = footer.getByRole('slider', {
         name: strings.performanceProfile.title,
         exact: true,
       });
-      await tiers.waitFor();
-      assert.ok(await tiers.getAttribute('aria-describedby'));
-      assert.equal(
-        await tiers.locator('[role=radio][aria-checked=true]').count(),
-        1,
-        'Exactly one speed/quality tier is selected',
-      );
+      await tier.waitFor();
+      assert.ok(await tier.getAttribute('aria-describedby'));
+      assert.ok(await tier.getAttribute('aria-valuetext'), 'The selected tier is announced');
       for (const level of ['simple', 'models', 'details']) {
         await chooseView(level);
-        assert.equal(
-          await footer.locator('#sidebar-engine-details').getAttribute('data-detail-level'),
-          level,
-        );
+        if (level === 'simple') {
+          assert.equal(await footer.locator('#sidebar-engine-details').count(), 0);
+        } else {
+          assert.equal(
+            await footer.locator('#sidebar-engine-details').getAttribute('data-detail-level'),
+            level,
+          );
+        }
         assert.equal(
           await footer.locator('[data-slot=engine-row]').count(),
-          level === 'simple' ? 1 : 6,
+          level === 'simple' ? 0 : 6,
           'Views replace one another; engine rows are never duplicated',
         );
         if (level === 'details') {
@@ -120,21 +135,16 @@ try {
           bounds && bounds.y >= 0 && bounds.y + bounds.height <= 600,
           `${platform}/${locale}: Settings must remain on-screen`,
         );
-        // A taller engine footer must leave a usable voice library, even when
-        // navigation needs to scroll. Check its real visible bounds.
-        const preview = sidebar
+        // The library lives in its own column now, so a tall engine footer can no
+        // longer squeeze it; it must stay usable beside the slim navigation.
+        const preview = page
+          .locator('[data-slot=secondary-sidebar]')
           .getByRole('button', { name: strings.clone.preview_voice, exact: true })
           .first();
         await preview.scrollIntoViewIfNeeded();
-        const previewBounds = await preview.boundingBox();
-        const tabBounds = await sidebar
-          .getByRole('tab', { name: strings.clone.saved_profiles, exact: true })
-          .boundingBox();
-        const footerBounds = await footer.boundingBox();
         assert.ok(
-          previewBounds.y >= tabBounds.y + tabBounds.height &&
-            previewBounds.y + previewBounds.height <= footerBounds.y,
-          `${platform}/${locale}/${level}: Voice preview must fit between tabs and engines`,
+          await preview.isVisible(),
+          `${platform}/${locale}/${level}: Voice preview must stay usable in the library column`,
         );
         assert.ok(
           await footer.evaluate((el) => el.scrollWidth <= el.clientWidth),

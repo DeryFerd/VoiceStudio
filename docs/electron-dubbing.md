@@ -41,6 +41,8 @@ Generate. Persisted provider error pages are discarded and restored to the sourc
 dialogue with a retryable error state.
 
 Long projects virtualize transcript rows, so only the visible editors are mounted.
+
+The Dubbing pane has a Projects tab beside its controls that lists saved dub projects, newest first. Selecting a project and confirming opens it in place (it waits while a dub is running); the Projects workspace remains the place to save, rename and delete.
 Timeline waveform peaks and onsets are computed once by the backend and cached as a
 small JSON payload; Chromium never decodes the full separated-vocals WAV to draw the
 timeline. Video previews are written atomically with MP4 fast-start metadata and are
@@ -186,7 +188,15 @@ including zero guidance. Engine-specific audible effects remain unverified.
 Saved Smart Fit override values now survive project import and draft recovery and
 reach generation only when Smart Fit is selected. Other timing strategies omit
 those parameters. Unit tests cover round-trip preservation and request routing;
-there is no new tuning panel (Tauri exposes these as stored preferences).
+the speed limits now have a panel (below).
+
+**Smart Fit speed limits (#2896).** With Smart Fit selected, the Timing section
+shows two sliders: *Fastest speed* (`audio_rate_cap`, 1.0 to 2.0, default 1.5) and
+*Slowest speed* (`min_audio_rate`, 0.5 to 1.0, default 0.85; 1.0 stops short lines
+being slowed to fill their slot). Both are sent as `fit_options`, validated by the
+API (out-of-range values return 422), saved with drafts and projects, and leave
+the defaults untouched until moved. Changing one re-mixes rendered lines without
+re-synthesizing them.
 
 Real export verification: `tests/test_smart_fit_export.py` passes all 43 tests
 with the installed app-managed FFmpeg/ffprobe explicitly supplied. Its seven

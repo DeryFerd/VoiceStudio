@@ -104,9 +104,7 @@
     "dub": "翻译并配音音频或视频。",
     "stories": "用多种声音创作场景。",
     "audiobook": "制作分章节的有声书。",
-    "transcribe": "将录音转成文字。",
-    "collapseFooter": "收起底栏",
-    "expandFooter": "展开底栏"
+    "transcribe": "将录音转成文字。"
   },
   "longformPersistence": {
     "storage_unavailable_title": "无法加载项目",
@@ -3219,13 +3217,6 @@
     "progress": "已验证 {{done}} / {{total}} 个片段",
     "cancelled": "已取消",
     "fitting": "正在调整时间"
-  },
-  "sponsorSlot": {
-    "book": "预订展示位",
-    "preview": "赞助商展示预览",
-    "message": "您的品牌、网站和留言",
-    "email_app": "打开邮件应用",
-    "copy_email": "复制邮箱"
   },
   "supportPlans": {
     "remove": "移除赞助商栏",

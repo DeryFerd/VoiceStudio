@@ -123,6 +123,14 @@ for (const entitlementFile of [config.mac.entitlements, config.mac.entitlementsI
   assert.match(entitlements, /<key>com\.apple\.security\.device\.audio-input<\/key>\s*<true\s*\/>/);
   assert.match(entitlements, /<key>com\.apple\.security\.cs\.allow-jit<\/key>\s*<true\s*\/>/);
 }
+if (DISTRIBUTION_TARGET !== 'mac-app-store') {
+  assert.equal(
+    config.mac.identity,
+    process.env.CSC_LINK ? undefined : '-',
+    'Unsigned macOS builds are signed ad hoc so the bundle signature stays valid',
+  );
+  if (config.mac.identity === '-') assert.equal(config.mac.hardenedRuntime, false);
+}
 if (DISTRIBUTION_TARGET === 'mac-app-store') {
   assert.deepEqual(config.mac.target, ['mas'], 'Mac App Store builds only the MAS package');
   assert.equal(config.mac.notarize, false, 'Apple handles Mac App Store notarization');

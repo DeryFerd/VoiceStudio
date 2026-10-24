@@ -227,6 +227,19 @@ export function LongformPage({ mode }: { mode: Mode }) {
           size="wide"
           variant="controls"
           footer={generatePanel}
+          library={
+            <div className="studio-scrollbar min-h-0 flex-1 overflow-y-auto p-3.5 text-[13px]">
+              <ProjectSettings
+                bare
+                mode={mode}
+                draft={draft}
+                disabled={locked}
+                onChange={set}
+                onBusy={setImporting}
+              />
+            </div>
+          }
+          libraryLabel={t('projects.title')}
           onCollapsedChange={setSidebarCollapsed}
           className="space-y-3 [&>details]:rounded-xl [&>details]:border [&>details]:border-border/60 [&>details]:bg-muted/20 [&>details]:p-3 [&>section]:rounded-xl [&>section]:border [&>section]:border-border/60 [&>section]:bg-muted/20 [&>section]:p-3"
         >
@@ -317,13 +330,6 @@ export function LongformPage({ mode }: { mode: Mode }) {
               onBusy={setImporting}
             />
           )}
-          <ProjectSettings
-            mode={mode}
-            draft={draft}
-            disabled={locked}
-            onChange={set}
-            onBusy={setImporting}
-          />
           <ProductionSettings
             value={draft.overrides}
             disabled={locked}

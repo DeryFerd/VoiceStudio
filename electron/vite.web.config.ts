@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import { rewriteDevApiProxyPath } from './src/shared/web-api-routing.ts';
 import { DEFAULT_BACKEND_PORT, DEFAULT_WEB_PORT, PRODUCT_NAME } from '../config/app-config.mjs';
+import { buildCommit } from '../config/build-commit.mjs';
 
 const root = resolve(import.meta.dirname, 'src/renderer');
 const webDist = resolve(import.meta.dirname, '../frontend/dist');
@@ -38,6 +39,7 @@ export default defineConfig({
   ],
   define: {
     __APP_VERSION__: JSON.stringify(version),
+    __BUILD_COMMIT__: JSON.stringify(buildCommit()),
     __WEB_DEPLOYMENT__: true,
   },
   resolve: {

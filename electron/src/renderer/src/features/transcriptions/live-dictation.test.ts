@@ -99,6 +99,19 @@ it('streams PCM and preserves repeated utterances without duplicating the EOF su
   expect(stopTrack).toHaveBeenCalled();
   expect(stopGraph).toHaveBeenCalled();
 });
+it('ignores empty utterance finals so pauses add no extra spaces (#3154)', async () => {
+  const result = vi.fn();
+  await live.start(result);
+  const socket = Socket.instances[0];
+  socket.frame({ type: 'final', final_kind: 'utterance', text: 'First sentence.' });
+  socket.frame({ type: 'final', final_kind: 'utterance', text: '' });
+  socket.frame({ type: 'final', final_kind: 'utterance', text: '   ' });
+  socket.frame({ type: 'partial', text: '  ' });
+  expect(live.getSnapshot().text).toBe('First sentence.');
+  socket.frame({ type: 'final', final_kind: 'utterance', text: ' Second sentence. ' });
+  expect(live.getSnapshot().text).toBe('First sentence. Second sentence.');
+  expect(result).toHaveBeenCalledTimes(2);
+});
 it('releases late microphone permission after cancellation', async () => {
   let allow!: (value: { getTracks: () => { stop: typeof stopTrack }[] }) => void;
   microphone.mockImplementation(

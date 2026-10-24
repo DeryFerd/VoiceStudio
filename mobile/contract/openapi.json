@@ -165,6 +165,23 @@
     "title": "ArgosPackRequest",
     "type": "object"
    },
+   "AttestationBody": {
+    "properties": {
+     "basis": {
+      "enum": [
+       "own_voice",
+       "speaker_permission"
+      ],
+      "title": "Basis",
+      "type": "string"
+     }
+    },
+    "required": [
+     "basis"
+    ],
+    "title": "AttestationBody",
+    "type": "object"
+   },
    "AudiobookPlanRequest": {
     "properties": {
      "default_voice": {
@@ -1234,6 +1251,17 @@
       ],
       "title": "Postprocess Output"
      },
+     "preset_voice": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preset Voice"
+     },
      "profile_id": {
       "anyOf": [
        {
@@ -1668,6 +1696,31 @@
      "audio"
     ],
     "title": "Body_upload_voice_clip_gallery_upload_post",
+    "type": "object"
+   },
+   "ChoicesBody": {
+    "properties": {
+     "choices": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "title": "Choices",
+      "type": "object"
+     },
+     "new_device": {
+      "default": false,
+      "title": "New Device",
+      "type": "boolean"
+     },
+     "remove_from_cloud": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Remove From Cloud",
+      "type": "array"
+     }
+    },
+    "title": "ChoicesBody",
     "type": "object"
    },
    "CleanupSegmentsRequest": {
@@ -2257,6 +2310,19 @@
       ],
       "title": "Max Audio Only Rate"
      },
+     "min_audio_rate": {
+      "anyOf": [
+       {
+        "maximum": 1.0,
+        "minimum": 0.5,
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Min Audio Rate"
+     },
      "video_slow_cap": {
       "anyOf": [
        {
@@ -2484,6 +2550,33 @@
      "repo_id"
     ],
     "title": "InstallModelRequest",
+    "type": "object"
+   },
+   "LocalValue": {
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "seen_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seen Seq"
+     },
+     "value": {
+      "title": "Value"
+     }
+    },
+    "required": [
+     "key"
+    ],
+    "title": "LocalValue",
     "type": "object"
    },
    "LongformChapter": {
@@ -4238,6 +4331,11 @@
       "title": "Backend Port",
       "type": "integer"
      },
+     "build_commit": {
+      "default": "unknown",
+      "title": "Build Commit",
+      "type": "string"
+     },
      "code_fingerprint": {
       "default": "",
       "title": "Code Fingerprint",
@@ -5860,6 +5958,456 @@
     "summary": "Create Ws Ticket",
     "tags": [
      "auth"
+    ]
+   }
+  },
+  "/api/cloud-sync/choices": {
+   "put": {
+    "operationId": "set_choices_api_cloud_sync_choices_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChoicesBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Set Choices Api Cloud Sync Choices Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Set Choices",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/confirm-deletes": {
+   "post": {
+    "operationId": "confirm_deletes_api_cloud_sync_confirm_deletes_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Confirm Deletes Api Cloud Sync Confirm Deletes Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Confirm Deletes",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/devices": {
+   "get": {
+    "operationId": "devices_api_cloud_sync_devices_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Devices Api Cloud Sync Devices Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Devices",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/devices/{device_id}/revoke": {
+   "post": {
+    "operationId": "revoke_api_cloud_sync_devices__device_id__revoke_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "device_id",
+      "required": true,
+      "schema": {
+       "pattern": "^[A-Za-z0-9]{16}$",
+       "title": "Device Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Revoke Api Cloud Sync Devices  Device Id  Revoke Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Revoke",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/local": {
+   "get": {
+    "operationId": "pulled_local_api_cloud_sync_local_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "since",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "minimum": 0,
+       "title": "Since",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Pulled Local Api Cloud Sync Local Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Pulled Local",
+    "tags": [
+     "cloud-sync"
+    ]
+   },
+   "put": {
+    "operationId": "put_local_api_cloud_sync_local_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LocalValue"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Put Local Api Cloud Sync Local Put",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Put Local",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/local/keys": {
+   "get": {
+    "operationId": "local_keys_api_cloud_sync_local_keys_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Local Keys Api Cloud Sync Local Keys Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Local Keys",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/off": {
+   "post": {
+    "operationId": "turn_off_api_cloud_sync_off_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Turn Off Api Cloud Sync Off Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Turn Off",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/on": {
+   "post": {
+    "operationId": "turn_on_api_cloud_sync_on_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChoicesBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Turn On Api Cloud Sync On Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Turn On",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/run": {
+   "post": {
+    "description": "Window focus or \"Sync now\": also starts sync if it could not start earlier.",
+    "operationId": "run_now_api_cloud_sync_run_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Run Now Api Cloud Sync Run Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Run Now",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/start": {
+   "post": {
+    "description": "Main: sync was switched on (or the app started signed in).",
+    "operationId": "start_api_cloud_sync_start_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Start Api Cloud Sync Start Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Start",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/status": {
+   "get": {
+    "operationId": "status_api_cloud_sync_status_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Status Api Cloud Sync Status Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Status",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/stop": {
+   "post": {
+    "description": "Main: sync or account features were switched off. Stops everything now.",
+    "operationId": "stop_api_cloud_sync_stop_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Stop Api Cloud Sync Stop Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Stop",
+    "tags": [
+     "cloud-sync"
+    ]
+   }
+  },
+  "/api/cloud-sync/use-choices-of/{device_id}": {
+   "post": {
+    "operationId": "use_choices_of_api_cloud_sync_use_choices_of__device_id__post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "device_id",
+      "required": true,
+      "schema": {
+       "pattern": "^[A-Za-z0-9]{16}$",
+       "title": "Device Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "title": "Response Use Choices Of Api Cloud Sync Use Choices Of  Device Id  Post",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Use Choices Of",
+    "tags": [
+     "cloud-sync"
     ]
    }
   },
@@ -15590,6 +16138,89 @@
      }
     },
     "summary": "Update Profile"
+   }
+  },
+  "/profiles/{profile_id}/attestation": {
+   "delete": {
+    "operationId": "clear_attestation_profiles__profile_id__attestation_delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "profile_id",
+      "required": true,
+      "schema": {
+       "title": "Profile Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Clear Attestation"
+   },
+   "post": {
+    "description": "Record \"This is my voice\" / \"I have the speaker's permission\" (sync consent, S2).",
+    "operationId": "attest_consent_profiles__profile_id__attestation_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "profile_id",
+      "required": true,
+      "schema": {
+       "title": "Profile Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AttestationBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Attest Consent"
    }
   },
   "/profiles/{profile_id}/audio": {

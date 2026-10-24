@@ -1,0 +1,110 @@
+# Android Play internal testing — signs the companion app with the Play upload
+# key and uploads it to the Play Console internal testing track, the Android
+# counterpart of ios-testflight.yml. Owner-dispatched from `main` only; nothing
+# is sent for production review (see docs/mobile.md → Play internal testing).
+
+name: Android Play internal testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      status:
+        description: "Release status: draft until the app's first Play Console release is rolled out"
+        type: choice
+        options: [completed, draft]
+        default: completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-play-internal
+  cancel-in-progress: false
+
+jobs:
+  play-internal:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    # Holds the Play secrets; restrict it to `main` in repository settings.
+    environment: google-play
+    concurrency:
+      group: signed-android-builds
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: mobile/android
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Require signing and upload credentials
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          for name in KEYSTORE KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD SERVICE_ACCOUNT; do
+            test -n "${!name}" || { echo "Missing $name; see docs/mobile.md → Play internal testing"; exit 1; }
+          done
+
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@42ebad84b0585498c0413b0967cf4e80ec0e1d19 # v4.4.1
+
+      - name: SDK location
+        run: printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+
+      - name: Write upload keystore
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+        run: |
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build signed bundle
+        env:
+          VOICESTUDIO_ANDROID_KEYSTORE: ${{ runner.temp }}/upload.jks
+          VOICESTUDIO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          VOICESTUDIO_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          VOICESTUDIO_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          # Shared clock and serialized builds keep codes increasing across both release workflows.
+          export VOICESTUDIO_ANDROID_VERSION_CODE="$(python3 "$GITHUB_WORKSPACE/scripts/android_version_code.py")"
+          test -n "$VOICESTUDIO_ANDROID_VERSION_CODE"
+          ./gradlew --no-daemon :app:bundleRelease
+
+      - name: Verify bundle signature
+        run: |
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify -strict "$AAB" | grep -q 'jar verified'
+          keytool -printcert -jarfile "$AAB" | grep -q 'Owner:'
+          if keytool -printcert -jarfile "$AAB" | grep -q 'CN=Android Debug'; then
+            echo "Bundle is debug-signed"; exit 1
+          fi
+
+      # Kept for the Play Console's one-time manual first upload.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: VoiceStudio-android-play
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 7
+
+      - name: Upload to Play internal testing
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: sh.voicestudio.mobile
+          releaseFiles: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: ${{ inputs.status }}
+
+      - name: Remove upload keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"

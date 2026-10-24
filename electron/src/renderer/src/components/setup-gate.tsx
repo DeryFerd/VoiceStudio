@@ -1,5 +1,6 @@
 import { ModelLibrary, PerformanceModelPacks } from '@/features/settings/model-library';
 import { AnalyticsConsent } from './analytics-consent';
+import { AccountConsent } from './account-consent';
 import { SetupRecovery } from './setup-recovery';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -52,6 +53,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
   const setAdvanced = step === 3 ? setDictationSetup : setSetupAdvanced;
   const [family, setFamily] = useState<ModelFamily>('tts');
   const [consentRequired, setConsentRequired] = useState(true);
+  const [accountChoiceRequired, setAccountChoiceRequired] = useState(false);
   const [enteringStudio, setEnteringStudio] = useState(false);
   const status = useQuery({
     queryKey: ['setup-status'],
@@ -97,7 +99,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
       : step === 1
         ? status.data?.models_ready
         : step === 2
-          ? !consentRequired
+          ? !consentRequired && !accountChoiceRequired
           : true);
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
@@ -203,6 +205,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
               {step === 2 && (
                 <>
                   <AnalyticsConsent onRequirementChange={setConsentRequired} />
+                  <AccountConsent onRequirementChange={setAccountChoiceRequired} />
                   <PrivacySettings showAnalytics={false} />
                 </>
               )}

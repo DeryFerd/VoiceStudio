@@ -44,7 +44,7 @@ vi.mock('./runtime-project', () => ({
   stageRuntimeSources: async () => {},
   runtimePython: () => '/runtime/python',
 }));
-import { BackendSupervisor } from './backend';
+import { BackendSupervisor, bindFailureFromLog } from './backend';
 import { availableBackendPort } from './backend-port';
 
 afterEach(() => {
@@ -359,3 +359,14 @@ it.each(['', '3900'])(
     }
   },
 );
+
+it.each([
+  ['[Errno 13] error while attempting to bind on address (\'127.0.0.1\', 3900): access denied', 'denied'],
+  ['ERROR:    [Errno 10013] error while attempting to bind on address (\'127.0.0.1\', 3900)', 'denied'],
+  ['[Errno 10048] error while attempting to bind on address (\'127.0.0.1\', 3900)', 'in_use'],
+  ['[Errno 98] error while attempting to bind on address (\'127.0.0.1\', 3900)', 'in_use'],
+  ['[Errno 2] No such file or directory', null],
+  ['INFO: Application shutdown complete.', null],
+])('classifies uvicorn bind failures by errno (#3020): %s', (log, expected) => {
+  expect(bindFailureFromLog(log)).toBe(expected);
+});

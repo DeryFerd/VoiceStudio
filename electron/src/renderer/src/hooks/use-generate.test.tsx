@@ -132,7 +132,7 @@ describe('shared generation lifecycle', () => {
     await waitFor(() => expect(screen.getByText('composer:idle')).toBeInTheDocument());
     expect(generateClone).toHaveBeenCalledTimes(1);
     expect(setLatestOutput).toHaveBeenCalledWith(result, 'Hello');
-    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { position: 'top-right' });
   });
 
   it('surfaces the backend model-loading sub-stage and progress', async () => {

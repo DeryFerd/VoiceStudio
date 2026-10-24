@@ -1,6 +1,7 @@
 import Foundation
 import VoiceStudioKit
 
+#if DEBUG
 /// Only selected by the UI test launch argument. No socket is opened.
 actor SmokeVault: CredentialVault {
     private var values: [String: Credentials] = [:]
@@ -26,7 +27,7 @@ struct SmokeTransport: HTTPTransport {
     }
     private func reply(_ json: String, headers: [String: String] = [:]) -> HTTPReply { HTTPReply(data: Data(json.utf8), headers: headers) }
     private static func wav() -> Data {
-        let count: UInt32 = 16000
+        let count: UInt32 = 16000 * 5
         var result = Data()
         func ascii(_ text: String) { result.append(Data(text.utf8)) }
         func u32(_ n: UInt32) { var value = n.littleEndian; withUnsafeBytes(of: &value) { result.append(contentsOf: $0) } }
@@ -36,3 +37,4 @@ struct SmokeTransport: HTTPTransport {
         return result
     }
 }
+#endif

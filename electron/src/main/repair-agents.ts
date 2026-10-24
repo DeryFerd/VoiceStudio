@@ -83,6 +83,23 @@ function expectedAgentPipeClose(error: unknown): boolean {
 }
 
 /** Agent CLIs may exit before consuming a prompt. Their pipe errors are asynchronous. */
+/**
+ * Backend-only capabilities (loopback bridges into Electron main). Third-party
+ * agent CLIs must never inherit them; every agent spawn builds its env here.
+ */
+const BACKEND_ONLY_ENV = [
+  'VOICESTUDIO_LLM_AGENT_URL',
+  'VOICESTUDIO_LLM_AGENT_TOKEN',
+  'VOICESTUDIO_ACCOUNT_BRIDGE_URL',
+  'VOICESTUDIO_ACCOUNT_BRIDGE_TOKEN',
+] as const;
+
+export function agentChildEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...envWithToolPath(), ...extra };
+  for (const key of BACKEND_ONLY_ENV) env[key] = undefined;
+  return env;
+}
+
 export function guardAgentProcessStreams(
   childProcess: Pick<ChildProcessWithoutNullStreams, AgentStreamName>,
   onUnexpectedError: (error: Error) => void = () => {},
@@ -151,7 +168,7 @@ interface ProbeResult {
  * Run a short probe without blocking the main process: a synchronous
  * `which`/`--version` per CLI froze every window for up to seconds each.
  */
-function probe(executable: string, args: string[]): Promise<ProbeResult> {
+export function probe(executable: string, args: string[]): Promise<ProbeResult> {
   return new Promise((resolveProbe) => {
     try {
       const child = execFile(
@@ -160,7 +177,7 @@ function probe(executable: string, args: string[]): Promise<ProbeResult> {
         {
           encoding: 'utf8',
           timeout: PROBE_TIMEOUT_MS,
-          env: envWithToolPath(),
+          env: agentChildEnv({}),
           windowsHide: true,
         },
         (error, stdout, stderr) =>
@@ -860,18 +877,15 @@ export async function registerRepairAgents(
       }
       child = spawn(command.executable, args, {
         cwd: sourceRoot ?? dirname(apiBridge.contextFile),
-        env: {
-          ...envWithToolPath(),
+        env: agentChildEnv({
           NO_COLOR: '1',
           FORCE_COLOR: '0',
           VOICESTUDIO_REPAIR_CONTEXT_FILE: apiBridge.contextFile,
-          VOICESTUDIO_LLM_AGENT_TOKEN: undefined,
-          VOICESTUDIO_LLM_AGENT_URL: undefined,
           ...(command.prefix.length ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
           ...(request.agent === 'opencode' && apiBridge.openCodeConfigFile
             ? { OPENCODE_CONFIG: apiBridge.openCodeConfigFile }
             : {}),
-        },
+        }),
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -1015,16 +1029,12 @@ export async function registerRepairAgents(
         }, timeoutMs);
         translationChild = spawn(command.executable, args, {
           cwd: translationTemp!,
-          env: {
-            ...envWithToolPath(),
-            // Agent subprocesses must not inherit the backend-only capability.
-            VOICESTUDIO_LLM_AGENT_TOKEN: undefined,
-            VOICESTUDIO_LLM_AGENT_URL: undefined,
+          env: agentChildEnv({
             ...(command.prefix.length ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
             NO_COLOR: '1',
             FORCE_COLOR: '0',
             ...(request.agent === 'opencode' ? { OPENCODE_CONFIG: openCodeConfigPath } : {}),
-          },
+          }),
           windowsHide: true,
           stdio: ['pipe', 'pipe', 'pipe'],
         });

@@ -1665,6 +1665,53 @@
       }
     },
     {
+      "id": "mlx-community/VoxCPM2-8bit",
+      "license": "apache-2.0",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "mlx-community/VoxCPM2-8bit",
+      "source_url": "https://huggingface.co/mlx-community/VoxCPM2-8bit",
+      "evidence_url": "https://huggingface.co/mlx-community/VoxCPM2-8bit/blob/d52725898a0675703f7f9ddc5a4d1a3cdbb99032/README.md",
+      "revision": "d52725898a0675703f7f9ddc5a4d1a3cdbb99032",
+      "engines": [
+        "mlx-audio"
+      ],
+      "configured_at": "backend/config/models.yaml",
+      "notes": "Licence identifier is upstream model-card metadata, not verified permission for this distribution. Component terms and attribution text require review.",
+      "runtime_revision": "d52725898a0675703f7f9ddc5a4d1a3cdbb99032",
+      "runtime_pin_scope": "central",
+      "runtime_pin_source": "backend/services/hf_revisions.py",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "unknown",
+      "audit_observations": {
+        "commercial_inference": {
+          "status": "unreviewed",
+          "scope": "Selected weight/component only; not complete workflow clearance."
+        },
+        "output_terms": {
+          "status": "not_assessed",
+          "ownership_or_all_rights_cleared": false
+        },
+        "sources": [],
+        "open_questions": [
+          "Governing terms at installed revision and relevant required components",
+          "Attribution/NOTICE/redistribution duties",
+          "Reference voice and input rights, consent, training-provenance scope"
+        ],
+        "identified_components": [
+          "Sesame CSM model and MLX conversion",
+          "Mimi audio codec",
+          "Llama architecture/text-tokenizer lineage must be inspected, not assumed equivalent to model weights",
+          "voice/reference sample"
+        ]
+      }
+    },
+    {
       "id": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit",
       "license": "apache-2.0",
       "commercial_use": false,
@@ -2946,6 +2993,262 @@
           "Reference voice and input rights, consent, training-provenance scope"
         ],
         "identified_components": []
+      }
+    },
+    {
+      "id": "csukuangfj/kitten-mini-en-v0_1-fp16",
+      "license": "apache-2.0; gpl-3.0",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "KittenML; ONNX conversion by Fangjun Kuang; eSpeak NG contributors",
+      "source_url": "https://huggingface.co/csukuangfj/kitten-mini-en-v0_1-fp16",
+      "evidence_url": "https://huggingface.co/csukuangfj/kitten-mini-en-v0_1-fp16/blob/2472be3b6436106f15d361747c225daa209d7bd8/LICENSE",
+      "revision": "2472be3b6436106f15d361747c225daa209d7bd8",
+      "engines": [
+        "sherpa-onnx"
+      ],
+      "configured_at": "mobile/contract/models.source.json",
+      "notes": "The selected ONNX repo LICENSE declares Apache-2.0. Required eSpeak NG phonemizer data is GPL-3.0, so the complete offered selection is conditional, not commercial-OK. Only English runtime data is selected; model voices require retained upstream notices.",
+      "runtime_revision": "2472be3b6436106f15d361747c225daa209d7bd8",
+      "runtime_pin_scope": "external",
+      "runtime_pin_source": "mobile/contract/models.source.json",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "not_required",
+      "audit_observations": {
+        "commercial_inference": {
+          "status": "component_conditions_recorded",
+          "scope": "Selected phone files only; no complete workflow or distribution clearance."
+        },
+        "output_terms": {
+          "status": "not_assessed",
+          "ownership_or_all_rights_cleared": false
+        },
+        "sources": [
+          {
+            "url": "https://huggingface.co/csukuangfj/kitten-mini-en-v0_1-fp16/blob/2472be3b6436106f15d361747c225daa209d7bd8/LICENSE",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://github.com/espeak-ng/espeak-ng/blob/2e9a5fccbb0095e87b2769e9249ea1f821918ecd/COPYING",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://huggingface.co/KittenML/kitten-tts-mini-0.1/blob/01d5d9ef9d365444e6d3669f7f3fe8a20bad9439/README.md",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          }
+        ],
+        "open_questions": [
+          "Conversion and bundled component provenance / required notices",
+          "Voice, input, output and training-data rights for the intended use"
+        ],
+        "identified_components": [
+          "model.fp16.onnx",
+          "tokens.txt",
+          "voices.bin",
+          "espeak-ng-data/phondata",
+          "espeak-ng-data/phonindex",
+          "espeak-ng-data/phontab",
+          "espeak-ng-data/intonations",
+          "espeak-ng-data/en_dict",
+          "espeak-ng-data/lang/gmw/en",
+          "espeak-ng-data/lang/gmw/en-US"
+        ]
+      }
+    },
+    {
+      "id": "csukuangfj/kokoro-int8-multi-lang-v1_1",
+      "license": "apache-2.0; gpl-3.0",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "hexgrad / Kokoro contributors; ONNX conversion by Fangjun Kuang; eSpeak NG contributors",
+      "source_url": "https://huggingface.co/csukuangfj/kokoro-int8-multi-lang-v1_1",
+      "evidence_url": "https://huggingface.co/csukuangfj/kokoro-int8-multi-lang-v1_1/blob/155831f1b4ba23b1f5c058be6a61df90cefb2a37/LICENSE",
+      "revision": "155831f1b4ba23b1f5c058be6a61df90cefb2a37",
+      "engines": [
+        "sherpa-onnx"
+      ],
+      "configured_at": "mobile/contract/models.source.json",
+      "notes": "The selected repo LICENSE declares Apache-2.0. Required eSpeak NG phonemizer data is GPL-3.0; the offered selection is conditional. Pinned sherpa frontend supports English and Mandarin, with 103 speaker IDs. Lexicons and Chinese normalization FSTs are selected; the unused CppJieba dictionaries and other languages are excluded.",
+      "runtime_revision": "155831f1b4ba23b1f5c058be6a61df90cefb2a37",
+      "runtime_pin_scope": "external",
+      "runtime_pin_source": "mobile/contract/models.source.json",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "not_required",
+      "audit_observations": {
+        "commercial_inference": {
+          "status": "component_conditions_recorded",
+          "scope": "Selected phone files only; no complete workflow or distribution clearance."
+        },
+        "output_terms": {
+          "status": "not_assessed",
+          "ownership_or_all_rights_cleared": false
+        },
+        "sources": [
+          {
+            "url": "https://huggingface.co/csukuangfj/kokoro-int8-multi-lang-v1_1/blob/155831f1b4ba23b1f5c058be6a61df90cefb2a37/LICENSE",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://github.com/espeak-ng/espeak-ng/blob/2e9a5fccbb0095e87b2769e9249ea1f821918ecd/COPYING",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://huggingface.co/hexgrad/Kokoro-82M-v1.1-zh/blob/01e7505bd6a7a2ac4975463114c3a7650a9f7218/README.md",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          }
+        ],
+        "open_questions": [
+          "Conversion and bundled component provenance / required notices",
+          "Voice, input, output and training-data rights for the intended use"
+        ],
+        "identified_components": [
+          "model.int8.onnx",
+          "tokens.txt",
+          "voices.bin",
+          "lexicon-us-en.txt",
+          "lexicon-zh.txt",
+          "date-zh.fst",
+          "number-zh.fst",
+          "phone-zh.fst",
+          "espeak-ng-data/phondata",
+          "espeak-ng-data/phonindex",
+          "espeak-ng-data/phontab",
+          "espeak-ng-data/intonations",
+          "espeak-ng-data/en_dict",
+          "espeak-ng-data/lang/gmw/en",
+          "espeak-ng-data/lang/gmw/en-US"
+        ]
+      }
+    },
+    {
+      "id": "csukuangfj/sherpa-onnx-whisper-base",
+      "license": "NOASSERTION",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "OpenAI; sherpa-onnx conversion by Fangjun Kuang",
+      "source_url": "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base",
+      "evidence_url": "https://github.com/openai/whisper/blob/31243bad24cc746f07d4c8bfdd2d974872cb1803/LICENSE",
+      "revision": "bb53ee204431c90d314c1cc08d28d23e5b7927cc",
+      "engines": [
+        "sherpa-onnx"
+      ],
+      "configured_at": "mobile/contract/models.source.json",
+      "notes": "The export repo has no model card or LICENSE. OpenAI releases original Whisper code and weights under MIT (linked evidence), but this does not establish governing terms for the converted files. Keep the unidentified category and require acceptance. Only int8 encoder/decoder and tokens are offered.",
+      "runtime_revision": "bb53ee204431c90d314c1cc08d28d23e5b7927cc",
+      "runtime_pin_scope": "external",
+      "runtime_pin_source": "mobile/contract/models.source.json",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "not_required",
+      "audit_observations": {
+        "commercial_inference": {
+          "status": "unreviewed",
+          "scope": "Selected phone files only; no complete workflow or distribution clearance."
+        },
+        "output_terms": {
+          "status": "not_assessed",
+          "ownership_or_all_rights_cleared": false
+        },
+        "sources": [
+          {
+            "url": "https://github.com/openai/whisper/blob/31243bad24cc746f07d4c8bfdd2d974872cb1803/LICENSE",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://github.com/openai/whisper/blob/31243bad24cc746f07d4c8bfdd2d974872cb1803/README.md",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          }
+        ],
+        "open_questions": [
+          "Conversion and bundled component provenance / required notices",
+          "Voice, input, output and training-data rights for the intended use"
+        ],
+        "identified_components": [
+          "base-encoder.int8.onnx",
+          "base-decoder.int8.onnx",
+          "base-tokens.txt"
+        ]
+      }
+    },
+    {
+      "id": "unsloth/Qwen3-1.7B-GGUF",
+      "license": "apache-2.0",
+      "commercial_use": false,
+      "review_status": "unreviewed",
+      "credit": "Alibaba Cloud / Qwen Team; GGUF quantization by Unsloth AI",
+      "source_url": "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF",
+      "evidence_url": "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/blob/d7f544eead698dbd1f15126ef60b45a1e1933222/README.md",
+      "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+      "engines": [
+        "llama.cpp"
+      ],
+      "configured_at": "mobile/contract/models.source.json",
+      "notes": "Pinned Unsloth card declares Apache-2.0 and links Qwen3-1.7B. Q4_K_M is 1,107,409,472 bytes and carries its tokenizer inside the GGUF; no separate tokenizer download is needed. Chosen over the official Q8_0-only GGUF repo to fit the approximately 1.2 GB target. Small multilingual instruction model with non-thinking ChatML and bounded context; translation quality is not guaranteed.",
+      "runtime_revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+      "runtime_pin_scope": "external",
+      "runtime_pin_source": "mobile/contract/models.source.json",
+      "component_closure": "incomplete",
+      "commercial_inference": "unknown",
+      "commercial_outputs": "unknown",
+      "documents": [],
+      "artifacts": [],
+      "required_components": [],
+      "upstream_access": "not_required",
+      "audit_observations": {
+        "commercial_inference": {
+          "status": "permissive_metadata_only",
+          "scope": "Selected phone files only; no complete workflow or distribution clearance."
+        },
+        "output_terms": {
+          "status": "not_assessed",
+          "ownership_or_all_rights_cleared": false
+        },
+        "sources": [
+          {
+            "url": "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/blob/d7f544eead698dbd1f15126ef60b45a1e1933222/README.md",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://huggingface.co/Qwen/Qwen3-1.7B/blob/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e/LICENSE",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          },
+          {
+            "url": "https://huggingface.co/Qwen/Qwen3-1.7B/blob/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e/README.md",
+            "checked_at": "2026-10-18",
+            "method": "read_primary_source"
+          }
+        ],
+        "open_questions": [
+          "Conversion and bundled component provenance / required notices",
+          "Voice, input, output and training-data rights for the intended use"
+        ],
+        "identified_components": [
+          "Qwen3-1.7B-Q4_K_M.gguf"
+        ]
       }
     }
   ],

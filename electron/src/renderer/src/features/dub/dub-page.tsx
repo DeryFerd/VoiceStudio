@@ -1,3 +1,4 @@
+import { DubProjects } from './dub-projects';
 import { Menu } from '@base-ui/react/menu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SecondarySidebar } from '@/components/workspace-sidebar';
@@ -22,7 +23,12 @@ import { CheckpointBanner, type CheckpointStage } from './checkpoint-banner';
 import { ConfirmDialog } from '../clone/confirm-dialog';
 import { useDubOnsets } from './use-dub-onsets';
 import { useDubLivePreview } from './use-dub-live-preview';
-import { setDubQuality, setDubProduction, setDubTranslationOptions } from './dub-session';
+import {
+  setDubFitOptions,
+  setDubQuality,
+  setDubProduction,
+  setDubTranslationOptions,
+} from './dub-session';
 import { DEFAULT_REPAIR_AGENT_KEY } from '@/lib/repair-agent-events';
 import type { RepairAgentId, RepairAgentInfo } from '../../../../preload/index.d';
 import {
@@ -1006,6 +1012,8 @@ export function DubPage() {
           icon={FilmIcon}
           size="spacious"
           variant="controls"
+          library={(active) => <DubProjects active={active} />}
+          libraryLabel={t('projects.title')}
           className="flex flex-col gap-2"
         >
           <section
@@ -1643,6 +1651,55 @@ export function DubPage() {
               </div>
               {['smart_fit', 'stretch_video'].includes(session.timingStrategy || '') && (
                 <p className="text-xs text-muted-foreground">{t('exportModal.retime_note')}</p>
+              )}
+              {session.timingStrategy === 'smart_fit' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">{t('dub.fit_speed_hint')}</p>
+                  {(
+                    [
+                      {
+                        key: 'audio_rate_cap',
+                        label: 'dub.fit_max_speed',
+                        min: 1,
+                        max: 2,
+                        defaultValue: 1.5,
+                      },
+                      {
+                        key: 'min_audio_rate',
+                        label: 'dub.fit_min_speed',
+                        min: 0.5,
+                        max: 1,
+                        defaultValue: 0.85,
+                      },
+                    ] as const
+                  ).map((knob) => {
+                    const current = session.fitOptions?.[knob.key] ?? knob.defaultValue;
+                    return (
+                      <label key={knob.key} className="block space-y-1 text-xs">
+                        <span className="flex justify-between">
+                          <span>{t(knob.label)}</span>
+                          <span className="tabular-nums">{current.toFixed(2)}×</span>
+                        </span>
+                        <input
+                          type="range"
+                          className="w-full accent-primary"
+                          aria-label={t(knob.label)}
+                          min={knob.min}
+                          max={knob.max}
+                          step={0.05}
+                          value={current}
+                          disabled={busy || Boolean(session.recovery)}
+                          onChange={(event) => {
+                            const value = Number(event.target.value);
+                            setDubFitOptions({
+                              [knob.key]: value === knob.defaultValue ? undefined : value,
+                            });
+                          }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
               )}
               <p className="text-xs font-medium text-muted-foreground">{t('dub.voice_match')}</p>
               <p className="text-xs text-muted-foreground">{t('dub.voice_match_title')}</p>

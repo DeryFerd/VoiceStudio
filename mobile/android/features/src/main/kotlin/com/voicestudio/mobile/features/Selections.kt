@@ -35,7 +35,7 @@ class LanguageCatalog(val names: List<String>) {
     }
 }
 
-data class Choice(val id: String, val title: String, val enabled: Boolean = true, val supporting: String? = null)
+data class Choice(val id: String, val title: String, val enabled: Boolean = true, val supporting: String? = null, val swatch: Long? = null)
 fun engineChoices(family: EngineFamily, profile: Profile?, text: (String) -> String): List<Choice> = family.backends.map { engine ->
     val incompatible = profile?.hasReferenceAudio == true && engine.supportsCloning != true
     val explanation=listOfNotNull(

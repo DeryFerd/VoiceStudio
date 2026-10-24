@@ -104,9 +104,7 @@
     "dub": "Ses veya videoyu çevirip dublaj yapın.",
     "stories": "Birden fazla sesle sahneler oluşturun.",
     "audiobook": "Bölümlü sesli kitaplar oluşturun.",
-    "transcribe": "Kayıtları metne dönüştürün.",
-    "collapseFooter": "Alt çubuğu daralt",
-    "expandFooter": "Alt çubuğu genişlet"
+    "transcribe": "Kayıtları metne dönüştürün."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Projeler yüklenemedi",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} bölüm doğrulandı",
     "cancelled": "İptal edildi",
     "fitting": "Zamanlama ayarlanıyor"
-  },
-  "sponsorSlot": {
-    "book": "Yerinizi ayırtın",
-    "preview": "Sponsor önizlemesi",
-    "message": "Markanız, web siteniz ve mesajınız",
-    "email_app": "E-posta uygulamasını aç",
-    "copy_email": "E-postayı kopyala"
   },
   "supportPlans": {
     "remove": "Sponsor çubuğunu kaldır",

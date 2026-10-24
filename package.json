@@ -1,6 +1,6 @@
 {
   "name": "omnivoice-studio-monorepo",
-  "version": "0.5.7",
+  "version": "0.5.7-beta.2",
   "license": "AGPL-3.0-only",
   "private": true,
   "packageManager": "bun@1.4.2",
@@ -37,10 +37,10 @@
   },
   "workspaces": ["electron"],
   "devDependencies": {
-    "concurrently": "^10.0.5",
-    "playwright": "^1.63.0",
+    "concurrently": "^10.0.6",
+    "playwright": "^1.64.1",
     "taze": "^21.3.0",
-    "turbo": "^2.11.5",
+    "turbo": "^2.11.10",
     "typescript": "^7.0.2",
     "wait-on": "^9.5.1"
   }

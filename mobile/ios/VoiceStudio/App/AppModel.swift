@@ -6,6 +6,7 @@ import UserNotifications
 import BackgroundTasks
 
 @MainActor @Observable final class AppModel {
+    let phone = PhoneModels()
     let connection: ConnectionStore
     let hostState: HostState
     var dub: DubWorkflow { hostState.dub }
@@ -16,6 +17,12 @@ import BackgroundTasks
     var history: [HistoryItem] { get { hostState.history } set { hostState.history = newValue } }
     var dubHistory: [DubHistoryItem] { get { hostState.dubHistory } set { hostState.dubHistory = newValue } }
     var error: ClientError?
+    /// A short confirmation key (e.g. `mobile.report.sent`) shown above the tabs.
+    var notice: String?
+    /// Content-report drafts per result, kept in memory until sent.
+    let reports = ContentReports(client: ContentReportClient(baseURL: ContentReportClient.baseURL(info: Bundle.main.infoDictionary)), appVersion: ContentReportClient.appVersion(info: Bundle.main.infoDictionary))
+    /// The engine each computer take was generated with, from the host's engine inventory (memory only).
+    @ObservationIgnored var computerEngines: [String: String] = [:]
     var busy = false
     @ObservationIgnored private var activityCount = 0
     var consentAnswered: Bool
@@ -26,14 +33,20 @@ import BackgroundTasks
     private(set) var monitorTask: Task<Void, Never>?
     private var notified = Set<String>()
     private var monitorID = UUID()
-    let mockMode: Bool
-    init() {
-        mockMode = ProcessInfo.processInfo.arguments.contains("--ui-smoke")
+    /// `mock` runs the offline smoke host (debug builds only), for SwiftUI previews.
+    init(mock: Bool = false) {
         let d = UserDefaults.standard
+        #if DEBUG
+        let mockMode = mock || ProcessInfo.processInfo.arguments.contains("--ui-smoke")
         if mockMode {
+            for task in ["speak", "dictate", "clone", "dub"] { d.removeObject(forKey: "run-on."+task) }
             d.removeObject(forKey: "consentAnswered"); d.removeObject(forKey: "activeHost")
+            d.removeObject(forKey: "theme"); d.removeObject(forKey: "language")
             connection = ConnectionStore(defaults: d, vault: SmokeVault(), transport: SmokeTransport())
         } else { connection = ConnectionStore() }
+        #else
+        connection = ConnectionStore()
+        #endif
         hostState = HostState(dub: DubWorkflow())
         consentAnswered = d.bool(forKey: "consentAnswered")
         analytics = d.bool(forKey: "analytics"); notifications = d.bool(forKey: "notifications")
@@ -47,6 +60,8 @@ import BackgroundTasks
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundMonitor.identifier)
             self.error = nil; self.loading = false; self.notified.removeAll()
         }
+        phone.onDubFinished = { [weak self] request in await self?.notifyPhone(request) }
+
     }
     @ObservationIgnored private let translator = L10n()
     var l10n: L10n { var value = translator; value.locale = (language.isEmpty ? Locale.current.identifier : language).replacingOccurrences(of: "_", with: "-"); return value }
@@ -61,6 +76,16 @@ import BackgroundTasks
         catch is CancellationError {}
         catch let failure as ClientError { guard scope == hostState.scopeID || connectionChange else { return }; error = failure; await connection.handle(failure, connectionChange: connectionChange) }
         catch { if scope == hostState.scopeID { self.error = ClientError("mobile.errors.file") } }
+    }
+    func perform(onPhone: Bool,_ work: @escaping @MainActor () async throws -> Void) async {
+        if onPhone { await performPhone(work) } else { await perform(work) }
+    }
+    func performPhone(_ work: @escaping @MainActor () async throws -> Void) async {
+        activityCount += 1; busy = true
+        defer { activityCount -= 1; busy = activityCount > 0 }
+        do { try await work() }
+        catch is CancellationError {}
+        catch { self.error = error as? ClientError ?? ClientError("mobile.simple.error") }
     }
     func refresh() async throws {
         let scope = hostState.scopeID
@@ -110,6 +135,17 @@ import BackgroundTasks
         content.sound = .default
         do { try await center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil)); notified.insert(id); UserDefaults.standard.set(true, forKey: id) }
         catch { self.error = ClientError("mobile.permissions.denied") }
+    }
+    private func notifyPhone(_ request: PhoneDubRequest) async {
+        let id = "phone-dub-"+request.id.uuidString
+        guard notifications, !UserDefaults.standard.bool(forKey: id), !Task.isCancelled else { return }
+        let status = await Self.authorizationStatus()
+        guard status == .authorized || status == .provisional else { return }
+        let content = UNMutableNotificationContent(); content.title = t("mobile.dub.done_notification",["title": request.title]); content.sound = .default
+        do {
+            try await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id,content: content,trigger: nil))
+            UserDefaults.standard.set(true,forKey: id)
+        } catch { self.error = ClientError("mobile.permissions.denied") }
     }
     // UNNotificationSettings isn't Sendable; read it off the main actor and return only the status.
     nonisolated private static func authorizationStatus() async -> UNAuthorizationStatus {

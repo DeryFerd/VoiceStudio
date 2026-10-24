@@ -360,6 +360,33 @@ def test_smart_fit_fit_options_override(patched_generate):
     assert not (job_dir / "dubbed_es.wav").exists()
 
 
+def test_smart_fit_min_audio_rate_override_widens_and_disables_underrun_fill(patched_generate):
+    run, model, job, job_dir = patched_generate
+    # seg0 [0,1] natural 0.5s sits in a ~1.95s slot: the default 0.85 floor
+    # slows it only to 0.85x; a 0.6 floor lets it stretch further, and 1.0
+    # turns the fill off (#2896).
+    segs = [
+        {"start": 0.0, "end": 1.0, "text": "0.5:hola"},
+        {"start": 2.0, "end": 3.0, "text": "2.2:buenos dias"},
+    ]
+    wide = _done(run(_body(segs, timing_strategy="smart_fit",
+                           fit_options={"min_audio_rate": 0.6})))
+    assert wide["fit_status"][0]["audio_rate"] == pytest.approx(0.6, abs=1e-3)
+    off = _done(run(_body(segs, timing_strategy="smart_fit",
+                          fit_options={"min_audio_rate": 1.0})))
+    assert off["fit_status"][0]["status"] == "fits"
+
+
+def test_smart_fit_rejects_out_of_range_min_audio_rate():
+    from pydantic import ValidationError
+
+    for bad in (0.2, 1.5, float("nan"), float("inf")):
+        with pytest.raises(ValidationError):
+            DubRequest(**_body([{"start": 0.0, "end": 1.0, "text": "x"}],
+                               timing_strategy="smart_fit",
+                               fit_options={"min_audio_rate": bad}))
+
+
 # ── Strategy-transition guard + fit-only re-mix ────────────────────────
 
 

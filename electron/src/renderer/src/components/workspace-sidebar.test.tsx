@@ -59,3 +59,95 @@ it('pins a footer outside the scrolling content and reports collapse so a page c
   expect(onCollapsedChange).toHaveBeenLastCalledWith(true);
   expect(document.querySelector('[data-slot="secondary-sidebar-footer"]')).toBeNull();
 });
+
+it("switches between a page's controls and its section library, hiding the pinned footer in the library", () => {
+  render(
+    <SecondarySidebar
+      title="Design"
+      icon={FilmIcon}
+      library={<div>Voices list</div>}
+      libraryLabel="Saved voices"
+      footer={<button type="button">Generate</button>}
+    >
+      <section>Controls body</section>
+    </SecondarySidebar>,
+  );
+  expect(screen.getByRole('tab', { name: 'Design' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.queryByText('Voices list')).toBeNull();
+  fireEvent.click(screen.getByRole('tab', { name: 'Saved voices' }));
+  expect(screen.getByText('Voices list')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Generate' })).toBeNull();
+  fireEvent.click(screen.getByRole('tab', { name: 'Design' }));
+  expect(screen.getByRole('button', { name: 'Generate' })).toBeVisible();
+});
+
+it.each([
+  ['ltr', 'ArrowRight'],
+  ['rtl', 'ArrowLeft'],
+])(
+  'selects section tabs with the keyboard in %s without discarding controls',
+  (direction, forward) => {
+    render(
+      <SecondarySidebar
+        title="Design"
+        icon={FilmIcon}
+        library={<div>Voices list</div>}
+        libraryLabel="Saved voices"
+      >
+        <input aria-label="Draft" defaultValue="My next voice" />
+      </SecondarySidebar>,
+    );
+    screen.getByRole('tablist').style.direction = direction;
+    const controls = screen.getByRole('tab', { name: 'Design' });
+    controls.focus();
+    fireEvent.keyDown(controls, { key: forward });
+    const library = screen.getByRole('tab', { name: 'Saved voices' });
+    expect(library).toHaveFocus();
+    expect(library).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Voices list')).toBeVisible();
+    fireEvent.keyDown(library, { key: 'Home' });
+    expect(screen.getByRole('textbox', { name: 'Draft' })).toHaveValue('My next voice');
+    expect(controls).toHaveFocus();
+  },
+);
+
+it('preserves edits in a section library when switching back to the controls', () => {
+  render(
+    <SecondarySidebar
+      title="Stories"
+      icon={FilmIcon}
+      library={<input aria-label="Project name" defaultValue="Draft" />}
+      libraryLabel="Projects"
+    >
+      <section>Controls</section>
+    </SecondarySidebar>,
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Projects' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Project name' }), {
+    target: { value: 'My story' },
+  });
+  fireEvent.click(screen.getByRole('tab', { name: 'Stories' }));
+  fireEvent.click(screen.getByRole('tab', { name: 'Projects' }));
+  expect(screen.getByRole('textbox', { name: 'Project name' })).toHaveValue('My story');
+});
+
+it('reports a retained library as inactive when its tab is hidden', () => {
+  render(
+    <SecondarySidebar
+      title="Dub"
+      icon={FilmIcon}
+      library={(active) => <input aria-label="Load active" value={String(active)} readOnly />}
+      libraryLabel="Projects"
+    >
+      <section>Controls</section>
+    </SecondarySidebar>,
+  );
+  fireEvent.click(screen.getByRole('tab', { name: 'Projects' }));
+  const field = screen.getByRole('textbox', { name: 'Load active' });
+  expect(field).toHaveValue('true');
+  fireEvent.click(screen.getByRole('tab', { name: 'Dub' }));
+  expect(field).toHaveValue('false');
+  fireEvent.click(screen.getByRole('tab', { name: 'Projects' }));
+  expect(screen.getByRole('textbox', { name: 'Load active' })).toBe(field);
+  expect(field).toHaveValue('true');
+});

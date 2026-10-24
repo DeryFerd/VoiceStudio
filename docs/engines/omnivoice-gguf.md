@@ -1,7 +1,7 @@
 # VoiceStudio — OmniVoice GGUF Engine
 
 OmniVoice GGUF runs the same OmniVoice model as the [default
-engine](omnivoice.md), but through a bundled native binary
+engine](omnivoice.md), but through a native binary
 (`bin/omnivoice-tts-<platform>`) loading quantized GGUF weights. It is
 hardware-adaptive: a probe picks the quantization that fits your machine, so
 small GPUs and CPU-only hosts get a working OmniVoice instead of a paging,
@@ -31,15 +31,20 @@ against the same table (an F32 reference quant, ~3.2 GB, is override-only).
 
 ## Setup
 
-Nothing to install: installer and CI builds bundle the binary for your
-platform. Select the engine via **Model Catalogue** (TTS tab → **Use**) or
-`OMNIVOICE_TTS_BACKEND=omnivoice-gguf`. The quant weights download on first
-use (see [downloading-models.md](../downloading-models.md)) — install them
-ahead of time from **Model Catalogue (TTS tab → the engine's Weights)** if you want the first
-generation to be quick; a long first render is the download, not a hang.
+The desktop installers (Windows, macOS, Linux packages) do **not** ship this
+native binary yet, so on an installed app the engine shows *Unavailable* in
+Model Catalogue ([#2780](https://github.com/debpalash/VoiceStudio/issues/2780)).
+Use the default in-process OmniVoice engine, which is the same model, or run
+from a source checkout and build the binary for your platform (below). Once
+`bin/omnivoice-tts-<platform>` exists, select the engine via **Model Catalogue**
+(TTS tab → **Use**) or `OMNIVOICE_TTS_BACKEND=omnivoice-gguf`. The quant weights
+download on first use (see [downloading-models.md](../downloading-models.md)) —
+install them ahead of time from **Model Catalogue (TTS tab → the engine's
+Weights)** if you want the first generation to be quick; a long first render is
+the download, not a hang.
 
 **Source checkouts:** the repo ships zero-byte placeholders in `bin/` — real
-binaries come from CI or the installer. The engine detects a placeholder and
+binaries come from CI (`build-omnivoice-tts`) or a local build. The engine detects a placeholder and
 reports unavailable with instructions
 ([#1172](https://github.com/debpalash/VoiceStudio/issues/1172)) instead of
 failing at spawn time; build one with
@@ -82,8 +87,10 @@ Before reporting ready, the engine:
 
 ## Troubleshooting
 
-- "GGUF binary missing": this build doesn't bundle the runtime for your
-  platform — use the default engine.
+- "GGUF binary missing": the installer doesn't include the runtime (see
+  Setup) — use the default engine, or build the binary from a source checkout.
+  The log line `Engine health check failed; engine=omnivoice-gguf` withholds the
+  reason by design; a missing binary is the usual cause on an installed app.
 - Checksum mismatch or quarantine messages: follow the printed fix, or
   reinstall.
 - Other issues: [install/troubleshooting.md](../install/troubleshooting.md).

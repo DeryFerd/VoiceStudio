@@ -36,6 +36,14 @@ function renderSettings() {
   return client;
 }
 
+it('marks the HuggingFace token input with a placeholder', () => {
+  renderSettings();
+  const input = document.querySelector<HTMLInputElement>(
+    'input[aria-label="settings.hf_token_input"]',
+  )!;
+  expect(input.placeholder).toBe('hf_…');
+});
+
 it('stores DeepL and Microsoft credentials only after an explicit save', async () => {
   const client = renderSettings();
   const invalidate = vi.spyOn(client, 'invalidateQueries');

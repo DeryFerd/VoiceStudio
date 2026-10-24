@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useId, useState, type CSSProperties, type ReactNode } from 'react';
 import { PanelLeftCloseIcon, PanelLeftOpenIcon, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,9 @@ export function SecondarySidebar({
   variant = 'controls',
   meta,
   footer,
+  library,
+  libraryLabel,
+  collapsed: controlledCollapsed,
   onCollapsedChange,
 }: {
   title: string;
@@ -41,17 +44,31 @@ export function SecondarySidebar({
   meta?: ReactNode;
   /** Pinned below the scrolling content — never scrolls out of view. */
   footer?: ReactNode;
+  /** Saved items beside the controls. A render callback receives visibility so retained panes can cancel hidden work. */
+  library?: ReactNode | ((active: boolean) => ReactNode);
+  libraryLabel?: string;
+  /** Controls the collapsed state when the parent owns a shared pane shortcut. */
+  collapsed?: boolean;
   /** Lets the page re-home the footer's content while the pane is collapsed. */
   onCollapsedChange?: (collapsed: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const [collapsed, setCollapsedState] = useState(false);
+  const [uncontrolledCollapsed, setUncontrolledCollapsed] = useState(false);
+  const collapsed = controlledCollapsed ?? uncontrolledCollapsed;
+  const [view, setView] = useState<'controls' | 'library'>('controls');
+  const [libraryVisited, setLibraryVisited] = useState(false);
+  const tabsId = useId();
+  const chooseView = (next: 'controls' | 'library') => {
+    if (next === 'library') setLibraryVisited(true);
+    setView(next);
+  };
+  const showLibrary = library != null && view === 'library';
   // Notify from the event handler, never from inside a state updater: updaters
   // must stay pure (StrictMode runs them twice, which would double-fire this).
   const setCollapsed = (next: boolean | ((value: boolean) => boolean)) => {
     const resolved = typeof next === 'function' ? next(collapsed) : next;
     if (resolved === collapsed) return;
-    setCollapsedState(resolved);
+    if (controlledCollapsed === undefined) setUncontrolledCollapsed(resolved);
     onCollapsedChange?.(resolved);
   };
   const dimensions = WIDTHS[size];
@@ -127,19 +144,96 @@ export function SecondarySidebar({
           {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
         </Button>
       </div>
+      {library != null && !collapsed && (
+        <div
+          role="tablist"
+          aria-label={title}
+          data-slot="secondary-sidebar-tabs"
+          className="flex shrink-0 gap-1 border-b border-border/45 px-2.5 py-2"
+          onKeyDown={(event) => {
+            if (event.altKey || event.ctrlKey || event.metaKey) return;
+            const tabs = [
+              ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+            ];
+            const current = tabs.findIndex((tab) => tab === event.target);
+            if (current < 0) return;
+            const forward =
+              getComputedStyle(event.currentTarget).direction === 'rtl'
+                ? 'ArrowLeft'
+                : 'ArrowRight';
+            const backward = forward === 'ArrowRight' ? 'ArrowLeft' : 'ArrowRight';
+            const next =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? 1
+                  : event.key === forward || event.key === backward
+                    ? 1 - current
+                    : null;
+            if (next === null) return;
+            event.preventDefault();
+            chooseView(next === 0 ? 'controls' : 'library');
+            tabs[next]?.focus();
+          }}
+        >
+          {(
+            [
+              ['controls', title],
+              ['library', libraryLabel ?? title],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              id={`${tabsId}-${value}`}
+              aria-controls={`${tabsId}-panel-${value}`}
+              aria-selected={view === value}
+              tabIndex={view === value ? 0 : -1}
+              onClick={() => chooseView(value)}
+              className={cn(
+                'h-7 min-w-0 flex-1 truncate rounded-md px-2 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                view === value
+                  ? 'bg-accent/80 text-foreground'
+                  : 'text-muted-foreground hover:bg-accent/45 hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {library != null && (
+        <div
+          role="tabpanel"
+          id={`${tabsId}-panel-library`}
+          aria-labelledby={`${tabsId}-library`}
+          hidden={!showLibrary || collapsed}
+          className={cn('flex min-h-0 flex-1 flex-col', (!showLibrary || collapsed) && 'hidden')}
+        >
+          {libraryVisited
+            ? typeof library === 'function'
+              ? library(showLibrary && !collapsed)
+              : library
+            : null}
+        </div>
+      )}
       <div
-        hidden={collapsed}
+        hidden={collapsed || showLibrary}
+        role={library != null ? 'tabpanel' : undefined}
+        id={library != null ? `${tabsId}-panel-controls` : undefined}
+        aria-labelledby={library != null ? `${tabsId}-controls` : undefined}
         data-slot="secondary-sidebar-content"
         className={cn(
           'studio-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3.5 text-[13px] [scroll-padding-block:0.875rem] [scrollbar-gutter:stable] [&>*]:min-w-0 [&>section]:w-full [&>section]:shrink-0 [&_button]:max-w-full [&_h2]:tracking-[-0.012em] [&_h3]:tracking-[-0.01em] [&_input]:max-w-full [&_label]:leading-5 [&_p]:leading-[1.55] [&_summary]:rounded-lg [&_summary]:outline-none [&_summary]:transition-[color,background-color] [&_summary]:duration-150 [&_summary:hover]:text-foreground [&_summary:focus-visible]:ring-2 [&_summary:focus-visible]:ring-ring/35 [&_textarea]:max-w-full',
           VARIANT_STYLES[variant],
-          collapsed && 'hidden',
+          (collapsed || showLibrary) && 'hidden',
           className,
         )}
       >
         {children}
       </div>
-      {footer !== undefined && footer !== null && !collapsed && (
+      {footer !== undefined && footer !== null && !collapsed && !showLibrary && (
         <div
           data-slot="secondary-sidebar-footer"
           className="flex min-h-0 max-h-[70%] flex-col space-y-3 border-t border-border/55 bg-background/40 p-3.5 text-[13px] backdrop-blur-xl"

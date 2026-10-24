@@ -104,9 +104,7 @@
     "dub": "Vertaal en dub audio of video.",
     "stories": "Maak scènes met meerdere stemmen.",
     "audiobook": "Maak luisterboeken met hoofdstukken.",
-    "transcribe": "Zet opnamen om in tekst.",
-    "collapseFooter": "Voettekst inklappen",
-    "expandFooter": "Voettekst uitklappen"
+    "transcribe": "Zet opnamen om in tekst."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Projecten konden niet worden geladen",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} segmenten gevalideerd",
     "cancelled": "Geannuleerd",
     "fitting": "Timing aanpassen"
-  },
-  "sponsorSlot": {
-    "book": "Reserveer je plek",
-    "preview": "Sponsorvoorbeeld",
-    "message": "Je merk, website en bericht",
-    "email_app": "E-mailapp openen",
-    "copy_email": "E-mailadres kopiëren"
   },
   "supportPlans": {
     "remove": "Sponsorbalk verwijderen",

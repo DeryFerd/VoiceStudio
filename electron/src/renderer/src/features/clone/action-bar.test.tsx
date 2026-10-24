@@ -12,11 +12,12 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }));
 
-const failure = vi.hoisted(() => ({ error: null as string | null }));
+const failure = vi.hoisted(() => ({ error: null as string | null, topic: null as string | null }));
 const readiness = vi.hoisted(() => ({
   blocker: null as null | 'reference' | 'text' | 'preparing',
 }));
 vi.mock('@/hooks/use-clone-readiness', () => ({ useCloneReadiness: () => readiness.blocker }));
+vi.mock('./install-stt-button', () => ({ InstallSttButton: () => <button>install-stt</button> }));
 vi.mock('@/hooks/use-clone-demo', () => ({ useCloneDemo: () => false }));
 vi.mock('@/hooks/use-tts-languages', () => ({
   useTtsLanguages: () => ({ names: ['English'], modelLabel: 'Test model', state: 'known' }),
@@ -78,6 +79,7 @@ vi.mock('@/hooks/use-generate', () => ({
     generate,
     cancel,
     error: failure.error,
+    errorTopic: failure.topic,
     cloneBlocker: readiness.blocker,
     ...runtime,
   }),
@@ -87,6 +89,7 @@ describe('ActionBar', () => {
   beforeEach(() => {
     readiness.blocker = null;
     failure.error = null;
+    failure.topic = null;
     generate.mockClear();
   });
   beforeEach(() => {
@@ -118,6 +121,14 @@ describe('ActionBar', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('LibsndfileError');
     expect(screen.getByRole('alert').querySelector('details')).not.toBeInTheDocument();
     expect(view.container.querySelector('pre')).not.toBeInTheDocument();
+  });
+  it('offers the speech-model install only for the missing-transcriber failure', () => {
+    failure.error = 'No transcript';
+    const view = render(<ActionBar />);
+    expect(screen.queryByText('install-stt')).not.toBeInTheDocument();
+    failure.topic = 'REFERENCE_STT_MISSING';
+    view.rerender(<ActionBar />);
+    expect(screen.getByText('install-stt')).toBeInTheDocument();
   });
   it('keeps synthesis available while the latest take is playing', () => {
     render(<ActionBar />);

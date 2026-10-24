@@ -104,9 +104,7 @@
     "dub": "Terjemahkan dan sulihsuarakan audio atau video.",
     "stories": "Buat adegan dengan beberapa suara.",
     "audiobook": "Buat buku audio dengan bab.",
-    "transcribe": "Ubah rekaman menjadi teks.",
-    "collapseFooter": "Ciutkan footer",
-    "expandFooter": "Perluas footer"
+    "transcribe": "Ubah rekaman menjadi teks."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Proyek tidak dapat dimuat",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} segmen divalidasi",
     "cancelled": "Dibatalkan",
     "fitting": "Menyesuaikan waktu"
-  },
-  "sponsorSlot": {
-    "book": "Pesan slot Anda",
-    "preview": "Pratinjau sponsor",
-    "message": "Merek, situs web & pesan Anda",
-    "email_app": "Buka aplikasi email",
-    "copy_email": "Salin email"
   },
   "supportPlans": {
     "remove": "Hapus bilah sponsor",

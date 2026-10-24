@@ -177,6 +177,10 @@ def hf_cache_dir() -> str:
 # install endpoint can't drift apart (mirrors the weight-floor single-sourcing).
 _GIB = 1024 ** 3
 MIN_FREE_GB = 10
+# Headroom the per-install check keeps free on top of the download, and the
+# preflight's hard floor. Smaller than MIN_FREE_GB (the comfortable-library
+# warning level) so a small model still installs on a nearly full disk.
+INSTALL_HEADROOM_GB = 2
 
 
 def disk_free_bytes(path: "str | None" = None) -> int:
@@ -200,7 +204,7 @@ def disk_free_bytes(path: "str | None" = None) -> int:
 
 
 def disk_space_error(to_download_bytes: "int | None", *, cache_dir: "str | None" = None) -> "str | None":
-    """Actionable message when *to_download_bytes* (+ MIN_FREE_GB headroom) won't
+    """Actionable message when *to_download_bytes* (+ INSTALL_HEADROOM_GB) won't
     fit on the cache volume; ``None`` when it fits, the size is unknown, or the
     volume can't be probed (never block on missing information).
 
@@ -214,7 +218,7 @@ def disk_space_error(to_download_bytes: "int | None", *, cache_dir: "str | None"
     free = disk_free_bytes(cache)
     if free <= 0:
         return None  # couldn't probe the volume → don't block on missing info
-    required = int(to_download_bytes) + MIN_FREE_GB * _GIB
+    required = int(to_download_bytes) + INSTALL_HEADROOM_GB * _GIB
     if free >= required:
         return None
 
@@ -223,7 +227,7 @@ def disk_space_error(to_download_bytes: "int | None", *, cache_dir: "str | None"
 
     return (
         f"Not enough disk space to install: this download needs {_gb(int(to_download_bytes))} "
-        f"plus {MIN_FREE_GB} GB free headroom ({_gb(required)} total), but only {_gb(free)} "
+        f"plus {INSTALL_HEADROOM_GB} GB free headroom ({_gb(required)} total), but only {_gb(free)} "
         f"is free at {cache}. Free up space (or move the model cache to a bigger volume) and retry."
     )
 
@@ -662,7 +666,7 @@ def list_models():
         # The headroom disk_space_error keeps free on top of every download, so
         # the UI warns with the same rule (and names it) instead of a raw
         # "needs 4.8 GB, 10.2 GB free" that contradicts its own refusal (#2597).
-        "disk_headroom_gb": MIN_FREE_GB,
+        "disk_headroom_gb": INSTALL_HEADROOM_GB,
         "platform_tags": platform_tags,
     }
     _set_cache(cache_key, response)

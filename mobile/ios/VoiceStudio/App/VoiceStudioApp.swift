@@ -22,7 +22,8 @@ import VoiceStudioKit
                     if phase == .active {
                         model.acceptUpload()
                         model.monitor()
-                    } else if phase == .background { BackgroundMonitor.schedule() }
+                        Task { await model.phone.refresh() }
+                    } else if phase == .background { model.phone.cancelDub(); BackgroundMonitor.schedule() }
                 }
         }
     }

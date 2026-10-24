@@ -313,19 +313,20 @@ export function ModelLicense({
             </DialogTitle>
             <DialogDescription className="break-all">{repoId}</DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <ModelLicenceView details={details.data} infoFallback={info} extra={verifiedInstall} />
-            {details.isError && (
-              <p role="alert" className="mt-3 text-sm text-destructive">
-                {t('modelLicense.detailsFailed')}
-              </p>
-            )}
-          </div>
           <LicenceAcceptanceFooter
             models={currentAcceptance ? [toAcceptable(label, currentAcceptance)] : []}
             onClose={close}
             closeDisabled={busy === 'commit'}
-          />
+          >
+            <div className="p-4">
+              <ModelLicenceView details={details.data} infoFallback={info} extra={verifiedInstall} />
+              {details.isError && (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {t('modelLicense.detailsFailed')}
+                </p>
+              )}
+            </div>
+          </LicenceAcceptanceFooter>
         </DialogContent>
       </Dialog>
     </>

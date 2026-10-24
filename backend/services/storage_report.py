@@ -58,9 +58,9 @@ def default_engines_dir() -> str:
     IndexTTS-2 install silently rolled up into the data dir's "other" subtotal.
     Mirrors ``backend/services/sidecar_install.py`` (`DATA_DIR/engines/<id>`).
     """
-    from core.config import DATA_DIR
+    from core.config import get_engines_dir
 
-    return str(Path(DATA_DIR) / "engines")
+    return str(Path(get_engines_dir()))
 
 
 def _has_venv(entry_path: str) -> bool:

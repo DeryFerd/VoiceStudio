@@ -595,6 +595,26 @@ def test_mlx_audio_generate_auto_language_skips_lang_code_entirely(language, mod
     assert "lang_code" not in seen_kwargs
 
 
+def test_mlx_audio_voxcpm2_8bit_resamples_48k_and_does_not_claim_cloning():
+    # The curated 8-bit VoxCPM2 emits 48 kHz; the adapter's rate is 24 kHz, so
+    # the audio must be resampled rather than played back at double length.
+    backend = tts_backend.MLXAudioBackend()
+    backend._model_id = backend.CURATED_MODELS["voxcpm2"]
+    backend._ensure_loaded = lambda: None
+    assert backend._model_id == "mlx-community/VoxCPM2-8bit"
+    assert backend.supports_cloning is False
+    seen = {}
+
+    def _fake_generate(**kw):
+        seen.update(kw)
+        return iter([types.SimpleNamespace(audio=[0.0] * 4800, sample_rate=48000)])
+
+    backend._model = types.SimpleNamespace(generate=_fake_generate)
+    wav = backend.generate("hello", language="th")
+    assert seen["lang_code"] == "th"
+    assert wav.shape[-1] == 2400
+
+
 @pytest.mark.parametrize("language, expected", [("German", "german"), ("de", "german"), ("pt-BR", "portuguese"), ("Chinese", "chinese")])
 def test_mlx_audio_generate_non_kokoro_model_ignores_kokoro_validation(language, expected):
     # Qwen3-TTS (and CSM/Dia/Chatterbox/MeloTTS/OuteTTS) don't use Kokoro's

@@ -75,6 +75,7 @@ import {
   isExpectedPipeClose,
   isUnsupportedPlatform,
   managedBackendSpawnOptions,
+  bundledUvEnv,
   platformSetupIssue,
 } from './backend';
 import { app } from 'electron';
@@ -589,7 +590,7 @@ it('installs into a newly selected custom destination that does not yet exist', 
   await supervisor.start();
   await supervisor.setupRuntime();
   expect(mocks.install.mock.calls[0][1]).toBe(join(selected, 'project'));
-  expect(mocks.runtimeConfig).toEqual({ root: selected, owned: true });
+  expect(mocks.runtimeConfig).toEqual({ root: selected, owned: true, scoped: false });
   await supervisor.shutdown();
 });
 
@@ -616,7 +617,7 @@ it.each([[[] as string[]], [['.DS_Store', 'desktop.ini']]])(
     await supervisor.start();
     await supervisor.setupRuntime();
     expect(mocks.install.mock.calls[0][1]).toBe(join(selected, 'project'));
-    expect(mocks.runtimeConfig).toEqual({ root: selected, owned: true });
+    expect(mocks.runtimeConfig).toEqual({ root: selected, owned: true, scoped: false });
     await supervisor.shutdown();
   },
 );
@@ -697,6 +698,14 @@ it('never overrides a uv the user pinned themselves', () => {
   const { env } = managedBackendSpawnOptions(3900);
 
   expect(env.OMNIVOICE_BUNDLED_UV).toBe('/pinned/uv');
+});
+
+it('drops a blank uv pin when this host has no uv to offer', () => {
+  // Failed on CI runners without uv: the blank pin went to the backend as-is.
+  expect(bundledUvEnv('', () => null)).toBeUndefined();
+  expect(bundledUvEnv('  ', () => '/found/uv')).toBe('/found/uv');
+  expect(bundledUvEnv('/pinned/uv', () => '/found/uv')).toBe('/pinned/uv');
+  expect(bundledUvEnv(undefined, () => null)).toBeUndefined();
 });
 
 it('only ever names a uv that is really there', () => {

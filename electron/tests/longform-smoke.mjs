@@ -147,13 +147,12 @@ try {
   );
   assert.equal(await page.getByLabel('Author', { exact: true }).inputValue(), 'Test author');
   assert.equal(await page.getByLabel('Word', { exact: true }).inputValue(), 'SQL');
-  await page
-    .locator('[data-slot=secondary-sidebar]')
-    .getByText('Projects', { exact: true })
-    .click();
+  // Projects is a tab beside the controls; Audiobook (the pane title) switches back.
+  await page.getByRole('tab', { name: 'Projects', exact: true }).click();
   await page.getByLabel('Project name', { exact: true }).fill('Saved book fixture');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByRole('button', { name: 'Saved book fixture', exact: true }).waitFor();
+  await page.getByRole('tab', { name: 'Audiobook', exact: true }).click();
   await page.getByRole('textbox', { name: 'Script', exact: true }).fill('Unsaved edit');
   await page.goto((process.env.VOICESTUDIO_UI_URL || 'http://localhost:3902') + '/#/projects');
   await page.getByRole('button', { name: 'Rename Saved book fixture', exact: true }).click();
@@ -180,10 +179,7 @@ try {
     .getByRole('navigation', { name: 'Workspaces', exact: true })
     .getByRole('button', { name: 'Stories', exact: true })
     .click();
-  await page
-    .getByRole('dialog')
-    .getByRole('link', { name: 'Stories', exact: true })
-    .click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Stories', exact: true }).click();
   await page
     .locator('[data-slot=secondary-sidebar]')
     .getByRole('button', { name: 'Narrator fixture', exact: true })

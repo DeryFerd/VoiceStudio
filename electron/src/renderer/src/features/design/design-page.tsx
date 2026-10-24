@@ -1,3 +1,4 @@
+import { VoicesSidebar } from '@/features/clone/voices-sidebar';
 import { WandSparklesIcon } from 'lucide-react';
 import { SecondarySidebar } from '@/components/workspace-sidebar';
 import { WorkspaceHeader } from '@/components/app-shell/workspace-header';
@@ -179,6 +180,8 @@ export function DesignPage() {
           icon={WandSparklesIcon}
           size="wide"
           variant="controls"
+          library={<VoicesSidebar />}
+          libraryLabel={t('clone.saved_profiles')}
           className="space-y-3"
         >
           <section className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-3">

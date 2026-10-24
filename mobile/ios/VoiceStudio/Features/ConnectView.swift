@@ -8,38 +8,44 @@ struct ConnectView: View {
     @State private var apiKey = ""
     @State private var label = ""
     @State private var scanning = false
+    @State private var manual = false
     var body: some View {
         Page {
-            Text(model.t("mobile.connect.subtitle"))
-            Button(model.t("mobile.connect.scan_qr"), systemImage: "qrcode.viewfinder") { scanning = true }
-            Text(model.t("mobile.connect.scan_help"))
+            Button(model.t("mobile.connect.scan_qr"), systemImage: "qrcode.viewfinder") { scanning = true }.studioButton(.primary)
+            DisclosureGroup(model.t("mobile.simple.address"), isExpanded: $manual) {
             Card {
                 TextField(model.t("mobile.connect.url_label"), text: $url).textContentType(.URL).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("connect.url")
                 TextField(model.t("mobile.connect.pin_label"), text: $pin).keyboardType(.numberPad).textContentType(.oneTimeCode)
+                DisclosureGroup(model.t("mobile.simple.more")) {
                 SecureField(model.t("mobile.connect.api_key_label"), text: $apiKey).textInputAutocapitalization(.never).autocorrectionDisabled()
-                Text(model.t("mobile.connect.api_key_help"))
-                TextField(model.t("mobile.ios.host_label"), text: $label)
+                }
                 Button(model.t(model.connection.connecting ? "mobile.connect.connecting" : "mobile.connect.connect")) { Task { await connect() } }
-                    .buttonStyle(VSButtonStyle(kind: .primary)).disabled(model.connection.connecting || model.busy || BackgroundUpload.shared.pending != nil || url.isEmpty).accessibilityIdentifier("connect.submit")
+                    .studioButton(.secondary).disabled(model.connection.connecting || model.busy || BackgroundUpload.shared.pending != nil || url.isEmpty).accessibilityIdentifier("connect.submit")
             }
-            if let e = model.connection.error { Text(model.t(e.key, e.params)) }
-            Text(model.t("mobile.connect.saved_hosts"))
+            }
+            if let error = model.connection.error {
+                ErrorNotice(error: error,titleKey: "mobile.simple.connection_error")
+                Button(model.t("mobile.simple.retry")) { Task { await connect() } }
+            }
+            if !model.connection.hosts.isEmpty { Text(model.t("mobile.connect.saved_hosts")) }
             ForEach(model.connection.hosts) { host in
                 Card {
                     Text(host.label); Text(host.url.absoluteString)
-                    Text(model.t("mobile.connect.last_seen", ["time": host.lastSeen.formatted()]))
                     Button(model.t("mobile.connect.connect")) { url = host.url.absoluteString; label = host.label; Task { await connect() } }
                     Button(model.t("mobile.connect.forget"), role: .destructive) { Task { await model.perform(connectionChange: true) { try await model.connection.forget(host) } } }
                 }
             }
         }.navigationTitle(model.t("mobile.connect.title")).navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $scanning) {
+        .fullScreenCover(isPresented: $scanning) {
             QRScanner(onCode: { code in
                 scanning = false
                 do { let address = try PairingAddress(code, qr: true); url = address.baseURL.absoluteString; pin = address.pin ?? ""; Task { await connect() } }
                 catch let e as ClientError { model.error = e } catch { model.error = ClientError("mobile.connect.error_qr") }
             }, onError: { e in scanning = false; model.error = e })
-                .presentationCornerRadius(VSTokens.radiusLg).ignoresSafeArea().overlay(alignment: .bottom) { Button(model.t("common.cancel")) { scanning = false } }
+                .ignoresSafeArea().overlay(alignment: .bottom) {
+                    Button(model.t("common.cancel")) { scanning = false }
+                        .studioButton(.secondary).padding(Theme.compactInset).background(.bar)
+                }
         }
     }
     private func connect() async {

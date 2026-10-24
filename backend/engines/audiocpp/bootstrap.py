@@ -309,9 +309,9 @@ def platform_slug() -> str:
 
 def managed_runtime_dir() -> Path:
     """Update-surviving location for the checksummed app-managed runtime."""
-    from core.config import DATA_DIR
+    from core.config import get_engines_dir
 
-    return Path(DATA_DIR) / "engines" / "audio-cpp" / VERSION.lstrip("v") / _platform_slug()
+    return Path(get_engines_dir()) / "audio-cpp" / VERSION.lstrip("v") / _platform_slug()
 
 
 def is_installed() -> bool:

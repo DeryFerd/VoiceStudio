@@ -1,12 +1,14 @@
-# VoiceStudio mobile — M1 companion app contract
+# VoiceStudio mobile — app contract
 
 Both native apps (iOS: Swift/SwiftUI, `mobile/ios/`; Android: Kotlin/Compose,
 `mobile/android/`) implement **exactly this spec**. A feature ships on both or
 on neither (CLAUDE.md → "Default features must work on every platform").
 
-M1 is a **companion**: the phone drives the user's own VoiceStudio backend
-(desktop app, Docker or server) over LAN, Tailscale or a remote URL. No
-on-device inference in M1; no cloud relay; no accounts.
+The apps run models **on the phone** and can also drive the user's own
+VoiceStudio computer (desktop app, Docker or server) over LAN, Tailscale or a
+remote URL. **Phone first:** once its models are downloaded every feature works
+offline with no computer; pairing adds the computer's engines. No cloud relay,
+no accounts. M1 (below) is the computer connection; M2 is on-device inference.
 
 ## Shared inputs (generated — never hand-edit)
 
@@ -31,7 +33,10 @@ on-device inference in M1; no cloud relay; no accounts.
   secondary = `textMuted`/`mutedForeground`; separators = `border`; fields =
   `input`; focus ring = `focus`; errors = `error`/`errorForeground`/`errorSurface`;
   warnings likewise; tab/nav bars = `chrome` + `toolbarForeground`.
-- Type: Inter (bundled, SIL OFL — include its license). Desktop sizes
+- Type: Inter (bundled, SIL OFL — include its license) preserves the brand in
+  artwork and the Home wordmark. iOS uses the system semantic text styles for
+  navigation, controls and body content, scaling with Dynamic Type; Android keeps
+  the generated Inter typography. Desktop sizes
   (`VSTokens.text*`) are the base; scale with Dynamic Type / Android font
   scale. Body text on phones uses `editor` (16/28); controls use `ui` (14/20)
   scaled up to the platform minimum touch-readable size.
@@ -39,6 +44,23 @@ on-device inference in M1; no cloud relay; no accounts.
   `spacingGap` between elements, `spacingInset` for screen padding (cap at 16
   on compact widths).
 - Respect reduced motion and reduced transparency.
+- Native iOS presentation follows Apple's current HIG: automatic system navigation
+  and tab-bar materials, platform button shapes and sheet curvature. Content can
+  scroll beneath native chrome while controls remain in safe areas. iOS content
+  cards and text fields use generated `iosCardRadius` and `iosFieldRadius`
+  tokens (continuous 24-point and 16-point corners). The Home wordmark uses
+  generated `iosHomeWordmarkSize` (28 points), scaling with Dynamic Type;
+  Android retains its generated shapes. These presentation differences preserve
+  the same capabilities and consent gates on both platforms.
+- Licence review (both platforms) leads with a plain summary: the licence
+  category, four rights rows (commercial use, generated audio, sharing, voice
+  rights; each "Restricted" or "Not stated"), the licensor's notes, the credit
+  and tappable https licence/source links. The raw terms, fingerprint, licence
+  code and receipts sit under a collapsed "Exact terms" section. iOS shows it as a
+  large, scrollable sheet with a leading Close action, an initially unchecked
+  confirmation and a persistent Accept action disabled until confirmation. Closing
+  never records acceptance or starts a download. On both platforms, multi-selection
+  sheets/dialogs edit a draft; Cancel/dismiss discards it and Confirm applies it.
 
 ## Strings
 
@@ -58,8 +80,19 @@ on-device inference in M1; no cloud relay; no accounts.
 
 ## Screens (M1)
 
-Bottom navigation: **Speak**, **Voices**, **Dub**, **Dictate**, **Settings**.
-Before pairing, only the Connect flow and Settings → About/Privacy are reachable.
+Bottom navigation: **Home**, **Voices**, **Dub**, **Dictate**, **Settings**.
+Home is the default after consent. It adapts Electron's dashboard with the same
+bundled `electron/public/signal-field.webp` artwork, generated palettes, Inter,
+card hierarchy, recent generated audio, recent dubbing projects and saved voices.
+Its six working shortcuts open Speak, voice cloning, Dub, Dictate, Models and
+Connect. Speak stays reachable from Home; it is not a sixth bottom tab. Recent
+phone audio plays locally, saved phone voices open Speak with that reference
+selected, and project rows open that project's outputs/resume controls. Computer
+libraries are shown only from the paired host. Empty sections use localized
+empty states; Home never starts downloads or external requests on its own.
+Desktop-only workspaces (voice design, stories, audiobooks, galleries and tools)
+are not represented as nonfunctional mobile shortcuts.
+All tabs work without pairing once on-device models are installed (see M2); the Connect flow is reachable from first run and from Settings.
 
 1. **First run**
    - Analytics consent: same copy keys as desktop, two equal-weight Yes/No
@@ -137,3 +170,171 @@ Before pairing, only the Connect flow and Settings → About/Privacy are reachab
 - API client against a mock server: health check, PIN header, session
   exchange/revoke, 401 handling, generate, dub upload + progress.
 - UI smoke: launch → consent → connect (mocked) → Speak generates → play.
+
+## M2 — on-device inference (owner-set 2026-10-18)
+
+### Runtimes (one per capability, identical on both platforms)
+
+| Capability | Runtime | Pin |
+|---|---|---|
+| TTS (preset voices), dictation, transcription | sherpa-onnx | release `v1.13.8` |
+| Voice cloning | omnivoice.cpp (GGML) | commit `886fc079838ca7400cb2b42b36e2a65aa1daabe8` (same as desktop `quant_map.json`) |
+| Dub translation | llama.cpp | release `b11716` |
+
+- Native libraries are built or fetched by `mobile/native/` scripts at the pins
+  above, verified by SHA-256, and never committed. Prebuilt artifacts (sherpa
+  AAR, llama xcframework) are downloaded with a recorded checksum; the rest is
+  built from source (iOS: CMake + Xcode toolchain, Metal where supported;
+  Android: NDK `arm64-v8a`, plus `x86_64` for the emulator).
+- Each app wraps the runtimes behind one platform interface
+  (`LocalEngine`: `synthesize`, `clone`, `transcribe`, `streamTranscribe`,
+  `translate`, all cancellable, all off the main thread, progress reported).
+  Feature screens never call a runtime directly.
+
+### Models
+
+- `mobile/contract/models.json` is **generated** by
+  `uv run python scripts/export_mobile_models.py` from
+  `mobile/contract/models.source.json` (which models the phone offers: HF repo,
+  pinned revision, files with SHA-256 and size, capability, languages, minimum
+  RAM) joined with `docs/licensing/model-license-data.json` (licence, category,
+  credit, rights holder). A phone model **must** have a registry entry; adding
+  one follows `docs/licensing/model-review-workflow.md`. The contract test fails
+  on drift, on a missing registry entry, or on a file without a checksum.
+- Initial set: KittenTTS mini and Kokoro multi-language (TTS), Whisper tiny/base
+  and a streaming Zipformer (dictation), OmniVoice-GGUF `Q4_K_M` (cloning), and
+  one small instruct LLM for translation (chosen through the review workflow;
+  must be commercial-OK or accepted like any other gated model).
+- `models.json` shape (both apps decode exactly this; unknown keys ignored):
+
+  ```json
+  {"schema_version": 1, "models": [{
+    "id": "kokoro-multi-int8", "name": "Kokoro", "capability": "tts | asr | asr-stream | clone | translate",
+    "runtime": "sherpa-onnx | omnivoice.cpp | llama.cpp",
+    "repo": "csukuangfj/kokoro-int8-multi-lang-v1_1", "revision": "<40-hex commit>",
+    "files": [{"path": "model.int8.onnx", "size": 0, "sha256": "<64-hex>", "role": "model"}],
+    "total_bytes": 0, "languages": ["en", "zh"], "min_ram_gb": 3,
+    "licence": {"id": "apache-2.0", "category": "commercial-ok | non-commercial | conditional | unidentified",
+                "requires_acceptance": false, "credit": "", "rights_holder": "",
+                "terms_fingerprint": "<sha256 of the terms shown>"},
+    "config": {}}]}
+  ```
+
+  `name` is the model's product name, shown instead of the id (never translated;
+  what it is for comes from the app's localized capability label). The apps never
+  show ids, repo names or licence codes on screens; licence details appear only
+  in the acceptance sheet.
+  `role` tells the runtime what a file is (e.g. `model`, `tokens`, `voices`,
+  `encoder`, `decoder`, `joiner`, `espeak-data`, `tokenizer`); `config` carries
+  runtime options (sample rate, speaker count, prompt template).
+- **Downloads only when the user starts them**, from Hugging Face (falling back
+  to `hf-mirror.com` exactly like the desktop endpoint race), resumable, Wi-Fi
+  only unless the user allows mobile data, verified by SHA-256 before use,
+  stored in app-private storage excluded from backups. A Models screen shows
+  each model's size, languages, licence and storage, with Download, Cancel and
+  Delete, and the total space used.
+- **Licence acceptance matches the desktop:** a model whose licence category is
+  not commercial-OK must be accepted on the phone before it is downloaded or
+  loaded. Acceptance is recorded locally per model with the fingerprint of the
+  exact terms shown, the app version and the time, and can be withdrawn.
+- **Device fit:** each model declares minimum RAM. Models the phone can't run
+  are shown disabled with the reason, never hidden and never attempted.
+
+### Where each task runs
+
+- Every task (Speak, clone, Dictate, Dub) has **Run on: This phone / My
+  computer**. Default: This phone when the needed model is installed; otherwise
+  the computer if one is paired; otherwise an inline prompt to download the
+  model (with its size). The choice is remembered per task.
+- With no computer paired, the app is fully usable: the Connect screen is
+  optional and reachable from Settings. Tabs never require pairing.
+- Voices: cloned voices made on the phone are stored on the phone (reference
+  audio + metadata); computer voices stay on the computer. Each list says where
+  a voice lives.
+
+### On-device dubbing
+
+Extract audio (AVFoundation / MediaExtractor), transcribe (sherpa Whisper),
+translate per segment (llama.cpp), synthesize per segment using either the
+original speaker from a source reference clip or a saved phone voice
+(omnivoice.cpp), fit timing,
+mix, and mux back into the video (AVAssetWriter / MediaMuxer). Long jobs run as
+a foreground task with progress (Android foreground service; iOS keeps
+progress visible and resumes from a saved checkpoint after interruption).
+
+### Privacy
+
+On-device tasks send nothing anywhere. The only network requests are the model
+downloads the user starts, content reports the user sends (see Reporting
+generated content) and, when paired, requests to their own computer.
+Settings → Privacy states this.
+
+### Tests (in addition to M1)
+
+- Models contract: generated catalogue matches its sources; every file pinned
+  and checksummed; every model has a registry entry and correct licence gate.
+- Download manager against a mock server: resume, checksum failure, Wi-Fi-only
+  rule, cancel, delete, low storage.
+- Licence gate: gated model can't download or load before acceptance;
+  withdrawal blocks it again.
+- Real inference smoke test in CI with the smallest models (cached): TTS
+  produces audio and ASR transcribes it back (iOS on the macOS runner via
+  VoiceStudioKit; Android on an `x86_64` emulator).
+- Routing: phone / computer / download prompt choices, and offline use with no
+  computer paired.
+
+## Reporting generated content
+
+Google Play's AI-generated content policy requires an in-app way to report
+offensive output; both apps ship it. The server is VoiceStudio's app API
+(`POST /v1/content-reports`, spec `api/openapi/v1.yaml` in the vssaas
+repository). It needs no sign-in and accepts no audio or identifiers.
+
+- **Where:** every generated result the app shows has a **Report** action,
+  whether it ran on the phone or the paired computer: a Speak result and its
+  recent takes (`task: speak`), the cloned-voice result on Voices
+  (`task: clone`) and a finished dub (`task: dub`).
+- **Sheet:** title, a required reason chosen from five (`sexual`, `hateful`,
+  `impersonation`, `misleading`, `other`; none preselected, Send disabled until
+  one is picked), an optional note (at most 1000 characters), an **Include the
+  text I entered** checkbox (unchecked, shown only when the result has text the
+  user typed), the disclosure of what is sent, and Send / Cancel.
+- **Nothing is sent until Send.** The request carries only the fields below; an
+  unticked checkbox omits `prompt_text`, and empty optional fields are omitted.
+
+  | Field | Value |
+  |---|---|
+  | `reason` | the chosen reason |
+  | `note` | trimmed note, if any |
+  | `prompt_text` | the typed text (first 5000 characters), only when ticked |
+  | `platform` | `android` / `ios` |
+  | `app_version` | root `package.json` version |
+  | `task` | `speak` / `clone` / `dub` |
+  | `model_id` | phone: the `repo` from `models.json` of the model that made it (Speak: the TTS or clone model; a cloned voice: the `asr` model that transcribed its reference; a dub: its pinned `clone` model; results saved before this feature: `unknown`); computer: the engine id the host reported, else `unknown` (characters outside `0-9A-Za-z._/:-` removed, at most 128) |
+  | `model_revision` | phone only: the model's `revision` |
+  | `runs_on` | `phone` / `computer` |
+
+- **Request:** `POST <base>/v1/content-reports`, `Content-Type:
+  application/json`, `Idempotency-Key` and no `Authorization`. Every build,
+  debug included, uses `https://appapi.voicestudio.sh` unless
+  `VOICESTUDIO_CONTENT_REPORTS_URL` (an https URL, from the environment or the
+  git-ignored `mobile/.env`; see `mobile/.env.example`) points it elsewhere, such
+  as `https://dev-appapi.voicestudio.sh` for testing. The key (32 characters of
+  `A-Za-z0-9`) is made when the sheet opens and reused when the user retries,
+  so a retried report is stored once.
+- **Responses:**
+
+  | Status | App |
+  |---|---|
+  | 201 | Close the sheet, show `mobile.report.sent`, discard the draft |
+  | 409 | Make a new key and send once more automatically |
+  | 429 | Keep the sheet and draft, show `mobile.report.rate_limited` |
+  | 400 | Show `mobile.report.invalid`; no retry (an app bug) |
+  | anything else, or no connection | Keep the draft, show `mobile.report.failed` with Retry |
+
+- **Draft:** kept in memory per result until it is sent, so closing and
+  reopening the sheet keeps the reason, note and checkbox.
+- **Tests:** against a mock server: exact body (no extra fields, prompt text
+  only when ticked, optional fields omitted when empty), headers (key format,
+  no `Authorization`), the same key on Retry, a new key after 409, 429 and 400
+  handling, and the production base URL unless a build overrides it.

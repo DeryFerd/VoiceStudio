@@ -21,8 +21,24 @@ if _BACKEND not in sys.path:
 # test module, which is what freezes DATA_DIR at `core.config` import time)
 # makes every local run behave like a clean CI runner. `setdefault` semantics:
 # an explicitly exported OMNIVOICE_DATA_DIR still wins.
-if not os.environ.get("OMNIVOICE_DATA_DIR"):
+#
+# pytest-xdist: the controller imports this file first and exports the dir it
+# made; every worker then inherits it, so all workers shared ONE prefs.json /
+# omnivoice.db / user-env and one worker's `llm_backend=off` flipped another's
+# "ready" assertion. A dir WE created (tracked in _OMNIVOICE_TEST_AUTO_DATA_DIR)
+# is therefore re-made per worker; an explicitly exported one is still honored.
+_AUTO_DATA_DIR = "_OMNIVOICE_TEST_AUTO_DATA_DIR"
+_inherited_auto_dir = os.environ.get("OMNIVOICE_DATA_DIR") if (
+    os.environ.get("PYTEST_XDIST_WORKER")
+    and os.environ.get("OMNIVOICE_DATA_DIR") == os.environ.get(_AUTO_DATA_DIR)
+) else None
+if _inherited_auto_dir:
+    _env_file = os.environ.get("OMNIVOICE_ENV_FILE", "")
+    if _env_file.startswith(_inherited_auto_dir):
+        del os.environ["OMNIVOICE_ENV_FILE"]  # re-derived below from the worker's dir
+if not os.environ.get("OMNIVOICE_DATA_DIR") or _inherited_auto_dir:
     os.environ["OMNIVOICE_DATA_DIR"] = tempfile.mkdtemp(prefix="omnivoice-test-data-")
+    os.environ[_AUTO_DATA_DIR] = os.environ["OMNIVOICE_DATA_DIR"]
 # Same story for the durable per-user env file (~/.config/omnivoice/env):
 # `main.py` loads it with override=True at import, so a TestClient importing
 # the app mid-suite would inject the developer's real TRANSLATE_* / key vars

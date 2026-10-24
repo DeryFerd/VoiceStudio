@@ -13,3 +13,16 @@ OkHttp/Okio: https://github.com/square/okhttp and https://github.com/square/okio
 ZXing: https://github.com/zxing/zxing
 Apache License 2.0: included in Apache-2.0.txt.
 No analytics, crash reporting or remote notification dependencies are present.
+
+Native runtime notices (same component set as the iOS app):
+sherpa-onnx 1.13.8 (Apache-2.0), ONNX Runtime (MIT), eSpeak NG (GPL-3.0),
+piper-phonemize (MIT), kaldi-native-fbank (Apache-2.0), KissFFT (BSD-3-Clause),
+kaldi-decoder, kaldifst and OpenFst (Apache-2.0), simple-sentencepiece
+(Apache-2.0), nlohmann/json (MIT), hclust-cpp (BSD-2-Clause), Eigen (MPL-2.0 with bundled BSD/Apache notices),
+omnivoice.cpp and its GGML (MIT), llama.cpp and its GGML (MIT).
+Their complete upstream notices are included in native-*.txt. Original nested
+component notices are retained, including Unicode data and bundled headers.
+Pinned source URLs/commits and eSpeak NG corresponding source (including build
+scripts) are listed in native-Corresponding-source.txt and native-sources.json.
+Runtime versions and AAR checksum: mobile/native/pins.json.
+Model licences and attribution are displayed separately in Models.

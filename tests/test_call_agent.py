@@ -945,7 +945,7 @@ def test_migration_adds_call_sessions_and_matches_the_base_schema(tmp_path, monk
     canon.executescript(_BASE_SCHEMA)
     with sqlite3.connect(db_path) as conn:
         migrated = [(r[1], r[2].upper(), r[3], r[5]) for r in conn.execute("PRAGMA table_info(call_sessions)")]
-        assert conn.execute("SELECT * FROM voice_profiles").fetchall() == [("keep", "Mine")]
+        assert conn.execute("SELECT id, name FROM voice_profiles").fetchall() == [("keep", "Mine")]
         # The newest revision, not a literal: later migrations must not break this test.
         assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == _alembic_head()
     fresh = [(r[1], r[2].upper(), r[3], r[5]) for r in canon.execute("PRAGMA table_info(call_sessions)")]

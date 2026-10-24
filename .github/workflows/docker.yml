@@ -15,6 +15,8 @@
 #   :latest   — rolling preview: latest commit on main (never a release build)
 #   :main     — alias of the same rolling main build (kept for back-compat)
 #   :stable   — most recent versioned release (set when a non-prerelease is published)
+#   :beta     — most recent `vX.Y.Z-beta.N` prerelease (moves only on beta releases;
+#               a beta also gets its exact :X.Y.Z-beta.N tag, never :X.Y or :stable)
 #   :0.3.6    — exact version from the git tag
 #   :0.3      — major.minor floating tag (updated on every patch within the minor)
 #   :sha-xxxx — specific commit SHA; produced by every build
@@ -23,6 +25,7 @@
 # build-and-push-rocm job from the same Dockerfile via the BASE_IMAGE build-arg:
 #   :rocm           — rolling preview from main (the ROCm analogue of :latest)
 #   :stable-rocm    — most recent versioned release, ROCm build
+#   :beta-rocm      — most recent beta prerelease, ROCm build
 #   :0.3.6-rocm     — exact version, ROCm build
 #   :0.3-rocm       — major.minor floating tag, ROCm build
 #   :sha-xxxx-rocm  — specific commit SHA, ROCm build
@@ -45,6 +48,17 @@ name: Docker (GHCR)
 on:
   push:
     branches: [main]
+    # A merge that only touches these cannot change what the image contains, so it
+    # does not rebuild two ~35 minute images. deploy/dockerhub-overview.md (the Docker
+    # Hub page, synced by this workflow), the Dockerfile and README.md (copied into
+    # the image) are deliberately NOT listed. Release and manual runs are unaffected.
+    paths-ignore:
+      - "docs/**"
+      - "mobile/**"
+      - "changelog.d/**"
+      - "CHANGELOG.md"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/*.md"
   release:
     types: [published]
   workflow_dispatch:
@@ -65,6 +79,13 @@ on:
 permissions:
   contents: read
   packages: write
+
+# Only the newest main push needs to build the rolling :latest/:main images, so a
+# newer push cancels an older one. Releases and manual backfills never cancel
+# anything: each gets its own group.
+concurrency:
+  group: docker-${{ github.event_name == 'push' && 'main-push' || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 env:
   REGISTRY: ghcr.io
@@ -92,7 +113,7 @@ jobs:
         env:
           RELEASE_REF: ${{ inputs.release_ref }}
         run: |
-          [[ "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]
           test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/${RELEASE_REF}^{commit}")"
           TAG_VERSION="${RELEASE_REF#v}"
           PACKAGE_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
@@ -105,7 +126,9 @@ jobs:
       - name: Resolve image source commit
         id: source
         shell: bash
-        run: echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # Both image builds run right at the runner's disk ceiling (CUDA hit
       # ENOSPC 2026-07-16 morning; ROCm hit it the same afternoon even with
@@ -172,7 +195,8 @@ jobs:
             latest=false
           tags: |
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !contains(github.ref, '-') }}
+            type=raw,value=beta,enable=${{ github.event_name == 'release' && github.event.release.prerelease && contains(github.ref, '-beta.') }}
             type=raw,value=stable,enable=${{ github.event_name == 'release' && !github.event.release.prerelease && !contains(github.ref, '-') }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=main,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -183,6 +207,8 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile
+          build-args: |
+            BUILD_COMMIT=${{ steps.source.outputs.commit }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -202,9 +228,15 @@ jobs:
           SOURCE_TAG: sha-${{ steps.source.outputs.short_sha }}
         run: |
           VERSION="${RELEASE_REF#v}"
-          MINOR="${VERSION%.*}"
-          TAGS=("$VERSION" "$MINOR")
-          if [[ "$PROMOTE_STABLE" == "true" ]]; then TAGS=(stable "${TAGS[@]}"); fi
+          if [[ "$VERSION" == *-beta.* ]]; then
+            # A beta never moves :stable or the floating major.minor tag.
+            test "$PROMOTE_STABLE" != "true"
+            TAGS=("$VERSION" beta)
+          else
+            MINOR="${VERSION%.*}"
+            TAGS=("$VERSION" "$MINOR")
+            if [[ "$PROMOTE_STABLE" == "true" ]]; then TAGS=(stable "${TAGS[@]}"); fi
+          fi
           for IMAGE in "$IMAGE_NAME" "$LEGACY_IMAGE_NAME"; do
             for TAG in "${TAGS[@]}"; do
               docker buildx imagetools create \
@@ -263,7 +295,7 @@ jobs:
         env:
           RELEASE_REF: ${{ inputs.release_ref }}
         run: |
-          [[ "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$RELEASE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]
           test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/${RELEASE_REF}^{commit}")"
           TAG_VERSION="${RELEASE_REF#v}"
           PACKAGE_VERSION="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
@@ -276,7 +308,9 @@ jobs:
       - name: Resolve image source commit
         id: source
         shell: bash
-        run: echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "short_sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # The ROCm base (~25 GB unpacked) plus build layers need every GB.
       # Same reclaim list as the CUDA job above — keep them identical
@@ -330,7 +364,8 @@ jobs:
             latest=false
           tags: |
             type=semver,pattern={{version}},suffix=-rocm,enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},suffix=-rocm,enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},suffix=-rocm,enable=${{ github.event_name == 'release' && !contains(github.ref, '-') }}
+            type=raw,value=beta-rocm,enable=${{ github.event_name == 'release' && github.event.release.prerelease && contains(github.ref, '-beta.') }}
             type=raw,value=stable-rocm,enable=${{ github.event_name == 'release' && !github.event.release.prerelease && !contains(github.ref, '-') }}
             type=raw,value=rocm,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=sha-${{ steps.source.outputs.short_sha }}-rocm
@@ -347,6 +382,7 @@ jobs:
           build-args: |
             BASE_IMAGE=rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.8.0
             GPU_FLAVOR=rocm
+            BUILD_COMMIT=${{ steps.source.outputs.commit }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -362,9 +398,15 @@ jobs:
           SOURCE_TAG: sha-${{ steps.source.outputs.short_sha }}-rocm
         run: |
           VERSION="${RELEASE_REF#v}"
-          MINOR="${VERSION%.*}"
-          TAGS=("${VERSION}-rocm" "${MINOR}-rocm")
-          if [[ "$PROMOTE_STABLE" == "true" ]]; then TAGS=(stable-rocm "${TAGS[@]}"); fi
+          if [[ "$VERSION" == *-beta.* ]]; then
+            # A beta never moves :stable-rocm or the floating major.minor tag.
+            test "$PROMOTE_STABLE" != "true"
+            TAGS=("${VERSION}-rocm" beta-rocm)
+          else
+            MINOR="${VERSION%.*}"
+            TAGS=("${VERSION}-rocm" "${MINOR}-rocm")
+            if [[ "$PROMOTE_STABLE" == "true" ]]; then TAGS=(stable-rocm "${TAGS[@]}"); fi
+          fi
           for IMAGE in "$IMAGE_NAME" "$LEGACY_IMAGE_NAME"; do
             for TAG in "${TAGS[@]}"; do
               docker buildx imagetools create \

@@ -104,9 +104,7 @@
     "dub": "Översätt och dubba ljud eller video.",
     "stories": "Skapa scener med flera röster.",
     "audiobook": "Skapa ljudböcker med kapitel.",
-    "transcribe": "Omvandla inspelningar till text.",
-    "collapseFooter": "Fäll ihop sidfoten",
-    "expandFooter": "Fäll ut sidfoten"
+    "transcribe": "Omvandla inspelningar till text."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Projekten kunde inte läsas in",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} segment validerade",
     "cancelled": "Avbruten",
     "fitting": "Justerar tidsplacering"
-  },
-  "sponsorSlot": {
-    "book": "Boka din plats",
-    "preview": "Förhandsvisning för sponsorer",
-    "message": "Ditt varumärke, webbplats och meddelande",
-    "email_app": "Öppna e-postappen",
-    "copy_email": "Kopiera e-postadress"
   },
   "supportPlans": {
     "remove": "Ta bort sponsorfältet",

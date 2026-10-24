@@ -104,9 +104,7 @@
     "dub": "音声や動画を翻訳・吹き替え。",
     "stories": "複数の声でシーンを作成。",
     "audiobook": "章立てのオーディオブックを作成。",
-    "transcribe": "録音を文字に起こす。",
-    "collapseFooter": "フッターを折りたたむ",
-    "expandFooter": "フッターを展開"
+    "transcribe": "録音を文字に起こす。"
   },
   "longformPersistence": {
     "storage_unavailable_title": "プロジェクトを読み込めませんでした",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} セグメントを検証済み",
     "cancelled": "キャンセル済み",
     "fitting": "タイミングを調整中"
-  },
-  "sponsorSlot": {
-    "book": "掲載枠を申し込む",
-    "preview": "スポンサーの表示例",
-    "message": "ブランド名・ウェブサイト・メッセージ",
-    "email_app": "メールアプリを開く",
-    "copy_email": "メールアドレスをコピー"
   },
   "supportPlans": {
     "remove": "スポンサー欄を非表示にする",

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "omnivoice"
-version = "0.5.7"
+version = "0.5.7-beta.2"
 description = "VoiceStudio — a private, local-first studio for voice cloning, speech generation, dubbing, transcription, and audiobooks"
 readme = "README.md"
 # Free and open-source under the GNU Affero General Public License v3 (see
@@ -84,7 +84,7 @@ dependencies = [
     # Qwen3-TTS, Chatterbox, MeloTTS, OuteTTS, Spark, Higgs-Audio, Voxtral,
     # …). Gives mac-ARM users a broad engine picker in Settings. Also gated
     # by platform markers because it depends on mlx (Apple Silicon only).
-    "mlx-audio>=0.3.0 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx-audio>=0.4.4 ; sys_platform == 'darwin' and platform_machine == 'arm64'",
     # Apple Silicon-only Parakeet TDT v3 ASR (mlx-community/parakeet-tdt-0.6b-v3
     # via MLX). Gives mac-ARM the Parakeet tier CUDA/CPU users get from
     # sherpa/NeMo: 25 European languages, TDT token/word timestamps, ~2 GB
@@ -309,7 +309,7 @@ constraint-dependencies = [
     "mako>=1.4.2",
     "msgpack>=1.2.1",
     "multidict>=6.9.1",
-    "pillow>=12.3.0",
+    "pillow>=13.0.0",
     "protobuf>=5.29.6",
     "pydantic-settings>=2.14.2",
     "pygments>=2.20.0",
@@ -318,6 +318,10 @@ constraint-dependencies = [
     "torchaudio==2.8.0",
     "torchvision==0.23.0",
 ]
+# gradio caps pillow below 13 (still in 6.30), but Pillow's security fixes for
+# the FlashPix/JPEG heap overflows and bundled libopenjp2 start at 13.0.0.
+# gradio only uses Pillow's stable image I/O; tests and the Docker smoke run it.
+override-dependencies = ["pillow>=13.0.0"]
 
 [tool.hatch.metadata]
 # Needed so the KittenTTS wheel-URL dep in `project.dependencies` is accepted
@@ -348,6 +352,7 @@ dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=6.0",
+    "pytest-xdist>=3.6",
 ]
 
 [tool.pytest.ini_options]

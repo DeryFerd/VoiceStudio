@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowUpRightIcon, GemIcon } from 'lucide-react';
+import { GemIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import './support-shortcut.css';
@@ -23,7 +23,6 @@ export function SupportShortcut() {
           <span className="hidden text-xs font-semibold sm:inline">
             {t('supportPlans.get_pro')}
           </span>
-          <ArrowUpRightIcon aria-hidden="true" className="size-3" />
         </TooltipTrigger>
         <TooltipContent surface="theme" side="bottom">
           {t('supportPlans.get_pro')}

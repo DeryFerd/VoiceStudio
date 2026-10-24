@@ -1,4 +1,6 @@
-# Security scanning — runs on every PR, on push to main, and weekly.
+# Security scanning — runs on PRs, on push to main, and weekly. The secret scan
+# runs on every PR; CodeQL, bandit and the dependency audits are skipped for PRs
+# that only touch docs/, mobile/ or Markdown (see the `changes` job).
 #
 # Complements the CodeRabbit + Greptile app reviews (which fire on PR creation)
 # with deterministic checks:
@@ -42,6 +44,45 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # A pull request whose every changed file is documentation or mobile-only source
+  # cannot change what CodeQL (Python, JS/TS), bandit or the dependency audits
+  # analyse, so those four jobs are skipped for it. The secret scan always runs,
+  # and every push to main, the weekly schedule and manual runs scan everything.
+  # Any doubt (API failure, deleted/renamed file, 3000+ files) means "true".
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - id: detect
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ]; then
+            if rows=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | [.status, .filename] | @tsv') && [ -n "$rows" ]; then
+              total=$(printf '%s\n' "$rows" | wc -l)
+              status_rc=0
+              printf '%s\n' "$rows" | cut -f1 | sort -u | grep -v -x -E 'added|modified' > /dev/null || status_rc=$?
+              if [ "$total" -lt 3000 ] && [ "$status_rc" -eq 1 ]; then
+                rc=0
+                outside=$(printf '%s\n' "$rows" | cut -f2 | grep -v -P '^(docs/|mobile/|\.github/ISSUE_TEMPLATE/|\.github/[^/]+\.md$|[^/]+\.md$)') || rc=$?
+                [ "$rc" -eq 1 ] && code=false
+              fi
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "code jobs: $code"
+
   # ── Secret scanning (gating) ─────────────────────────────────────────────
   # Full-history scan on push to main; PR-diff scan on pull_request (faster,
   # and the action picks the right mode from the event automatically).
@@ -65,6 +106,8 @@ jobs:
   # ── CodeQL SAST (Python + JS/TS) ─────────────────────────────────────────
   codeql:
     name: CodeQL (${{ matrix.language }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -79,7 +122,7 @@ jobs:
           persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3.38.2
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: ${{ matrix.language }}
           # Both targets are interpreted — no compiled build step needed.
@@ -106,13 +149,15 @@ jobs:
               - "**/*.test.tsx"
 
       - name: Analyze
-        uses: github/codeql-action/analyze@1190a975f95ce23525efb6a3fc21ea29567c1b52 # v3.38.2
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: "/language:${{ matrix.language }}"
 
   # ── Python SAST (bandit → SARIF) ─────────────────────────────────────────
   bandit:
     name: Python SAST (bandit)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -153,6 +198,8 @@ jobs:
   # ── Dependency advisories (reporting) ────────────────────────────────────
   dependencies:
     name: Dependency audit
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

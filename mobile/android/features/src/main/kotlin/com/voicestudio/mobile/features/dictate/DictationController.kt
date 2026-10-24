@@ -99,7 +99,7 @@ class DictationController(private val api:VoiceStudioApi,private val scope:Corou
 fun interface DictationAudioSource {
     suspend fun record(keepRecording: () -> Boolean, send: (ByteArray, Int) -> Unit)
 }
-private class MicrophoneSource : DictationAudioSource {
+internal class MicrophoneSource : DictationAudioSource {
     @Suppress("MissingPermission")
     override suspend fun record(keepRecording: () -> Boolean, send: (ByteArray, Int) -> Unit) = withContext(Dispatchers.IO) {
         val size=AudioRecord.getMinBufferSize(16000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT).coerceAtLeast(6400)

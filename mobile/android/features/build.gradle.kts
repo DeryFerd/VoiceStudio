@@ -26,6 +26,7 @@ dependencies {
     implementation(libs.compose.material)
     implementation(libs.compose.icons)
 
+    api(project(":core:local"))
     api(project(":core:data"))
     api(project(":core:designsystem"))
     implementation(libs.activity)

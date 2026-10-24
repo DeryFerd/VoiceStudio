@@ -108,6 +108,22 @@ test('first run: setup gate completes to home', async (t) => {
     for (const heading of ['Model packs', 'Privacy', 'Enter studio']) {
       await next.click();
       await page.getByRole('heading', { name: heading, exact: true }).first().waitFor();
+      if (heading === 'Privacy') {
+        // A fresh profile is asked about the optional account (equal-weight Yes/No, owner rule
+        // 2026-10-16) and Next stays disabled until it answers. Main reports availability
+        // asynchronously, so wait for the question rather than reading it once.
+        const local = page.getByRole('button', { name: 'Keep everything local', exact: true });
+        const asked = await local
+          .waitFor({ timeout: 5000 })
+          .then(() => true)
+          .catch(() => false);
+        if (asked) {
+          const yes = page.getByRole('button', { name: 'Turn on account features', exact: true });
+          assert.equal(await yes.isVisible(), true, 'Both choices must carry equal weight');
+          await local.click();
+          await local.waitFor({ state: 'detached' });
+        }
+      }
     }
     await page.getByRole('button', { name: 'Enter studio', exact: true }).last().click();
     await page.getByRole('heading', { name: 'Home', exact: true }).waitFor();

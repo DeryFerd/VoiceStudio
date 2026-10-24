@@ -79,6 +79,19 @@ class HostSwitchRegressionTest {
         var request=b.takeRequest(10,TimeUnit.MILLISECONDS)
         while(request!=null) {assertFalse(request.path.orEmpty().contains("host-a"));request=b.takeRequest(10,TimeUnit.MILLISECONDS)}
     }
+    @Test fun changingRunLocationPreservesTheSharedSpeakScript() = runBlocking<Unit> {
+        vm.connect(a.url("/").toString(),"","");awaitIdle()
+        compose.setContent {StudioApp(vm)}
+        compose.onNodeWithTag("home.speak").performScrollTo().performClick()
+        compose.onNodeWithText("Type what you want to hear…").performTextInput("Draft from computer")
+        compose.onNodeWithText("This phone").performClick()
+        compose.onNode(hasSetTextAction() and hasText("Draft from computer")).assertExists()
+        compose.onNode(hasSetTextAction()).performTextReplacement("Edited on phone")
+        compose.onNodeWithText("Computer").performClick()
+        compose.onNode(hasSetTextAction() and hasText("Edited on phone")).assertExists()
+        compose.onNodeWithText("This phone").performClick()
+        compose.onNode(hasSetTextAction() and hasText("Edited on phone")).assertExists()
+    }
     @Test fun reconnectAndDisconnectClearCheckpointsAndStopOldMonitoring() = runBlocking {
         vm.connect(a.url("/").toString(),"","");awaitIdle()
         val oldHost=a.url("/").toString()
@@ -115,6 +128,7 @@ class HostSwitchRegressionTest {
         val player=mock(Player::class.java)
         `when`(player.duration).thenReturn(1000)
         compose.setContent {CompositionLocalProvider(LocalHostPlayerFactory provides {_,_->player}) {StudioApp(vm)}}
+        compose.onNodeWithTag("home.speak").performScrollTo().performClick()
         compose.onNodeWithText("Type what you want to hear…").performTextInput("Text for A")
         compose.onAllNodesWithContentDescription("Play").assertCountEquals(2)
         val oldConnection=vm.state.value.connectionId
@@ -122,6 +136,7 @@ class HostSwitchRegressionTest {
         compose.waitForIdle()
         assertTrue(vm.state.value.connectionId>oldConnection)
         verify(player).release()
+        compose.onNodeWithTag("home.speak").performScrollTo().performClick()
         compose.onNodeWithText("Generated audio").assertDoesNotExist()
         compose.onNodeWithText("Text for A").assertDoesNotExist()
         compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
@@ -175,7 +190,7 @@ class HostSwitchRegressionTest {
         }
         var shown by androidx.compose.runtime.mutableStateOf(true)
         val l=com.voicestudio.mobile.l10n.L10n.load(app,"en")
-        val copy=l.t("mobile.android.operation_failed")
+        val copy=l.t(com.voicestudio.mobile.features.shortErrorKey("mobile.android.operation_failed"))
         compose.setContent {
             CompositionLocalProvider(com.voicestudio.mobile.features.LocalL10n provides l) {
                 com.voicestudio.mobile.designsystem.VoiceStudioTheme {
@@ -183,7 +198,12 @@ class HostSwitchRegressionTest {
                 }
             }
         }
-        compose.waitUntil(5000) {compose.onAllNodesWithText(copy).fetchSemanticsNodes().isNotEmpty()}
+        // The receipt reaches the screen through a main-looper observer; drive the looper
+        // while waiting so a slow CI runner can't time out on an idle queue.
+        compose.waitUntil(20000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            compose.onAllNodesWithText(copy).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithText(copy).assertExists()
         compose.runOnIdle {shown=false};compose.waitForIdle()
         // Recreate the view model/store as on a new launch; receipts must be durable.

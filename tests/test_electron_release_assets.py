@@ -53,7 +53,7 @@ def _release(
             assets.append({"name": f"{artifact}.blockmap", "size": 10, "digest": "sha256:map"})
     return {
         "tagName": f"v{version}",
-        "isPrerelease": False,
+        "isPrerelease": channel == "beta",
         "assets": assets,
     }
 
@@ -102,6 +102,34 @@ def test_there_is_no_preview_feed(tmp_path: Path):
 def test_stable_requires_a_plain_version(tmp_path: Path):
     with pytest.raises(ReleaseContractError, match="wrong shape"):
         verify_release(_release(tmp_path), tmp_path, channel="stable", version="0.5.3-144")
+
+
+def test_beta_release_is_a_prerelease_with_beta_manifests(tmp_path: Path):
+    release = _release(tmp_path, channel="beta", version="0.5.9-beta.1")
+    result = verify_release(release, tmp_path, channel="beta", version="0.5.9-beta.1")
+    assert len(result) == 4
+    assert all(item.startswith("electron-beta-") for item in result)
+
+
+def test_beta_must_never_be_published_as_a_full_release(tmp_path: Path):
+    """A non-prerelease beta would become GitHub's `latest` and reach stable users."""
+    release = _release(tmp_path, channel="beta", version="0.5.9-beta.1")
+    release["isPrerelease"] = False
+    with pytest.raises(ReleaseContractError, match="prerelease flag"):
+        verify_release(release, tmp_path, channel="beta", version="0.5.9-beta.1")
+
+
+def test_stable_must_not_be_flagged_a_prerelease(tmp_path: Path):
+    release = _release(tmp_path)
+    release["isPrerelease"] = True
+    with pytest.raises(ReleaseContractError, match="prerelease flag"):
+        verify_release(release, tmp_path, channel="stable", version="0.5.3")
+
+
+@pytest.mark.parametrize("version", ["0.5.9", "0.5.9-rc.1", "0.5.9-beta", "0.5.9-beta.1.2"])
+def test_beta_requires_a_beta_version(tmp_path: Path, version: str):
+    with pytest.raises(ReleaseContractError, match="wrong shape"):
+        verify_release(_release(tmp_path), tmp_path, channel="beta", version=version)
 
 
 def test_stable_release_tag_must_match_the_manifest_version(tmp_path: Path):

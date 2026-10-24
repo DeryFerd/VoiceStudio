@@ -30,6 +30,9 @@ export interface Profile {
   verified_own_voice?: boolean | number | null;
   consent_text?: string | null;
   consent_recorded_at?: string | null;
+  /** Sync consent attestation (S2): required before a voice can sync. */
+  consent_basis?: 'own_voice' | 'speaker_permission' | '' | null;
+  consent_attested_at?: string | null;
 }
 
 // ── History (`GET /history`) ───────────────────────────────────────────────
@@ -70,6 +73,9 @@ export interface EngineBackend {
   reason: string | null;
   hint?: string | null;
   supports_cloning?: boolean | null;
+  /** Built-in voices a request may pick (`preset_voice`); empty or absent when the engine has none (#2938). */
+  preset_voices?: string[];
+  default_voice?: string | null;
   /** False: needs a reference clip, so Voice Design is unavailable. Null/absent: undeclared. */
   supports_voice_design?: boolean | null;
   /** "tags" = OmniVoice's closed design vocabulary; "freeform" = sent as written (#2389). */
@@ -144,6 +150,8 @@ export interface DesignRecipe {
 /** Everything the clone form sends. Names are the UI names; `toGenerateForm`
  *  in generate.ts maps them to the multipart field names. */
 export interface CloneGenerateInput {
+  /** Built-in voice id for engines that ship presets. */
+  presetVoice?: string;
   wavBits?: 16 | 24 | 32;
   effectPreset?: 'broadcast' | 'raw';
   seed?: number;

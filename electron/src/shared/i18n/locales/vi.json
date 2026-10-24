@@ -104,9 +104,7 @@
     "dub": "Dịch và lồng tiếng âm thanh hoặc video.",
     "stories": "Tạo cảnh với nhiều giọng nói.",
     "audiobook": "Tạo sách nói có chương.",
-    "transcribe": "Chuyển bản ghi âm thành văn bản.",
-    "collapseFooter": "Thu gọn chân trang",
-    "expandFooter": "Mở rộng chân trang"
+    "transcribe": "Chuyển bản ghi âm thành văn bản."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Không thể tải dự án",
@@ -2749,13 +2747,6 @@
     "progress": "Đã xác thực {{done}} / {{total}} đoạn",
     "cancelled": "Đã hủy",
     "fitting": "Đang điều chỉnh thời gian"
-  },
-  "sponsorSlot": {
-    "book": "Đặt vị trí của bạn",
-    "preview": "Xem trước nhà tài trợ",
-    "message": "Thương hiệu, trang web và lời nhắn",
-    "email_app": "Mở ứng dụng email",
-    "copy_email": "Sao chép email"
   },
   "supportPlans": {
     "remove": "Xóa thanh nhà tài trợ",

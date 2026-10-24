@@ -1,12 +1,12 @@
 import type { CSSProperties, MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUpRightIcon } from 'lucide-react';
+import { ArrowUpRightIcon, StarIcon } from 'lucide-react';
 import { getBridge } from '@/components/bridge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { runRendererTask } from '@/lib/global-error-recovery';
 import { REPO_URL, X_URL } from '@shared/utils/contactLinks';
-import { homeContributors } from './home-contributors-data';
+import { homeContributors, homeCoreMaintainers } from './home-contributors-data';
 
 function openProfile(event: MouseEvent<HTMLAnchorElement>) {
   const bridge = getBridge();
@@ -31,6 +31,7 @@ export function HomeContributors() {
       style={{ '--contributor-columns': topCount * 2 } as CSSProperties}
     >
       {items.map(({ login, avatar }, index) => {
+        const coreMaintainer = homeCoreMaintainers.some((maintainer) => maintainer === login);
         const row = index < starts[1] ? 0 : index < starts[2] ? 1 : 2;
         const start = starts[row];
         const portrait = (
@@ -39,6 +40,15 @@ export function HomeContributors() {
               <span className="home-contributor-all">{t('homeUi.all')}</span>
             ) : (
               <img src={avatar} alt="" width={44} height={44} />
+            )}
+            {coreMaintainer && (
+              <span
+                className="home-core-maintainer"
+                data-core-maintainer={login}
+                aria-hidden="true"
+              >
+                <StarIcon />
+              </span>
             )}
           </span>
         );
@@ -57,7 +67,12 @@ export function HomeContributors() {
                   delay={120}
                   closeDelay={250}
                   render={
-                    <button type="button" className="home-contributor" aria-label="@debpalash" />
+                    <button
+                      type="button"
+                      className="home-contributor"
+                      aria-label="@debpalash"
+                      aria-description={t('homeUi.coreMaintainer')}
+                    />
                   }
                 >
                   {portrait}
@@ -70,7 +85,10 @@ export function HomeContributors() {
                 >
                   <div className="home-contributor-identity">
                     <img src={avatar} alt="" width={40} height={40} />
-                    <strong>Palash</strong>
+                    <div>
+                      <strong>Palash</strong>
+                      <small>{t('homeUi.coreMaintainer')}</small>
+                    </div>
                   </div>
                   {[
                     { label: 'GitHub', handle: 'debpalash', href: 'https://github.com/debpalash' },
@@ -109,6 +127,7 @@ export function HomeContributors() {
                       aria-label={
                         login === 'all' ? t('homeUi.allContributors') : `GitHub · @${login}`
                       }
+                      aria-description={coreMaintainer ? t('homeUi.coreMaintainer') : undefined}
                       onClick={openProfile}
                     />
                   }
@@ -116,7 +135,9 @@ export function HomeContributors() {
                   {portrait}
                 </TooltipTrigger>
                 <TooltipContent surface="theme" side="bottom">
-                  {login === 'all' ? t('homeUi.allContributors') : `@${login}`}
+                  {login === 'all'
+                    ? t('homeUi.allContributors')
+                    : `@${login}${coreMaintainer ? ` · ${t('homeUi.coreMaintainer')}` : ''}`}
                 </TooltipContent>
               </Tooltip>
             )}

@@ -139,6 +139,7 @@ export function toGenerateForm(input: CloneGenerateInput): FormData {
   form.append('num_step', String(input.steps));
   form.append('wav_bits', String(input.wavBits ?? 16));
   form.append('effect_preset', input.effectPreset ?? 'broadcast');
+  if (input.presetVoice) form.append('preset_voice', input.presetVoice);
   form.append('guidance_scale', String(input.cfg));
   form.append('speed', String(input.speed));
   form.append('denoise', String(input.denoise));

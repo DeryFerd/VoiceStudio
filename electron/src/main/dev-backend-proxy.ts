@@ -68,6 +68,19 @@ export interface DevBackendProxy {
   close: () => Promise<void>;
 }
 
+/**
+ * Port for the dev proxy from `VOICESTUDIO_ELECTRON_PROXY_PORT`. `0` asks the OS
+ * for a free port at bind time: test harnesses that load the packaged renderer
+ * use it, because a port picked first and bound later can be taken in between
+ * (Electron's own debugger listener took one in CI).
+ */
+export function electronProxyPort(raw: string | undefined): number {
+  const port = Number(raw);
+  return raw?.trim() && Number.isInteger(port) && port >= 0 && port <= 65535
+    ? port
+    : DEFAULT_ELECTRON_PROXY_PORT;
+}
+
 /** Dev-only same-origin bridge whose target and scoped credentials remain main-owned. */
 export async function startDevBackendProxy(
   getBaseUrl: () => string,

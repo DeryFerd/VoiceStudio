@@ -30,7 +30,7 @@ export default defineConfig({
     },
     react(),
   ],
-  define: { __APP_VERSION__: JSON.stringify('0.0.0-test') },
+  define: { __APP_VERSION__: JSON.stringify('0.0.0-test'), __BUILD_COMMIT__: JSON.stringify('000000000') },
   resolve: {
     alias: [
       ...tauriModules.map((id) => ({ find: id, replacement: `${tauriStub}?module=${id}` })),
@@ -43,6 +43,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/shared/test/setup.js'],
+    // Shared release runners (Intel macOS, Windows ARM) run the suite many times slower
+    // than a laptop; a real hang still fails, a busy runner no longer does.
+    testTimeout: process.env.CI ? 30_000 : 5_000,
     include: ['src/shared/**/*.test.{js,jsx,ts,tsx}'],
     css: false,
   },

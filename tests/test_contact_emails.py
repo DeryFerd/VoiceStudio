@@ -22,6 +22,11 @@ _RESERVED_DOMAIN = re.compile(r"(^|\.)(example\.(com|net|org)|example|test|inval
 # GitHub no-reply commit addresses are identities, not contact addresses.
 _NOREPLY_DOMAIN = "users.noreply.github.com"
 _TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|fixtures)/|\.test\.[a-z]+$|_test\.py$")
+# Vendored copyright notices retain upstream identities, not project contacts.
+_NATIVE_LICENCE_PATH = re.compile(
+    r"^mobile/(?:ios/VoiceStudio/Resources/NativeLicences/[^/]+\.txt"
+    r"|android/app/src/main/assets/licenses/native-[^/]+\.txt)$"
+)
 
 
 def _tracked_text_files():
@@ -38,6 +43,8 @@ def _tracked_text_files():
 def test_only_project_contact_addresses_are_published():
     stray = []
     for name, text in _tracked_text_files():
+        if _NATIVE_LICENCE_PATH.fullmatch(name):
+            continue
         for address in _EMAIL.findall(text):
             domain = address.rsplit("@", 1)[1]
             if (address.lower() in _CONTACTS or _RESERVED_DOMAIN.search(domain) or domain.lower() == _NOREPLY_DOMAIN

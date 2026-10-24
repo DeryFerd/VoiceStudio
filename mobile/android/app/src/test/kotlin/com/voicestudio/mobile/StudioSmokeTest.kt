@@ -59,25 +59,30 @@ class StudioSmokeTest {
         try {
             compose.setContent {CompositionLocalProvider(LocalHostPlayerFactory provides {_,_->player}) {StudioApp(vm)}}
             awaitCondition {!vm.state.value.loading}
+            compose.onNodeWithText("Saved on this phone. Nothing is sent.").assertExists()
             compose.onNodeWithText("No thanks").assertExists().performClick()
             awaitCondition {vm.preferences.value.consent==false}
+            compose.onNodeWithText("Settings").performClick()
+            compose.onNodeWithText("Connect").performScrollTo().performClick()
+            compose.onNodeWithText("Enter address").performClick()
             compose.onNodeWithText("Server address").performTextInput(server.url("/").toString())
             compose.onAllNodesWithText("Connect").filter(hasClickAction()).onFirst().performScrollTo().performClick()
             awaitCondition {vm.state.value.connected&&engineRead.count==0L}
             compose.onAllNodes(isDialog()).assertCountEquals(0)
+            compose.onNodeWithTag("home.speak").performScrollTo().performClick()
             compose.onNodeWithText("Type what you want to hear…").performTextInput("A local generation")
             releaseEngines.countDown()
             awaitCondition {!vm.state.value.busy}
-            compose.onNodeWithText("Default voice (engine preset)").assertExists()
+            compose.onNodeWithText("Default voice").assertExists()
             compose.onNodeWithText("Local engine").assertExists()
             compose.onNodeWithText("Auto").assertExists()
-            compose.onNodeWithText("Voice").performScrollTo().performClick()
+            compose.onNodeWithText("Default voice").performScrollTo().performClick()
             compose.onNodeWithText("Sample voice").performClick()
             compose.onNodeWithText("French").assertExists()
-            compose.onNodeWithText("Voice").performClick()
-            compose.onNodeWithText("Default voice (engine preset)").performClick()
+            compose.onNodeWithText("Sample voice").performClick()
+            compose.onNodeWithText("Default voice").performClick()
             compose.onNodeWithText("Auto").assertExists()
-            compose.onNodeWithText("Generate").performScrollTo().performClick()
+            compose.onNodeWithText("Generate").assertIsDisplayed().performClick()
             awaitCondition {vm.state.value.audio!=null&&!vm.state.value.busy}
             compose.onNodeWithContentDescription("Play").performScrollTo().performClick()
             verify(player).play()

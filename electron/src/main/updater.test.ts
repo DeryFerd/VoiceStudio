@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, Set<(...args: any[]) => void>>();
   const ipcHandlers = new Map<string, (...args: any[]) => unknown>();
-  // updates.json once stored the retired channel choice.
-  const disk = { channel: undefined as 'stable' | 'preview' | undefined };
+  // updates.json holds the saved update channel ("preview" is a retired value).
+  const disk = { file: undefined as string | undefined };
   const fs = {
-    rmSync: vi.fn((_path: string) => {
-      disk.channel = undefined;
+    readFileSync: vi.fn((_path: string) => {
+      if (disk.file === undefined) throw new Error('ENOENT');
+      return disk.file;
+    }),
+    writeFileSync: vi.fn((_path: string, data: string) => {
+      disk.file = data;
     }),
   };
   const autoUpdater = {
@@ -63,7 +67,9 @@ import {
   DesktopUpdater,
   feedManifestName,
   listDesktopReleases,
+  readSavedUpdateChannel,
   registerUpdateIpc,
+  resolveBetaFeed,
   resolveUpdateFeedUrl,
   UPDATE_CHANNELS,
 } from './updater';
@@ -76,7 +82,7 @@ describe('DesktopUpdater', () => {
   beforeEach(() => {
     mocks.handlers.clear();
     mocks.ipcHandlers.clear();
-    mocks.disk.channel = undefined;
+    mocks.disk.file = undefined;
     mocks.app.isPackaged = true;
     mocks.autoUpdater.autoDownload = true;
     mocks.autoUpdater.autoInstallOnAppQuit = true;
@@ -220,33 +226,120 @@ describe('DesktopUpdater', () => {
     });
   });
 
-  test('migrates a saved Preview choice to Stable without errors', async () => {
-    mocks.disk.channel = 'preview';
-    const updater = new DesktopUpdater();
-
-    expect(mocks.fs.rmSync).toHaveBeenCalledWith(expect.stringContaining('updates.json'), {
-      force: true,
-    });
-    expect(mocks.disk.channel).toBeUndefined();
-    await updater.check();
-
-    expect(updater.snapshot().status).toBe('idle');
-    expect(updater.snapshot()).not.toHaveProperty('channel');
-    expect(mocks.autoUpdater.allowPrerelease).toBe(false);
-    expect(mocks.autoUpdater.allowDowngrade).toBe(false);
-    expect(mocks.autoUpdater.setFeedURL).toHaveBeenLastCalledWith({
-      provider: 'generic',
-      url: 'https://github.com/debpalash/VoiceStudio/releases/latest/download',
-      channel: `electron-stable-${process.platform}-${process.arch}`,
-    });
-    expect(updater).not.toHaveProperty('setChannel');
+  test('reads a saved Preview or damaged choice as Stable', () => {
+    for (const saved of ['{"channel":"preview"}', 'not json', '{}', 'null']) {
+      mocks.disk.file = saved;
+      expect(readSavedUpdateChannel()).toBe('stable');
+      expect(new DesktopUpdater().snapshot().channel).toBe('stable');
+    }
+    mocks.disk.file = undefined;
+    expect(readSavedUpdateChannel()).toBe('stable');
   });
 
-  test('a leftover settings file that cannot be removed never blocks the updater', () => {
-    mocks.fs.rmSync.mockImplementationOnce(() => {
+  test('a saved Beta choice survives restarts and checks the newest beta or stable release', async () => {
+    const platform = process.platform;
+    const arch = process.arch;
+    const beta = feedManifestName(platform, arch, 'direct', 'beta');
+    const stable = feedManifestName(platform, arch, 'direct', 'stable');
+    const feedFetcher = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify([
+            { tag_name: 'v0.5.9-beta.2', assets: [{ name: beta }] },
+            { tag_name: 'v0.5.9-beta.10', assets: [{ name: beta }] },
+            { tag_name: 'v0.5.8', assets: [{ name: stable }] },
+            { tag_name: 'v0.5.10-beta.1', draft: true, assets: [{ name: beta }] },
+            { tag_name: 'v0.5.9-beta.11', assets: [{ name: 'unrelated.txt' }] },
+            { tag_name: 'nightly', assets: [{ name: beta }] },
+          ]),
+          { status: 200 },
+        ),
+    );
+    mocks.disk.file = '{"channel":"beta"}';
+    const updater = new DesktopUpdater('direct', feedFetcher);
+    expect(updater.snapshot().channel).toBe('beta');
+    await updater.check();
+
+    expect(mocks.autoUpdater.allowDowngrade).toBe(false);
+    expect(mocks.autoUpdater.channel).toBe(`electron-beta-${platform}-${arch}`);
+    expect(mocks.autoUpdater.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/debpalash/VoiceStudio/releases/download/v0.5.9-beta.10',
+      channel: `electron-beta-${platform}-${arch}`,
+    });
+  });
+
+  test('Beta rolls onto a stable release that passes the newest beta', async () => {
+    const stable = feedManifestName(process.platform, process.arch, 'direct', 'stable');
+    const beta = feedManifestName(process.platform, process.arch, 'direct', 'beta');
+    const feed = await resolveBetaFeed(
+      process.platform,
+      process.arch,
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify([
+              { tag_name: 'v0.5.9-beta.3', assets: [{ name: beta }] },
+              { tag_name: 'v0.5.9', assets: [{ name: stable }] },
+            ]),
+            { status: 200 },
+          ),
+      ),
+    );
+    expect(feed).toEqual({
+      url: 'https://github.com/debpalash/VoiceStudio/releases/download/v0.5.9',
+      channel: `electron-stable-${process.platform}-${process.arch}`,
+    });
+  });
+
+  test('Beta feed lookup fails closed on an unusable response', async () => {
+    await expect(
+      resolveBetaFeed(
+        process.platform,
+        process.arch,
+        vi.fn(async () => new Response('', { status: 503 })),
+      ),
+    ).rejects.toThrow('503');
+    await expect(
+      resolveBetaFeed(
+        process.platform,
+        process.arch,
+        vi.fn(async () => new Response('[]', { status: 200 })),
+      ),
+    ).rejects.toThrow('No beta or stable release');
+  });
+
+  test('switching channel persists, clears the old offer, and is refused mid-download', () => {
+    const updater = new DesktopUpdater();
+    emit('update-available', { version: '0.5.3', releaseNotes: 'Old' });
+
+    expect(updater.setChannel('beta')).toMatchObject({ status: 'idle', channel: 'beta' });
+    expect(updater.snapshot().availableVersion).toBeUndefined();
+    expect(JSON.parse(mocks.disk.file!)).toEqual({ channel: 'beta' });
+    expect(readSavedUpdateChannel()).toBe('beta');
+
+    emit('download-progress', { percent: 10 });
+    expect(updater.setChannel('stable').channel).toBe('beta');
+    expect(readSavedUpdateChannel()).toBe('beta');
+  });
+
+  test('Store builds expose no channel and ignore switch requests', () => {
+    const updater = new DesktopUpdater('microsoft-store', vi.fn());
+    expect(updater.snapshot()).not.toHaveProperty('channel', expect.anything());
+    updater.setChannel('beta');
+    expect(mocks.fs.writeFileSync).not.toHaveBeenCalled();
+    expect(feedManifestName(process.platform, process.arch, 'microsoft-store', 'beta')).toContain(
+      'microsoft-store-stable',
+    );
+  });
+
+  test('a channel file that cannot be written never blocks the updater', () => {
+    mocks.fs.writeFileSync.mockImplementationOnce(() => {
       throw new Error('EPERM');
     });
-    expect(() => new DesktopUpdater()).not.toThrow();
+    const updater = new DesktopUpdater();
+    expect(() => updater.setChannel('beta')).not.toThrow();
+    expect(updater.snapshot().channel).toBe('beta');
   });
 
   test('keeps startup checks quiet while reporting manual check failures', async () => {
@@ -347,6 +440,13 @@ describe('DesktopUpdater', () => {
             body: 'Ready',
           },
           { name: 'missing tag' },
+          {
+            tag_name: 'mobile-v0.5.7-beta.2',
+            name: 'mobile-v0.5.7-beta.2 — VoiceStudio mobile',
+            published_at: '2026-10-24T14:00:00Z',
+            prerelease: true,
+            body: 'Phone apps',
+          },
         ]),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
@@ -396,7 +496,7 @@ describe('update IPC', () => {
   beforeEach(() => {
     mocks.handlers.clear();
     mocks.ipcHandlers.clear();
-    mocks.disk.channel = undefined;
+    mocks.disk.file = undefined;
     mocks.app.isPackaged = true;
     vi.clearAllMocks();
     mocks.autoUpdater.checkForUpdates.mockResolvedValue(undefined);
@@ -426,8 +526,16 @@ describe('update IPC', () => {
       }),
     ).toThrow('Untrusted update request');
 
-    expect(UPDATE_CHANNELS).not.toHaveProperty('setChannel');
+    const setChannel = mocks.ipcHandlers.get(UPDATE_CHANNELS.setChannel)!;
+    const trustedEvent = { sender: webContents, senderFrame: webContents.mainFrame };
+    expect(() => setChannel(trustedEvent, 'nightly')).toThrow('Unknown update channel');
+    // A downloaded update pins the channel until it is installed.
+    expect(setChannel(trustedEvent, 'beta')).toMatchObject({ channel: 'stable' });
+    expect(() =>
+      setChannel({ sender: {}, senderFrame: { url: 'https://attacker.invalid' } }, 'beta'),
+    ).toThrow('Untrusted update request');
+
     dispose();
-    expect(mocks.ipcMain.removeHandler).toHaveBeenCalledTimes(6);
+    expect(mocks.ipcMain.removeHandler).toHaveBeenCalledTimes(7);
   });
 });

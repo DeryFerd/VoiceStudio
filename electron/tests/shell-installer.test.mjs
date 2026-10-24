@@ -58,18 +58,22 @@ function fixture(t, options = {}) {
     writeFileSync(join(bin, name), '#!/bin/sh\nset -eu\n' + body, { mode: 0o755 });
   shim(
     'uname',
-    `case "$1" in -s) echo ${options.mac ? 'Darwin' : 'Linux'};; -m) echo ${options.mac ? 'arm64' : 'x86_64'};; esac\n`,
+    `case "$1" in -s) echo ${options.mac ? 'Darwin' : 'Linux'};; -m) echo ${options.machine ?? (options.mac ? 'arm64' : 'x86_64')};; esac\n`,
   );
   shim(
     'hdiutil',
     `
 if [ "$1" = attach ]; then
+ [ "$TEST_ATTACH_FAIL" = 0 ] || exit 1
  while [ "$1" != -mountpoint ]; do shift; done
  shift; mkdir -p "$1/VoiceStudio.app/Contents"
  printf fixture > "$1/VoiceStudio.app/Contents/Info.plist"
 fi
 `,
   );
+  shim('sysctl', `[ "$TEST_ROSETTA" = 1 ] && echo 1 || echo 0\n`);
+  shim('xattr', 'printf "%s\\n" "$*" >> "$TEST_ROOT/xattr"\n');
+  shim('codesign', `printf "%s\\n" "$*" >> "$TEST_ROOT/codesign"\ncase "$*" in *--verify*) [ "$TEST_SIG_INVALID" = 0 ];; esac\n`);
   shim('ditto', 'cp -R "$1" "$2"\n');
   shim(
     'curl',
@@ -84,7 +88,7 @@ case "$url" in
  */latest) printf 'https://github.com/debpalash/VoiceStudio/releases/tag/v1.2.3';;
  */SHA256SUMS.txt)
    version=$(printf '%s' "$url" | sed 's|.*/download/v||; s|/.*||')
-   printf '%s  VoiceStudio-Electron-%s-${options.mac ? 'mac-arm64.dmg' : 'linux-x64.AppImage'}\\n' "$TEST_DIGEST" "$version" > "$out";;
+   printf '%s  VoiceStudio-Electron-%s-${options.mac ? 'mac-arm64.dmg' : 'linux-x64.AppImage'}\\n%s  VoiceStudio-Electron-%s-mac-x64.dmg\\n' "$TEST_DIGEST" "$version" "$TEST_DIGEST" "$version" > "$out";;
  */VoiceStudio-Electron-*.AppImage|*/VoiceStudio-Electron-*.dmg)
    [ "$TEST_MISSING" = 0 ] || exit 22
    printf '${payload}' > "$out";;
@@ -140,6 +144,9 @@ if [ "$1 $2" = 'run electron-builder' ]; then printf '${payload}' > release/Voic
           VOICESTUDIO_INSTALL_DIR: options.installDir ?? (options.mac
             ? join(home, 'Applications')
             : join(home, '.local/bin')),
+          TEST_ROSETTA: options.rosetta ? '1' : '0',
+          TEST_SIG_INVALID: options.sigInvalid ? '1' : '0',
+          TEST_ATTACH_FAIL: options.attachFails ? '1' : '0',
           TEST_MISSING: options.missing ? '1' : '0',
           TEST_BUILD_FAIL: options.buildFails ? '1' : '0',
         },
@@ -211,6 +218,43 @@ test('macOS installs the verified Electron bundle and replaces only the app', (t
   assert.equal(existsSync(join(app, 'old-file')), false);
   assert.equal(readFileSync(f.settings, 'utf8'), 'preserve me');
   assert.match(readFileSync(join(f.root, 'registration'), 'utf8'), /-f .*VoiceStudio\.app/);
+});
+
+for (const [name, options, asset, intel] of [
+  ['Apple Silicon', { mac: true, machine: 'arm64' }, 'mac-arm64.dmg', false],
+  ['Intel', { mac: true, machine: 'x86_64' }, 'mac-x64.dmg', true],
+  ['Apple Silicon terminal under Rosetta', { mac: true, machine: 'x86_64', rosetta: true }, 'mac-arm64.dmg', false],
+]) {
+  test(`macOS ${name} downloads ${asset}`, (t) => {
+    const f = fixture(t, options);
+    const r = f.run();
+    assert.equal(r.status, 0, r.stderr);
+    assert.match(readFileSync(join(f.root, 'requests'), 'utf8'), new RegExp(`/VoiceStudio-Electron-1\\.2\\.3-${asset.replace('.', '\\.')}`));
+    assert.equal(r.stdout.includes('Intel Mac'), intel);
+  });
+}
+
+test('macOS clears quarantine and repairs an invalid signature after install', (t) => {
+  const f = fixture(t, { mac: true, sigInvalid: true });
+  const r = f.run();
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(readFileSync(join(f.root, 'xattr'), 'utf8'), /-dr com\.apple\.quarantine .*VoiceStudio\.app/);
+  assert.match(readFileSync(join(f.root, 'codesign'), 'utf8'), /--force --deep --sign - .*VoiceStudio\.app/);
+  assert.match(r.stdout, /Repaired the app signature/);
+});
+
+test('macOS leaves a valid signature untouched', (t) => {
+  const f = fixture(t, { mac: true });
+  assert.equal(f.run().status, 0);
+  assert.doesNotMatch(readFileSync(join(f.root, 'codesign'), 'utf8'), /--force/);
+});
+
+test('macOS reports an unreadable disk image clearly and installs nothing', (t) => {
+  const f = fixture(t, { mac: true, attachFails: true });
+  const r = f.run();
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /Could not open the disk image VoiceStudio-Electron-1\.2\.3-mac-arm64\.dmg/);
+  assert.equal(existsSync(join(f.home, 'Applications/VoiceStudio.app')), false);
 });
 
 test('refuses replacement and uninstall while VoiceStudio is running', (t) => {

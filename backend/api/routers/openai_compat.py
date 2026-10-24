@@ -583,10 +583,15 @@ def _typed_speech_http_error(e: Exception) -> Optional[HTTPException]:
 
 def _run_tts(backend, text: str, kw: dict):
     """Run TTS inference in the GPU thread pool."""
-    from services.audio_dsp import apply_mastering, normalize_audio
+    import torch
+    from services.audio_dsp import apply_mastering, normalize_audio, trim_speech_padding
     from services.watermark import mark_synthetic
     wav = backend.generate(text, **kw)
     sr = backend.sample_rate
+    # Strip the engine's lead-in/tail silence, as /generate does — unless the
+    # caller asked for an exact `duration`, which a trim would shorten.
+    if not kw.get("duration") and torch.is_tensor(wav):
+        wav = trim_speech_padding(wav, sr)
     # Engines that already emit mastered, studio-grade audio (e.g. VoxCPM2's
     # native 48 kHz) opt out of apply_mastering via `applies_own_mastering`.
     # That chain's highpass + Compressor is tuned for VoiceStudio's 24 kHz clone

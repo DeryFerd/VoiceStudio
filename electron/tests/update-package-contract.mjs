@@ -48,11 +48,11 @@ const channel = option(
   process.env.VOICESTUDIO_UPDATE_CHANNEL || `electron-stable-${platform}-${arch}`,
 );
 const releaseDir = resolve(electronRoot, option('release', 'release'));
-const expectedChannel =
+const expectedChannels =
   process.env.VOICESTUDIO_DISTRIBUTION === 'microsoft-store'
-    ? `electron-microsoft-store-stable-${platform}-${arch}`
-    : `electron-stable-${platform}-${arch}`;
-assert.equal(channel, expectedChannel, 'Distribution uses its dedicated stable update channel');
+    ? [`electron-microsoft-store-stable-${platform}-${arch}`]
+    : [`electron-stable-${platform}-${arch}`, `electron-beta-${platform}-${arch}`];
+assert(expectedChannels.includes(channel), 'Distribution uses its dedicated update channel');
 
 assert(['win32', 'darwin', 'linux'].includes(platform), `Supported platform: ${platform}`);
 assert(['x64', 'arm64'].includes(arch), `Supported architecture: ${arch}`);
@@ -129,10 +129,13 @@ if (platform === 'win32') {
   const updateInfo = execFileSync(artifactPath, ['--appimage-updateinformation'], {
     encoding: 'utf8',
   }).trim();
+  // Stable images follow the latest stable release. A beta image is pinned to its
+  // own tag: `latest` skips prereleases and could roll it back to an older stable.
+  const updateRelease = channel.startsWith('electron-beta-') ? `v${version}` : 'latest';
   assert.equal(
     updateInfo,
-    'gh-releases-zsync|debpalash|VoiceStudio|latest|VoiceStudio-Electron-*-linux-x64.AppImage.zsync',
-    'External AppImage updaters follow the stable Linux release feed',
+    `gh-releases-zsync|debpalash|VoiceStudio|${updateRelease}|VoiceStudio-Electron-*-linux-x64.AppImage.zsync`,
+    'External AppImage updaters follow the channel their image was built for',
   );
   const control = `${artifactPath}.zsync`;
   assert(existsSync(control), 'Versioned AppImage zsync control file exists');

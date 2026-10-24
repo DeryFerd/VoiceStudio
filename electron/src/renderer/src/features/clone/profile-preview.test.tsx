@@ -47,6 +47,9 @@ it('previews the saved profile without modifying the script settings', async () 
     expect.anything(),
   );
   expect(cloneSettingsStore.state).toBe(before);
+  expect(mocks.success).toHaveBeenCalledWith('tts.generationComplete', {
+    position: 'top-right',
+  });
 });
 it('refuses a competing interactive synthesis', async () => {
   const release = acquireSynthesis()!;

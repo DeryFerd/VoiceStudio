@@ -14,6 +14,22 @@ app (MSI installers) is no longer maintained; if you still run it, follow the
 Python, FFmpeg, and model weights are bootstrapped by the app itself on first
 launch; no toolchain is needed for the installer.
 
+## Keep engine environments off `C:`
+
+Engine environments (IndexTTS, CosyVoice, MOSS-TTS and other sidecars, plus the
+audio.cpp runtime) install under `<app data>\engines` and can reach several GB
+each. To place them on another drive, set `OMNIVOICE_ENGINES_DIR` before
+launching VoiceStudio, for example in PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable('OMNIVOICE_ENGINES_DIR', 'D:\VoiceStudio\engines', 'User')
+```
+
+Restart VoiceStudio afterwards. Voices, projects and settings stay in the data
+folder (`OMNIVOICE_DATA_DIR` moves that too). Engines already installed under the
+old folder are not moved: reinstall them from Engines, or move the
+`engines\<engine>` folder yourself and delete the old copy.
+
 ## Install
 
 Download the installer matching your PC from the
@@ -72,11 +88,14 @@ drive (for example an external SSD):
 
 1. Run the installer and choose the external drive on its **Installation
    Folder** page.
-2. On the setup screen, press **Change…** beside **App environment** to put the
-   Python environment on the drive. uv's download cache and managed Python stay
-   beside that environment, so multi-GB wheels are not staged on `C:`.
-3. In **Settings > Storage**, move the application data folder (voices,
-   projects, settings) and the model cache to the drive.
+2. On the setup screen, press **Change…** beside **App environment** and pick
+   the drive. That one folder then holds the Python environment, uv's download
+   cache, managed Python, your data (`data`), the model cache (`models`) and
+   scratch files (`tmp`), so nothing is staged on `C:`. The setup screen lists
+   each effective location. Variables you set yourself (`OMNIVOICE_DATA_DIR`,
+   `OMNIVOICE_CACHE_DIR`, `TEMP`) win over the folder.
+3. An existing installation is never moved. To relocate its data or model cache
+   later, use **Settings > Storage**.
 
 The drive must be connected when VoiceStudio starts.
 
@@ -153,7 +172,7 @@ configuration.
 
 ## HF_TOKEN persistence
 
-The **recommended path** is the in-app **Settings → API Keys** panel: it
+The **recommended path** is the in-app **Settings → Credentials** panel: it
 writes the token to VoiceStudio's encrypted SQLite store *and* to the canonical
 `huggingface_hub` location, so every subprocess the app spawns picks it up.
 

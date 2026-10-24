@@ -843,4 +843,7 @@ public enum VSTokens {
     public static let radiusControl: Double = 8.00
     public static let spacingGap: Double = 16.00
     public static let spacingInset: Double = 24.00
+    public static let iosCardRadius: Double = 24.00
+    public static let iosFieldRadius: Double = 16.00
+    public static let iosHomeWordmarkSize: Double = 28.00
 }

@@ -81,6 +81,10 @@ class Supertonic3Backend(SubprocessBackend):
     display_name = "Supertonic-3 (31 langs, CPU ONNX, 7 preset voices, OpenRAIL-M)"
     supports_voice_design = False  # preset voices only
     supports_cloning = False  # preset voices only; generate() never reads ref_audio
+    #: Selectable built-in voices; /generate's ``preset_voice`` and the voice
+    #: picker read these (#2938). Same list ``generate()`` validates against.
+    PRESET_VOICES = list(st3_constants.VOICE_PRESETS)
+    DEFAULT_VOICE = st3_constants.DEFAULT_VOICE
     # TTS-04: honest hardware reporting. Supertonic-3 has no CUDA / MPS
     # path in the SDK ‑‑ ONNX Runtime CPU EP only.
     gpu_compat: tuple[str, ...] = ("cpu",)

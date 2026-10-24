@@ -2175,6 +2175,39 @@ def _selfheal_broken_snapshot_links(checkpoint: str) -> bool:
     return False
 
 
+def _preflight_truncated_weights(checkpoint: str) -> None:
+    """Refuse to memory-map a cut-off ``.safetensors`` file (#3015, #2382).
+
+    Reading past the end of a truncated mapped file is an access violation on
+    Windows that kills the backend with no Python traceback. A header check
+    first turns that into a re-download (hub cache) or a clear error (local
+    directory). Never raises for healthy caches.
+    """
+    from services import hf_cache_repair as repair
+
+    if os.path.isdir(checkpoint):
+        bad = repair.find_truncated_weights(checkpoint)
+        if bad:
+            raise RuntimeError(
+                "These model weight files are incomplete (a cut-off download): "
+                + ", ".join(bad)
+                + ". Delete them and download the model again."
+            )
+        return
+    if not repair.find_truncated_weights(
+        os.path.join(repair.repo_cache_dir(checkpoint), "snapshots")
+    ):
+        return
+    logger.warning("Model cache for %s has a truncated weight file; re-downloading it.", checkpoint)
+    summary = repair.repair_repo_cache(checkpoint)
+    if not summary.get("ok"):
+        raise RuntimeError(
+            f"The model weights for {checkpoint} are incomplete and could not be "
+            f"re-downloaded ({summary.get('error') or 'unknown'})."
+            + _manual_cache_delete_hint(checkpoint)
+        )
+
+
 def _manual_cache_delete_hint(checkpoint: str) -> str:
     """Names the exact on-disk folder to delete when every auto-repair rung
     failed — "delete the model" is only actionable if the user can find it.
@@ -2583,6 +2616,8 @@ def _load_model_sync():
             logger.info("Preloading PyTorch Whisper after TTS model load.")
         else:
             logger.info("Skipping PyTorch Whisper preload; ASR will load on demand.")
+        _preflight_truncated_weights(checkpoint)
+
         def _load():
             return VoiceStudio.from_pretrained(
                 checkpoint, device_map=device,

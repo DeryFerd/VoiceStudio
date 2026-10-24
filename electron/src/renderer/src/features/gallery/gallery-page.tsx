@@ -37,6 +37,7 @@ import type {
 import { mergeDescribedAttrs } from '@shared/utils/voiceInstruct';
 import { STORAGE, readDraft } from '@/features/design/design-draft';
 import { setCloneSetting } from '@/lib/store/clone-settings';
+import { onStorageKey } from '@/lib/storage-events';
 
 const FACET_LABELS: Record<string, string> = {
   gender: 'clone.cat_Gender',
@@ -56,6 +57,8 @@ export function GalleryPage() {
   const [category, setCategory] = useState('');
   const [facets, setFacets] = useState<Record<string, string>>({});
   const [favorites, setFavorites] = useState(readFavorites);
+  // Favorites pulled by Cloud sync replace the list, so a later toggle never writes the old one back.
+  useEffect(() => onStorageKey(FAVORITES_KEY, () => setFavorites(readFavorites())), []);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const toggleFavorite = (id: string) =>
     setFavorites((current) => {

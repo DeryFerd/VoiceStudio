@@ -48,17 +48,18 @@ val LocalRoles = staticCompositionLocalOf { VSTheme.roles("default", true) }
     val dark = when(preferences.mode) { "light" -> false; "system" -> isSystemInDarkTheme(); else -> true }
     val roles = VSTheme.roles(if(dark) preferences.darkPalette else preferences.lightPalette, dark)
     val font = FontFamily(Font(R.font.inter_variable))
-    val body = TextStyle(fontFamily = font, fontSize = VSTokens.TEXT_EDITOR_SIZE.sp, lineHeight = VSTokens.TEXT_EDITOR_LINE_HEIGHT.sp)
-    val control = TextStyle(fontFamily = font, fontSize = maxOf(VSTokens.TEXT_UI_SIZE, VSTokens.TEXT_EDITOR_SIZE).sp, lineHeight = VSTokens.TEXT_UI_LINE_HEIGHT.sp)
+    val body = TextStyle(fontFamily = font, fontSize = VSTokens.TEXT_EDITOR_SIZE.sp, lineHeight = (VSTokens.TEXT_EDITOR_SIZE * 1.5f).sp)
+    val control = TextStyle(fontFamily = font, fontSize = VSTokens.TEXT_UI_SIZE.sp, lineHeight = VSTokens.TEXT_UI_LINE_HEIGHT.sp)
     val caption = TextStyle(fontFamily = font, fontSize = VSTokens.TEXT_CAPTION_SIZE.sp, lineHeight = VSTokens.TEXT_CAPTION_LINE_HEIGHT.sp)
-    val title = body.copy(fontWeight = FontWeight.SemiBold)
-    val heading = title.copy(fontSize = (VSTokens.TEXT_EDITOR_SIZE * 2).sp, lineHeight = (VSTokens.TEXT_UI_LINE_HEIGHT * 2).sp)
-    val shape = RoundedCornerShape(VSTokens.RADIUS_CONTROL.dp)
+    val title = body.copy(fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+    val heading = title.copy(fontSize = VSTokens.IOS_HOME_WORDMARK_SIZE.sp, lineHeight = (VSTokens.IOS_HOME_WORDMARK_SIZE * 1.2f).sp)
+    // Both native apps use the generated mobile presentation radii.
+    val shape = RoundedCornerShape(VSTokens.IOS_FIELD_RADIUS.dp)
     CompositionLocalProvider(LocalRoles provides roles) {
         MaterialTheme(colorScheme = VSTheme.scheme(roles, dark),
-            shapes = Shapes(shape, shape, shape, RoundedCornerShape(VSTokens.RADIUS_LG.dp), RoundedCornerShape(VSTokens.RADIUS_LG.dp)),
+            shapes = Shapes(shape, shape, shape, RoundedCornerShape(VSTokens.IOS_CARD_RADIUS.dp), RoundedCornerShape(VSTokens.IOS_CARD_RADIUS.dp)),
             typography = Typography(displayLarge=title, displayMedium=title, displaySmall=title, headlineLarge=heading, headlineMedium=heading, headlineSmall=heading,
-                titleLarge=title, titleMedium=title, titleSmall=title, bodyLarge=body, bodyMedium=body, bodySmall=caption,
+                titleLarge=title, titleMedium=body.copy(fontWeight=FontWeight.SemiBold), titleSmall=control.copy(fontWeight=FontWeight.SemiBold), bodyLarge=body, bodyMedium=control, bodySmall=caption,
                 labelLarge=control, labelMedium=control, labelSmall=caption), content=content)
     }
 }

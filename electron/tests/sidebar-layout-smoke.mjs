@@ -4,25 +4,46 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const browser = await chromium.launch({
-  ...(process.env.PLAYWRIGHT_BUNDLED === '1' ? {} : { channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' }),
+  ...(process.env.PLAYWRIGHT_BUNDLED === '1'
+    ? {}
+    : { channel: process.env.PLAYWRIGHT_CHANNEL || 'msedge' }),
   headless: true,
 });
 const page = await browser.newPage();
 const out = mkdtempSync(join(tmpdir(), 'voicestudio-sidebar-'));
 const ui = process.env.VOICESTUDIO_UI_URL || 'http://localhost:3912';
 try {
-  await page.addInitScript(() => localStorage.setItem('voicestudio.setup.complete.v1', '1'));
+  await page.addInitScript(() => {
+    localStorage.setItem('voicestudio.setup.complete.v1', '1');
+    // The expanded navigation is under test, so keep it open beside the library.
+    const saved = JSON.parse(localStorage.getItem('voicestudio.workspace-layout') || '{}');
+    localStorage.setItem(
+      'voicestudio.workspace-layout',
+      JSON.stringify({ ...saved, autoCollapseSidebar: false }),
+    );
+  });
   await page.goto(ui + '/#/clone');
   const sidebar = page.locator('aside').first();
   const chooseView = async (name) => {
-    await sidebar
-      .getByRole('radiogroup', { name: 'Tool settings', exact: true })
-      .getByRole('radio', { name, exact: true })
-      .click();
+    // The view switch lives in the popover that the speed/quality label opens.
+    const group = page.getByRole('radiogroup', { name: 'Tool settings', exact: true });
+    if (!(await group.isVisible())) {
+      await sidebar.locator('[data-slot=performance-trigger]').click();
+      await group.waitFor();
+    }
+    await group.getByRole('radio', { name, exact: true }).click();
+    const popup = page.locator('[data-slot=popover-content]');
+    if (await popup.count()) {
+      await page.keyboard.press('Escape');
+      await popup.waitFor({ state: 'hidden' });
+    }
   };
   const navigation = sidebar.getByRole('navigation', { name: 'Workspaces', exact: true });
   await navigation.waitFor();
-  assert.equal(await sidebar.locator('footer a:visible').count(), 1);
+  await sidebar.getByRole('slider', { name: 'Speed / quality', exact: true }).waitFor();
+  // Simple keeps engine links out of the sidebar; they open from the slider's popover.
+  assert.equal(await sidebar.locator('footer a:visible').count(), 0);
+  assert.equal(await sidebar.locator('[data-slot=engine-row]').count(), 0);
   await chooseView('Models');
   const speechTool = sidebar.getByRole('link', { name: /^Text to speech: .*Change engine$/ });
   await speechTool.focus();
@@ -93,18 +114,22 @@ try {
     await page.setViewportSize({ width, height: 720 });
     await page.goto(ui + '/#/personas');
     const compactMain = page.locator('[data-slot=compact-main-sidebar]');
-    await compactMain.waitFor();
-    assert.equal(Math.round((await compactMain.boundingBox()).width), 48);
-    const openMain = compactMain.getByRole('button', { name: 'Toggle Sidebar' });
-    assert.equal(await openMain.locator('img').count(), 1);
+    await page.getByRole('heading', { name: 'Saved voices', exact: true }).waitFor();
     assert.equal(await page.getByRole('heading', { name: 'Saved voices', exact: true }).count(), 1);
     if (width === 1920) {
-      await openMain.click();
-      await compactMain.waitFor({ state: 'detached' });
-      const expandedMain = page.locator('.brand-sidebar').filter({ hasText: 'Saved voices' });
-      await expandedMain.waitFor();
-      await expandedMain.getByRole('button', { name: 'Close' }).click();
+      // A wide window keeps the slim navigation column; the library belongs to the page.
+      const slim = page.locator('.brand-sidebar').first();
+      await slim.waitFor();
+      assert.equal(await compactMain.count(), 0);
+      const slimWidth = (await slim.boundingBox()).width;
+      assert.ok(slimWidth >= 196 && slimWidth <= 288, `Slim navigation width ${slimWidth}`);
+      await slim.getByRole('button', { name: 'Close' }).click();
       await compactMain.waitFor();
+    } else {
+      await compactMain.waitFor();
+      assert.equal(Math.round((await compactMain.boundingBox()).width), 48);
+      const openMain = compactMain.getByRole('button', { name: 'Toggle Sidebar' });
+      assert.equal(await openMain.locator('img').count(), 1);
     }
   }
   const macStartupPage = await browser.newPage();
@@ -160,6 +185,10 @@ try {
   try {
     await macPage.addInitScript(() => {
       localStorage.setItem('voicestudio.setup.complete.v1', '1');
+      localStorage.setItem(
+        'voicestudio.workspace-layout',
+        JSON.stringify({ autoCollapseSidebar: false }),
+      );
       Object.defineProperty(window, 'voicestudio', {
         value: {
           app: {
@@ -183,14 +212,14 @@ try {
     });
     await macPage.goto(ui + '/#/clone');
     const macSidebar = macPage.locator('aside').first();
-    const macNotifications = macPage.locator('[data-slot=macos-system-notifications]');
+    const macNotifications = macPage.locator('[data-slot=account-corner]');
     const macNotificationBounds = await macNotifications.boundingBox();
     assert.ok(
       macNotificationBounds &&
         macNotificationBounds.y < 20 &&
         macNotificationBounds.x + macNotificationBounds.width >=
           (await macPage.evaluate(() => window.innerWidth)) - 20,
-      'macOS notifications must sit in the top-right titlebar corner',
+      'macOS account corner (account control and notifications) must sit in the top-right titlebar corner',
     );
     const titlebarActions = await macPage.locator('main .workspace-titlebar button').all();
     const titlebarActionBounds = (
@@ -204,12 +233,13 @@ try {
         ),
       'macOS titlebar actions must leave space before notifications',
     );
-    await macNotifications.getByRole('button').first().click();
+    await macNotifications.locator('button:has(.lucide-bell)').click();
     await macPage.locator('[data-slot=popover-content][data-open]').waitFor({ state: 'visible' });
     await macPage.keyboard.press('Escape');
     const brandLink = macSidebar.getByRole('link', { name: /^VoiceStudio v\S+/ });
     const brandBounds = await brandLink.boundingBox();
-    assert.ok(brandBounds && brandBounds.x >= 96, 'macOS brand must clear the traffic lights');
+    // The traffic lights have their own row above the brand.
+    assert.ok(brandBounds && brandBounds.y >= 28, 'macOS brand must sit below the traffic lights');
     assert.ok(
       await brandLink
         .getByText('VoiceStudio', { exact: true })

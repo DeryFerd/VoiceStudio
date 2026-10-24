@@ -125,6 +125,17 @@ describe('model licence acceptance', () => {
     expect(acceptAll.disabled).toBe(false);
   });
 
+  it.each([
+    ['MacIntel', 'mac'],
+    ['Win32', 'windows'],
+    ['Linux x86_64', 'linux'],
+  ])('follows the %s design language for the action row', async (nav, family) => {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue(nav);
+    await render(<LicenceAcceptanceFooter models={[pending('a/one')]} onClose={() => {}} />);
+    expect(document.querySelector('[data-licence-acceptance]')?.getAttribute('data-platform')).toBe(family);
+    vi.restoreAllMocks();
+  });
+
   it('records each model separately with the fingerprint it showed', async () => {
     const onAccepted = vi.fn();
     mock.api.mockResolvedValue({ accepted: true });

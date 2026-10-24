@@ -139,6 +139,7 @@ def test_metadata_releases_temporary_sidecar_exit_handlers(monkeypatch, engine, 
     ('melotts', 'english', 'japanese'),
     ('qwen3-tts', 'korean', 'bengali'),
     ('outetts', 'bengali', 'hindi'),
+    ('voxcpm2', 'thai', 'bengali'),
 ])
 def test_curated_mlx_models_declare_documented_languages(model, allowed, rejected, monkeypatch, tts):
     monkeypatch.setenv('OMNIVOICE_MLX_AUDIO_MODEL', model)

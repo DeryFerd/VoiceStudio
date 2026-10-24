@@ -35,6 +35,9 @@ class SystemInfoResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     app_version: str = ""
+    # First 9 characters of the commit this backend was built from (the desktop app
+    # and Docker image set OMNIVOICE_BUILD_COMMIT), "unknown" when it cannot be told.
+    build_commit: str = "unknown"
     # Effective compute-time budgets (seconds) for one synthesis job — the
     # values services/model_manager.py's GPU_JOB_TIMEOUT_S / CPU_JOB_TIMEOUT_S
     # captured at backend import time (#1787). A value just saved via

@@ -123,7 +123,7 @@ def invalid_media_file_detail() -> dict[str, str]:
 # One-line "what to do" per docs-taxonomy key. Keys mirror error_docs_map's
 # taxonomy; the docs URL itself stays owned by error_docs_map.
 _HINTS: dict[str, str] = {
-    "GPU_OOM": "Close other GPU-heavy apps or unload models, then retry. You can also choose CPU in Settings → Performance & Device or select a smaller TTS engine.",
+    "GPU_OOM": "Close other GPU-heavy apps or unload models, then retry. If another program is holding most of the GPU, or this computer has a second GPU, pick a different one in Settings → Performance & Device. You can also choose CPU there or select a smaller TTS engine.",
     "GPU_ARCH_UNSUPPORTED": "This PyTorch build does not support your GPU. Choose CPU in Settings → Performance & Device, or install a compatible PyTorch build.",
     # #2462: the HOST ran out of RAM, not a GPU. On a CPU-only machine there is
     # no device to spill to, so *every* out-of-memory failure there is this
@@ -189,6 +189,12 @@ _HINTS: dict[str, str] = {
     # page showed verbatim and which read as a disk/permission problem.
     "NO_AUDIO_TRACK": "Check that the file plays with sound in a media player. If its audio is in a separate file, choose that file instead, or merge the audio into the video first.",
     "INVALID_MEDIA_FILE": "Check the source in a media player. If it cannot play, wait for the download or copy to finish, free disk space if needed, then download a fresh copy and upload it again.",
+    # #2929/#2678: the voice has no transcript and no speech-to-text model is
+    # installed to produce one, so the only advice that works is one of those two.
+    "REFERENCE_STT_MISSING": "This voice has no transcript, and no speech-to-text model is installed to write one. Type what the reference clip says into the transcript box (clips up to 20 seconds), or install a speech-to-text model in Model Catalogue (Whisper is a good default), select it, then generate again.",
+    # A Python package the engine imports is absent from VoiceStudio's
+    # environment. Not memory, not the GPU, not the network.
+    "ENGINE_DEPENDENCY_MISSING": "A Python package this engine needs is not installed in VoiceStudio's environment, so the engine could not start. Open Model Catalogue, select the engine and use Install / Repair, then restart VoiceStudio. If it still fails, switch to another engine and include the engine name in your report.",
     # HF_MIRROR_UNREACHABLE has a DYNAMIC hint (it names the configured mirror)
     # — see hf_mirror_hint(); build_failure special-cases it.
 }
@@ -458,6 +464,11 @@ _CONTEXT_FREE_HINT_CLASSES = frozenset({
     # Triggered by a VoiceStudio-authored sentence or ffmpeg's own no-stream
     # wording; it reaches the user through an upload's error response.
     "NO_AUDIO_TRACK",
+    # Each is matched on wording only that failure produces: a Python
+    # ModuleNotFoundError sentence and VoiceStudio's own reference-transcript
+    # sentence.
+    "ENGINE_DEPENDENCY_MISSING",
+    "REFERENCE_STT_MISSING",
 })
 
 
@@ -475,6 +486,10 @@ _TERMINAL_FAILURE_CLASSES = frozenset({
     "WINDOWS_APP_CONTROL_BLOCKED",
     # The same file has no audio on every retry.
     "NO_AUDIO_TRACK",
+    # A missing package or a missing transcript model does not appear between
+    # two renders of the same request.
+    "ENGINE_DEPENDENCY_MISSING",
+    "REFERENCE_STT_MISSING",
 })
 
 
@@ -924,6 +939,14 @@ def classify(reason: BaseException | str) -> str:
     # quote keeps a legitimately-named `omnivoice_*` helper from matching.
     if "no module named 'omnivoice'" in low:
         return "BROKEN_VENV"
+    # The reference clip has no transcript and no speech-to-text model exists to
+    # write one (omnivoice.models.omnivoice._ReferenceAsrNotInstalled).
+    if "automatic reference transcription needs an installed speech-to-text" in low:
+        return "REFERENCE_STT_MISSING"
+    # Last and narrowest-by-type: an engine imported a package that is not
+    # installed. Every earlier no-module rule (encodings, omnivoice) wins first.
+    if "no module named '" in low:
+        return "ENGINE_DEPENDENCY_MISSING"
     return ""
 
 

@@ -15,6 +15,12 @@ from pathlib import Path
 from typing import Any
 
 
+# Stable is `X.Y.Z`; Beta is `X.Y.Z-beta.N`. Nothing else is an update channel.
+CHANNEL_VERSION = {
+    "stable": re.compile(r"\d+\.\d+\.\d+"),
+    "beta": re.compile(r"\d+\.\d+\.\d+-beta\.\d+"),
+}
+
 TARGETS = {
     # electron-updater's Provider.getCustomChannelName appends an OS suffix
     # for macOS/Linux but leaves Windows channel names unchanged.
@@ -57,12 +63,12 @@ def _asset_map(release: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def verify_release(
     release: dict[str, Any], manifest_dir: Path, *, channel: str, version: str
 ) -> list[str]:
-    # Stable is the only Electron update feed; there is no `preview` release.
-    if channel != "stable":
+    if channel not in CHANNEL_VERSION:
         raise ReleaseContractError(f"unsupported channel: {channel}")
-    if re.fullmatch(r"\d+\.\d+\.\d+", version) is None:
+    if CHANNEL_VERSION[channel].fullmatch(version) is None:
         raise ReleaseContractError(f"{channel} version has the wrong shape: {version}")
-    if release.get("isPrerelease"):
+    # Beta ships as a GitHub prerelease so it can never become `latest`.
+    if bool(release.get("isPrerelease")) != (channel == "beta"):
         raise ReleaseContractError(f"{channel} prerelease flag does not match the channel")
     expected_tag = f"v{version}"
     if release.get("tagName") != expected_tag:
@@ -131,7 +137,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--release-json", type=Path, required=True)
     parser.add_argument("--manifest-dir", type=Path, required=True)
-    parser.add_argument("--channel", choices=("stable",), required=True)
+    parser.add_argument("--channel", choices=tuple(CHANNEL_VERSION), required=True)
     parser.add_argument("--version", required=True)
     args = parser.parse_args()
     release = json.loads(args.release_json.read_text(encoding="utf-8"))

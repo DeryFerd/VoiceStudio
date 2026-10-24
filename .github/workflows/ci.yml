@@ -8,16 +8,90 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # The merge queue tests each PR on top of the latest main (and the PRs queued
+  # before it) once, instead of every PR re-running CI each time main moves.
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+# A new push to a PR cancels that PR's older run (a mass rebase of ~65 branches
+# once queued 360 runs, most of them for commits already replaced). Pushes to main
+# and manual runs are keyed by commit, so every main commit still gets its own CI.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Run all JavaScript actions on Node 24 (GH deprecates Node 20 in Sep 2026).
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # A pull request whose every changed file is on this allowlist cannot affect the
+  # Electron jobs: they run against fake JavaScript backends, not the Python one.
+  # Those jobs (UI crawler, Desktop UI, native package, and the Electron steps of
+  # the test job) are skipped for such PRs; they take ~45 runner-minutes. Anything
+  # else, every push to main and every manual run still runs the full matrix, and
+  # if detection fails for any reason everything runs (`!= 'false'` below).
+  # Other workflow files are on the allowlist (they cannot change what these jobs
+  # do); ci.yml and electron-*.yml are not. pyproject.toml is not either (the
+  # packaging contract parses its `readme =` key), and neither is backend/assets/
+  # (the renderer smokes play its sample WAV).
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      electron: ${{ steps.detect.outputs.electron }}
+    steps:
+      - id: detect
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # Any doubt means "true". Only an explicit "nothing outside the allowlist"
+          # from grep (exit 1) produces "false". Every pipe below ends in a command
+          # that reads ALL its input: an early-exit consumer (grep -q, head) makes the
+          # producer die of SIGPIPE, which `pipefail` reports as a failure and, on a
+          # large file list, silently turned "a file was deleted" into "no match".
+          electron=true
+          if [ "$EVENT" = pull_request ]; then
+            if rows=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | [.status, .filename] | @tsv') && [ -n "$rows" ]; then
+              total=$(printf '%s\n' "$rows" | wc -l)
+              status_rc=0
+              printf '%s\n' "$rows" | cut -f1 | sort -u | grep -v -x -E 'added|modified' > /dev/null || status_rc=$?
+              if [ "$total" -ge 3000 ]; then
+                echo "3000+ files (the API truncates here): running everything"
+              elif [ "$status_rc" -ne 1 ]; then
+                # Only plain edits and additions are safe. Electron checks assert that some
+                # root files exist, and a rename out of electron/ lists only the new path.
+                echo "a file was deleted, renamed, copied or changed type (status check rc=$status_rc): running everything"
+              else
+                rc=0
+                outside=$(printf '%s\n' "$rows" | cut -f2 | grep -v -P '^(backend/(?!assets/)|omnivoice/|docs/|mobile/|\.github/ISSUE_TEMPLATE/|\.github/scripts/|\.github/[^/]+\.md$|tests/.*\.py$|scripts/[^/]+\.py$|[^/]+\.md$|Makefile$|uv\.lock$|\.github/workflows/(?!(ci|electron-[a-z-]+)\.yml$)[^/]+\.yml$)') || rc=$?
+                if [ "$rc" -eq 1 ]; then
+                  electron=false
+                elif [ "$rc" -eq 0 ]; then
+                  echo "Electron jobs run because of (first 5):"
+                  # Indented so a hostile file name can never start a workflow command.
+                  printf '%s\n' "$outside" | sed -n '1,5s/^/    /p'
+                else
+                  echo "path matching failed (grep exit $rc): running everything"
+                fi
+              fi
+            fi
+          fi
+          echo "electron=$electron" >> "$GITHUB_OUTPUT"
+          echo "electron jobs: $electron"
+
   installer:
     name: Electron installer contracts
     runs-on: ubuntu-24.04
@@ -45,8 +119,11 @@ jobs:
         shell: pwsh
         run: ./electron/tests/powershell-installer.ps1
 
-  test:
-    name: Tests (backend + frontend)
+  test-python:
+    name: Tests (Python)
+    needs: changes
+    # Must report even if `changes` failed, so a detection error never skips the gate.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
     env:
       # Same restricted-network resilience the smoke matrix already sets. This
@@ -110,8 +187,12 @@ jobs:
       # networked empty-cache run before it was caught). All legitimate HF
       # interactions in tests are stubbed; anything that trips this is a
       # test-isolation bug.
+      # `-n auto` runs tests/ in parallel (one worker per CPU; 10 min serial ->
+      # ~3 min on a 4-core runner, with identical results). backend/tests/ below
+      # stays serial: one test there depends on another's leftover state and
+      # fails when run in isolation, which parallel scheduling exposes.
       - name: Run pytest
-        run: uv run --no-sync pytest tests/ -q --tb=short
+        run: uv run --no-sync pytest tests/ -q --tb=short -n auto
         env:
           HF_HUB_OFFLINE: "1"
 
@@ -145,6 +226,51 @@ jobs:
       - name: Mobile theme tokens match Electron
         run: bun --no-install scripts/export-mobile-tokens.ts --check
 
+
+  # Electron checks run beside the Python job instead of after it (~16 min serial
+  # -> the longer of the two). They need no Python: every backend they touch is a
+  # JavaScript fake. `test` below keeps the required check name and gates on both.
+  test-electron:
+    name: Tests (Electron)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.2'
+
+      # Cache the resolved .debs for media and Snap artifact tests.
+      - name: System deps (ffmpeg and squashfs-tools)
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: ffmpeg squashfs-tools
+          version: 1.0
+
+      # Cache ~/.bun/install/cache keyed on bun.lock — `bun install` drops
+      # from ~15 s cold to near-instant on warm cache.
+      - name: Cache bun deps
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install Electron deps
+        # --frozen-lockfile so an Electron workspace change that forgets to
+        # regenerate the root bun.lock fails HERE (fast) instead of only in the
+        # Docker build (deploy/Dockerfile), which is what reddened main on #485.
+        run: bun install --frozen-lockfile
+
       # node:test suites for shared renderer modules (tests/frontend/*.test.mjs).
       # Node 22 strips TypeScript types natively; imports need explicit `.ts`.
       - name: Frontend unit tests
@@ -159,8 +285,50 @@ jobs:
       - name: Snap artifact repair regression
         run: node --test electron/tests/snap-artifact-verification.test.mjs electron/tests/snap-launcher.test.mjs electron/tests/snap-store-packaging.test.mjs
 
-      # Browser workflow smokes exercise the maintained Electron renderer after
-      # the production build/typecheck/test contract above succeeds.
+  # Split from Tests (Electron) so the two ~7 minute halves run side by side.
+  # The browser workflow smokes need only the checked-out sources.
+  electron-smokes:
+    name: Electron renderer smokes
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.2'
+
+      # Cache the resolved .debs for media and Snap artifact tests.
+      - name: System deps (ffmpeg and squashfs-tools)
+        uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+        with:
+          packages: ffmpeg squashfs-tools
+          version: 1.0
+
+      # Cache ~/.bun/install/cache keyed on bun.lock — `bun install` drops
+      # from ~15 s cold to near-instant on warm cache.
+      - name: Cache bun deps
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install Electron deps
+        # --frozen-lockfile so an Electron workspace change that forgets to
+        # regenerate the root bun.lock fails HERE (fast) instead of only in the
+        # Docker build (deploy/Dockerfile), which is what reddened main on #485.
+        run: bun install --frozen-lockfile
+
+      # Browser workflow smokes exercise the maintained Electron renderer.
       - name: Install Playwright chromium
         run: bunx playwright install --with-deps chromium
       - name: Electron renderer workflow smokes
@@ -186,12 +354,102 @@ jobs:
             exit 1
           }
           # Every smoke must be classified (run here, or needs a backend/native app).
-          node --test electron/tests/smoke-inventory.test.mjs
+          node --test electron/tests/smoke-inventory.test.mjs electron/tests/ui-crawler.test.mjs
           # Runs every offline renderer smoke; it serves /api from a fake backend on $OMNIVOICE_PORT.
           node electron/tests/run-renderer-smokes.mjs
 
+  # The required check. Its name is what branch protection matches, so it stays
+  # "Tests (backend + frontend)" even though the work now runs in two jobs.
+  test:
+    name: Tests (backend + frontend)
+    needs: [changes, test-python, test-electron, electron-smokes]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PYTHON: ${{ needs.test-python.result }}
+      ELECTRON: ${{ needs.test-electron.result }}
+      SMOKES: ${{ needs.electron-smokes.result }}
+      ELECTRON_NEEDED: ${{ needs.changes.outputs.electron }}
+    steps:
+      - name: Both test jobs passed
+        run: |
+          echo "Python: $PYTHON, Electron: $ELECTRON, smokes: $SMOKES (needed: $ELECTRON_NEEDED)"
+          [ "$PYTHON" = success ] || exit 1
+          # Skipped is only acceptable when change detection said nothing in this
+          # PR can affect the Electron jobs.
+          for result in "$ELECTRON" "$SMOKES"; do
+            [ "$result" = success ] || { [ "$result" = skipped ] && [ "$ELECTRON_NEEDED" = false ]; } || exit 1
+          done
+
+  # Clicks every button on every route under four backend fault modes and fails
+  # on stuck spinners, buttons left disabled, silent failures, crashes and
+  # console errors
+  # (electron/tests/ui-crawler.mjs). Three route shards, not a mode x shard
+  # matrix: each shard still runs every fault mode concurrently in one process,
+  # and a matrix of twelve jobs per push queued behind the runner limit for hours.
+  ui-crawler:
+    name: UI crawler (${{ matrix.shard }}/3)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.2'
+
+      - name: Cache bun deps
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install Electron deps
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: Crawl every button
+        shell: bash
+        env:
+          OMNIVOICE_PORT: '3999'
+          VOICESTUDIO_UI_URL: http://localhost:3912
+          VOICESTUDIO_CRAWL_SHARD: ${{ matrix.shard }}/3
+        run: |
+          set -euo pipefail
+          bun run --cwd electron smoke:server > /tmp/voicestudio-crawler-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in {1..60}; do
+            curl --fail --silent "$VOICESTUDIO_UI_URL" >/dev/null && break
+            sleep 0.25
+          done
+          curl --fail --silent --show-error "$VOICESTUDIO_UI_URL" >/dev/null || {
+            cat /tmp/voicestudio-crawler-server.log
+            exit 1
+          }
+          node electron/tests/ui-crawler.mjs
+
   linux-native-package:
     name: Linux native package
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -221,6 +479,8 @@ jobs:
   # installers are covered separately by packaged-smoke.mjs on release paths.
   electron-ui:
     name: Desktop UI (${{ matrix.label }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -298,7 +558,9 @@ jobs:
   # on Linux until Phase 1's INST-01 lands setuptools for WhisperX.
   smoke-matrix:
     name: Smoke (${{ matrix.label }})
-    needs: test
+    # After the Python tests (the fast-failing half), not the whole test gate: waiting for
+    # the Electron jobs too left these 1-4 minute jobs idle for ~9 minutes of every run.
+    needs: test-python
     strategy:
       fail-fast: false
       matrix:
@@ -438,7 +700,7 @@ jobs:
       - name: Run smoke tests
         # Exercise credential paths and the Windows accept guard natively.
         if: matrix.backend_supported
-        run: uv run --no-sync pytest tests/smoke/ tests/test_hf_token_cache_paths.py tests/test_win_accept_guard.py -q --tb=short
+        run: uv run --no-sync pytest tests/smoke/ tests/test_hf_token_cache_paths.py tests/test_win_accept_guard.py tests/test_ios_testflight.py -q --tb=short
         env:
           HF_HUB_OFFLINE: "1"  # same no-silent-downloads guard as the main pytest job
           HF_HUB_CACHE: ${{ runner.temp }}/pockettts-empty-hf-cache

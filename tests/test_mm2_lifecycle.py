@@ -110,6 +110,16 @@ def test_omnivoice_unload_idempotent_and_preload_safe():
 def test_list_loaded_empty(monkeypatch):
     monkeypatch.setattr(mm, "model", None)
     monkeypatch.setattr(mm, "_diar_pipeline", None)
+    # list_loaded() also reads these process-wide registries (sidecars, engines,
+    # the active backend, the dictation ASR and the offline translator); an earlier test on
+    # the same pytest-xdist worker can leave an engine or sidecar behind, which
+    # made this test pass serially and fail depending on worker placement.
+    monkeypatch.setattr("services.subprocess_backend.list_live_sidecars", lambda: [])
+    monkeypatch.setattr("services.asr_backend._capture_backend", None)
+    monkeypatch.setattr("api.routers.dub_translate._nllb_model", None)
+    monkeypatch.setattr("api.routers.engines._ENGINE_INSTANCES", {})
+    monkeypatch.setattr("services.tts_backend._active_instance", None)
+    monkeypatch.setattr("services.tts_backend._active_instance_id", None)
     out = ml.list_loaded()
     assert out == {"models": [], "count": 0} or out["count"] == 0
 
@@ -268,6 +278,25 @@ def test_cache_is_complete_flags_truncated_weight_repo(tmp_path, monkeypatch):
     )
     monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path / "ok"))
     assert models.cache_is_complete({"repo_id": "k2-fsa/OmniVoice"}) is True
+
+
+def test_cosyvoice3_partial_download_is_not_installed(tmp_path, monkeypatch):
+    """#3112: an interrupted CosyVoice 3 download kept some 5 MB+ weights, which the
+    any-large-file check took for a complete install. Its declared files decide now."""
+    monkeypatch.setenv("HF_HUB_CACHE", str(tmp_path))
+    model = next(m for m in models.KNOWN_MODELS if m["repo_id"] == "FunAudioLLM/Fun-CosyVoice3-0.5B-2512")
+    big = b"\0" * (6 * 1024 * 1024)
+    rev = tmp_path / "models--FunAudioLLM--Fun-CosyVoice3-0.5B-2512" / "snapshots" / "abc123"
+    rev.mkdir(parents=True)
+    for name in ("cosyvoice3.yaml", "campplus.onnx", "llm.pt"):  # flow.pt, hift.pt, ... never landed
+        (rev / name).write_bytes(big)
+    assert models.cache_is_complete(model) is False
+
+    for name in model["required_files"]:
+        path = rev / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(big)
+    assert models.cache_is_complete(model) is True
 
 
 def test_cache_is_complete_exempts_config_only_repo(tmp_path, monkeypatch):

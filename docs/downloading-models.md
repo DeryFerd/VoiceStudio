@@ -157,5 +157,5 @@ takes effect at the next retry boundary.
   the engine's **Weights** list in **Model Catalogue** and install it again.
 - **Out of disk** — model sizes are shown in the catalog; free space or change
   the cache location with `HF_HOME` / `HF_HUB_CACHE`. An install also keeps
-  10 GB free on the model disk after the download, so it needs the download
-  size plus 10 GB; the warning in Model Catalogue shows both numbers.
+  2 GB free on the model disk after the download, so it needs the download
+  size plus 2 GB; the warning in Model Catalogue shows both numbers.

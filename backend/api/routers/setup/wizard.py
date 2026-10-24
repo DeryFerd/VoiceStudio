@@ -23,7 +23,7 @@ from core.device_caps import KERNEL_RISK_MARKER, is_windows_on_arm
 # MIN_FREE_GB + disk_free_bytes are single-sourced in ``.models`` (the lowest
 # module in the setup import graph) so the wizard gate, the /models header, and
 # the per-install disk guard can't drift apart.
-from .models import REQUIRED_MODELS, hf_cache_dir, is_cached, MIN_FREE_GB, disk_free_bytes
+from .models import REQUIRED_MODELS, hf_cache_dir, is_cached, MIN_FREE_GB, INSTALL_HEADROOM_GB, disk_free_bytes
 from core.browser_guard import reject_cross_site_get
 
 logger = logging.getLogger("omnivoice.setup.wizard")
@@ -55,7 +55,7 @@ def setup_status():
         "hf_cache_dir": cache,
         "disk_free_gb": round(free_gb, 2),
         "min_free_gb": MIN_FREE_GB,
-        "enough_disk": free_gb >= MIN_FREE_GB,
+        "enough_disk": free_gb >= INSTALL_HEADROOM_GB,
     }
 
 
@@ -443,11 +443,17 @@ def preflight():
     # ── Disk free
     cache = hf_cache_dir()
     free = _disk_free_gb(cache)
-    if free < MIN_FREE_GB:
+    if free < INSTALL_HEADROOM_GB:
         disk = {
             "status": "fail",
-            "detail": f"{free:.1f} GB free at {cache} (need ≥ {MIN_FREE_GB} GB)",
-            "fix": f"Free up disk space or set HF_HOME to a larger partition.",
+            "detail": f"{free:.1f} GB free at {cache} (need ≥ {INSTALL_HEADROOM_GB} GB)",
+            "fix": "Free up disk space or set HF_HOME to a larger partition.",
+        }
+    elif free < MIN_FREE_GB:
+        disk = {
+            "status": "warn",
+            "detail": f"{free:.1f} GB free at {cache} ({MIN_FREE_GB}+ GB recommended)",
+            "fix": "Small models fit; free up space before installing larger ones.",
         }
     else:
         disk = {"status": "pass", "detail": f"{free:.1f} GB free at {cache}", "fix": None}

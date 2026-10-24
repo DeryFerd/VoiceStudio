@@ -41,6 +41,7 @@ and co-authors of pull request #N.
 - [ ] I've tested this locally
 - [ ] Every non-exempt human commit author has signed the [CLA](https://github.com/debpalash/VoiceStudio/blob/main/.github/CLA-1.0.md) (the **CLA** check tells you how)
 - [ ] I've updated relevant documentation (if applicable)
+- [ ] User-visible change: I added a one-line `changelog.d/<PR#>.<type>.md` fragment (not `CHANGELOG.md`)
 - [ ] No local machine paths, logs, or personal env details in this PR
 - [ ] Maintained version files are in sync (if an owner-requested bump): root `package.json`, `pyproject.toml`, `backend/core/version.py`, and lockfiles
 - [ ] If this PR changes runtime behavior, the regression fixture at `tests/fixtures/omnivoice_data/` still loads green on the `smoke-matrix` CI job (macOS + Windows + Linux)

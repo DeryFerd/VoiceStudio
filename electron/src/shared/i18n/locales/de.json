@@ -104,9 +104,7 @@
     "dub": "Übersetze und synchronisiere Audio oder Video.",
     "stories": "Erstelle Szenen mit mehreren Stimmen.",
     "audiobook": "Erstelle Hörbücher mit Kapiteln.",
-    "transcribe": "Wandle Aufnahmen in Text um.",
-    "collapseFooter": "Fußleiste einklappen",
-    "expandFooter": "Fußleiste ausklappen"
+    "transcribe": "Wandle Aufnahmen in Text um."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Projekte konnten nicht geladen werden",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} Segmente geprüft",
     "cancelled": "Abgebrochen",
     "fitting": "Timing anpassen"
-  },
-  "sponsorSlot": {
-    "book": "Platz anfragen",
-    "preview": "Sponsor-Vorschau",
-    "message": "Deine Marke, Website und Nachricht",
-    "email_app": "E-Mail-App öffnen",
-    "copy_email": "E-Mail-Adresse kopieren"
   },
   "supportPlans": {
     "remove": "Sponsorenleiste entfernen",

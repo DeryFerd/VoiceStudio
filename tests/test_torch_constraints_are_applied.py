@@ -191,3 +191,56 @@ def _install_argv(cell_source: str) -> list:
             if "install" in argv and "pip" in argv:
                 return argv
     return []
+
+
+# --- [tool.uv] override-dependencies on the same `uv pip install` paths (#3275) ---
+# The override that lifts gradio's `pillow<13` cap lives in pyproject, which
+# `uv pip install` applies only from the project directory with a recent uv
+# (run elsewhere, it installs Pillow 12.3.0), so both paths pass it explicitly.
+_OVERRIDES = _ROOT / "deploy" / "uv-overrides.txt"
+
+
+def _requirement_lines(path):
+    return sorted(
+        line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+
+
+def test_the_overrides_file_matches_pyproject():
+    pyproject = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = sorted(pyproject["tool"]["uv"].get("override-dependencies", []))
+    assert declared, "pyproject declares no override-dependencies; drop deploy/uv-overrides.txt too"
+    assert _requirement_lines(_OVERRIDES) == declared
+
+
+def test_the_dockerfile_passes_copies_and_checks_the_overrides():
+    text = _DOCKERFILE.read_text(encoding="utf-8")
+    install_start = text.index("RUN uv pip install")
+    install = text[install_start:text.index("\n\n", install_start)]
+    assert "--override deploy/uv-overrides.txt" in install, install
+    assert re.search(r"^COPY .*uv-overrides\.txt", text, re.MULTILINE)
+    guard = text[text.index("# Guard: every security override"):]
+    assert "open('deploy/uv-overrides.txt')" in guard and "specifier.contains" in guard
+
+
+def test_the_colab_notebook_passes_the_overrides():
+    nb = json.loads(_NOTEBOOK.read_text(encoding="utf-8"))
+    installs = [
+        "".join(c["source"]) for c in nb["cells"]
+        if c["cell_type"] == "code" and '"uv", "pip", "install"' in "".join(c["source"])
+    ]
+    for src in installs:
+        args = _install_argv(src)
+        i = args.index("--override")
+        assert args[i + 1:i + 2] == ["deploy/uv-overrides.txt"], args
+
+
+def test_the_colab_notebook_updates_a_reused_clone():
+    # A clone from an earlier session lacked deploy/uv-overrides.txt, so the
+    # install cell failed on the file it now passes (#3281 review).
+    nb = json.loads(_NOTEBOOK.read_text(encoding="utf-8"))
+    src = next("".join(c["source"]) for c in nb["cells"] if "# 2a. Clone the repo" in "".join(c["source"]))
+    reuse = src[src.index("# 2a."):src.index("else:", src.index("# 2a."))]
+    assert '"pull", "--ff-only"' in reuse
+    assert 'shutil.rmtree(os.path.join(REPO_DIR, "frontend", "dist")' in reuse

@@ -844,4 +844,7 @@ object VSTokens {
     const val RADIUS_CONTROL: Float = 8.00f
     const val SPACING_GAP: Float = 16.00f
     const val SPACING_INSET: Float = 24.00f
+    const val IOS_CARD_RADIUS: Float = 24.00f
+    const val IOS_FIELD_RADIUS: Float = 16.00f
+    const val IOS_HOME_WORDMARK_SIZE: Float = 28.00f
 }

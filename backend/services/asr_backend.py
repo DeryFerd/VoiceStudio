@@ -3497,6 +3497,27 @@ def transcribe_reference(audio_path: str, *, release_after: bool = False) -> str
     return text or None
 
 
+def reference_asr_installed() -> bool:
+    """True when :func:`transcribe_reference` has a local recognizer to try.
+
+    The selected offline engine, the selected dictation engine, or any
+    installed fallback counts: a user whose selection points at a model that
+    is not on disk, but who has another speech-to-text model installed, must
+    not be told that none exists (#2929/#2678). Never downloads, never raises.
+    """
+    try:
+        if asr_model_missing_error(
+            require_installed=active_backend_id() != "openai-compat-asr",
+        ) is None:
+            return True
+        if asr_model_missing_error(purpose="dictation", require_installed=True) is None:
+            return True
+        return bool(_installed_reference_fallbacks([]))
+    except Exception:  # noqa: BLE001 — a failed probe must not block typing a transcript
+        logger.warning("reference ASR availability probe failed", exc_info=True)
+        return False
+
+
 _capture_backend: ASRBackend | None = None
 # The sherpa model id the cached capture backend was built for, so a model
 # switch in Settings rebuilds the singleton instead of serving the old model.

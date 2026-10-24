@@ -1,4 +1,12 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { UpdateState } from '../../../../preload/index.d';
@@ -15,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   check: vi.fn(),
   download: vi.fn(),
   dismiss: vi.fn(),
+  setChannel: vi.fn(),
   install: vi.fn(),
   listReleases: vi.fn(),
   flushDubDraft: vi.fn(),
@@ -23,14 +32,16 @@ const mocks = vi.hoisted(() => ({
   activeWork: false,
 }));
 
-vi.mock('@/components/bridge', () => ({
-  appVersion: () => '0.5.2',
-  getBridge: () => ({
+vi.mock('@/components/bridge', () => {
+  // Electron exposes one stable bridge. Recreating it on every render reruns
+  // the state-subscription effect and can overwrite a completed update check.
+  const bridge = {
     updates: {
       getState: mocks.getState,
       check: mocks.check,
       download: mocks.download,
       dismiss: mocks.dismiss,
+      setChannel: mocks.setChannel,
       install: mocks.install,
       listReleases: mocks.listReleases,
       onState: (listener: (state: UpdateState) => void) => {
@@ -40,8 +51,9 @@ vi.mock('@/components/bridge', () => ({
         };
       },
     },
-  }),
-}));
+  };
+  return { appVersion: () => '0.5.2', getBridge: () => bridge };
+});
 
 vi.mock('@/features/dub/dub-session', () => ({
   dubSession: { state: { phase: 'idle', recovery: null, batchProgress: null } },
@@ -59,6 +71,10 @@ vi.mock('sonner', () => ({ toast: { error: mocks.toastError, info: vi.fn() } }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
 import { UpdateSettings } from './update-settings';
+
+// The release workflow runs this on shared Linux runners, where the default 1s
+// wait for the async update flow timed out once (v0.5.7-beta.1 packaging).
+configure({ asyncUtilTimeout: 5_000 });
 
 function renderSettings() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -100,20 +116,84 @@ describe('UpdateSettings', () => {
 
   afterEach(cleanup);
 
-  test('checks for updates and offers no update-channel choice', async () => {
+  test('checks for updates and hides the channel choice when the build cannot switch', async () => {
     renderSettings();
     fireEvent.click(await screen.findByRole('button', { name: 'updates.check_now' }));
     await waitFor(() => expect(mocks.check).toHaveBeenCalledOnce());
 
-    // No Preview feed is published, so a channel picker would only mislead.
-    expect(screen.queryByText('about.update_channel')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'about.channel_preview' })).not.toBeInTheDocument();
+    // Store and dev builds report no channel, so a picker would do nothing.
+    expect(screen.queryByText('update.channel')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'update.channel_beta' })).not.toBeInTheDocument();
+  });
+
+  test('switches to Beta and checks that channel straight away', async () => {
+    mocks.state = { ...mocks.state, channel: 'stable' };
+    const beta = { ...mocks.state, channel: 'beta' as const };
+    mocks.setChannel.mockResolvedValue(beta);
+    mocks.check.mockResolvedValue({
+      ...beta,
+      status: 'available',
+      availableVersion: '0.5.9-beta.1',
+    });
+    renderSettings();
+
+    const stable = await screen.findByRole('button', { name: 'update.channel_stable' });
+    expect(stable).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'update.channel_beta' }));
+
+    await waitFor(() => expect(mocks.setChannel).toHaveBeenCalledWith('beta'));
+    await waitFor(() => expect(mocks.check).toHaveBeenCalledOnce());
+    expect(await screen.findByText('update.available')).toBeInTheDocument();
+    expect(mocks.getState).toHaveBeenCalledOnce();
+  });
+
+  test('does not check when the channel switch is refused', async () => {
+    mocks.state = { ...mocks.state, channel: 'stable' };
+    mocks.setChannel.mockResolvedValue(mocks.state);
+    renderSettings();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'update.channel_beta' }));
+    await waitFor(() => expect(mocks.setChannel).toHaveBeenCalledWith('beta'));
+    expect(mocks.check).not.toHaveBeenCalled();
+  });
+
+  test('locks the channel while an update is downloading', async () => {
+    mocks.state = { ...mocks.state, channel: 'stable', status: 'downloading', progress: 5 };
+    renderSettings();
+    expect(await screen.findByRole('button', { name: 'update.channel_beta' })).toBeDisabled();
+  });
+
+  test('lists betas only for Beta users', async () => {
+    mocks.state = { ...mocks.state, channel: 'beta' };
+    mocks.listReleases.mockResolvedValue([
+      {
+        version: '0.5.9-beta.1',
+        name: 'v0.5.9-beta.1',
+        date: '2026-09-13T00:00:00Z',
+        prerelease: true,
+        notes: '',
+      },
+    ]);
+    renderSettings();
+    expect(await screen.findByText('v0.5.9-beta.1')).toBeInTheDocument();
   });
 
   test('lists tagged releases only', async () => {
     mocks.listReleases.mockResolvedValue([
-      { version: '0.5.2', name: 'v0.5.2', date: '2026-09-12T00:00:00Z', prerelease: false, notes: '' },
-      { version: '0.5.3-7', name: 'preview', date: '2026-09-13T00:00:00Z', prerelease: true, notes: '' },
+      {
+        version: '0.5.2',
+        name: 'v0.5.2',
+        date: '2026-09-12T00:00:00Z',
+        prerelease: false,
+        notes: '',
+      },
+      {
+        version: '0.5.3-7',
+        name: 'preview',
+        date: '2026-09-13T00:00:00Z',
+        prerelease: true,
+        notes: '',
+      },
     ]);
     renderSettings();
     expect(await screen.findByText('v0.5.2')).toBeInTheDocument();

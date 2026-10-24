@@ -9,36 +9,39 @@ import com.voicestudio.mobile.network.PairingAddress
 import java.text.DateFormat
 import java.util.Date
 
-@Composable fun ConnectScreen(vm:StudioViewModel) {
+@Composable fun ConnectScreen(vm:StudioViewModel,
+    scanContent: @Composable ((String)->Unit, ()->Unit, (Throwable)->Unit)->Unit = { code,close,error -> QrScanner(code,close,error) }
+) {
     val state by vm.state.collectAsState()
     val prefs by vm.preferences.collectAsState()
     var url by rememberSaveable {mutableStateOf("")}
     var pin by remember {mutableStateOf("")}
     var key by remember {mutableStateOf("")}
+    var manual by rememberSaveable {mutableStateOf(false)}
+    var more by rememberSaveable {mutableStateOf(false)}
     var scanner by remember {mutableStateOf(false)}
     val camera=permissionAction(Manifest.permission.CAMERA,"mobile.permissions.camera",vm::fail) {scanner=true}
     Screen {
         ScreenTitle("mobile.connect.title")
-        Text(tr("mobile.connect.subtitle"))
-        Text(tr("mobile.connect.scan_help"),color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Secondary("mobile.connect.scan_qr",!state.busy,camera)
-        if(scanner) QrScanner(onCode={raw ->
-            try {val address=PairingAddress.parse(raw);url=address.baseUrl.toString();pin=address.pin.orEmpty();scanner=false}
+        Action("mobile.connect.scan_qr",!state.busy,onClick=camera)
+        if(scanner) scanContent({raw ->
+            try {val address=PairingAddress.parse(raw);url=address.baseUrl.toString();pin=address.pin.orEmpty();scanner=false;manual=true}
             catch(e:Exception) {scanner=false;vm.fail(e)}
-        },onClose={scanner=false},onError={scanner=false;vm.fail(it)})
+        },{scanner=false},{scanner=false;vm.fail(it)})
+        Secondary("mobile.simple.address") {manual=!manual}
+        if(manual) {
         Field("mobile.connect.url_label",url,{url=it})
         Field("mobile.connect.pin_label",pin,{pin=it},secret=true)
-        Field("mobile.connect.api_key_label",key,{key=it},secret=true)
-        Text(tr("mobile.connect.api_key_help"),color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(tr("mobile.permissions.local_network"),color=MaterialTheme.colorScheme.onSurfaceVariant)
-        Action(if(state.busy) "mobile.connect.connecting" else "mobile.connect.connect",url.isNotBlank()&&!state.busy) {
+        Secondary("mobile.simple.more") {more=!more}
+        if(more) Field("mobile.connect.api_key_label",key,{key=it},secret=true)
+        Secondary(if(state.busy) "mobile.connect.connecting" else "mobile.connect.connect",url.isNotBlank()&&!state.busy) {
             val transientKey=key;key="";vm.connect(url,pin,transientKey)
+        }
         }
         if(prefs.hosts.isNotEmpty()) Heading("mobile.connect.saved_hosts")
         prefs.hosts.forEach {host ->
             Text(host.label,style=MaterialTheme.typography.titleMedium)
             Text(host.url)
-            Text(tr("mobile.connect.last_seen",mapOf("time" to DateFormat.getDateTimeInstance().format(Date(host.lastSeen)))))
             Secondary("mobile.connect.connect",!state.busy) {url=host.url;vm.reconnect(host)}
             Secondary("mobile.connect.forget",!state.busy) {vm.forget(host.url)}
         }

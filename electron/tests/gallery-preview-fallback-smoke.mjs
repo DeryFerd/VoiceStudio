@@ -34,8 +34,12 @@ await page.route('**/api/community/items?*', (route) =>
 );
 await page.route('**/api/community/items/feat_00_the_librarian/preview*', async (route) => {
   const local = new URL(route.request().url()).searchParams.get('local') === 'true';
-  if (local) fallback++;
-  else canonical++;
+  // Count loads, not reads: a playing media element may fetch further byte ranges of the same
+  // clip (slower CI runners do), but every new load starts at byte 0.
+  if (!/^bytes=[1-9]/.test(route.request().headers().range ?? '')) {
+    if (local) fallback++;
+    else canonical++;
+  }
   const audio =
     local && !broken
       ? readFileSync(

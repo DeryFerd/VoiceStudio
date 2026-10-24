@@ -27,16 +27,49 @@ def test_electron_packaging_workflows_publish_store_provenance(workflow_name):
     assert "electron/release/store-artifact-manifest-*.json" in upload_step["with"]["path"]
 
 
-def test_snap_store_rehearsal_is_strict_build_only_and_records_provenance():
+def test_snap_store_workflow_builds_strict_snap_and_uploads_only_tags_to_candidate():
     import yaml
 
-    workflow = yaml.load(
-        (ROOT / ".github/workflows/snap-store.yml").read_text(), Loader=yaml.BaseLoader
-    )
+    serialized = (ROOT / ".github/workflows/snap-store.yml").read_text()
+    workflow = yaml.load(serialized, Loader=yaml.BaseLoader)
     assert workflow["permissions"] == {"contents": "read"}
-    assert set(workflow["on"]) == {"workflow_dispatch"}
-    package = workflow["jobs"]["package"]
+    assert set(workflow["on"]) == {"push", "workflow_dispatch"}
+    assert workflow["on"]["push"] == {"tags": ["v*"]}
+    assert workflow["env"]["SNAP_NAME"] == "voicestudio"
+    assert "linuxExecutableName: 'voicestudio'" in (
+        ROOT / "electron/electron-builder.config.mjs"
+    ).read_text()
+
+    jobs = workflow["jobs"]
+    package = jobs["package"]
     assert package["env"]["VOICESTUDIO_DISTRIBUTION"] == "snap-store"
+    assert "environment" not in package and "secrets." not in yaml.dump(package)
+    tag_guard = next(s for s in package["steps"] if s.get("name") == "Match the tag to the app version")
+    assert '"v$version"' in tag_guard["run"]
+    import os
+    import re
+    import subprocess
+
+    import json
+
+    version = json.loads((ROOT / "package.json").read_text())["version"]
+    # A beta package version (X.Y.Z-beta.N) is never a Snap release: the job is
+    # skipped for beta tags and this guard rejects them if it ever runs.
+    is_final = re.fullmatch(r"\d+\.\d+\.\d+", version) is not None
+    for tag, error in [
+        (f"v{version}", None if is_final else "is not a final"),
+        (f"v{version}-rc.1", "is not a final"),
+        ("v0.5", "is not a final"),
+        ("v999.0.0", "does not match package.json"),
+    ]:
+        result = subprocess.run(
+            ["bash", "-e", "-c", tag_guard["run"]],
+            cwd=ROOT, capture_output=True, text=True,
+            env=dict(os.environ, GITHUB_REF_NAME=tag),
+        )
+        assert (result.returncode == 0) == (error is None), (tag, result.stdout)
+        if error:
+            assert error in result.stdout, (tag, result.stdout)
     command = next(
         step["run"]
         for step in package["steps"]
@@ -46,9 +79,78 @@ def test_snap_store_rehearsal_is_strict_build_only_and_records_provenance():
     assert "verify_snap_artifact.mjs" in command
     assert "--distribution=snap-store --platform=linux --arch=x64" in command
     assert "applicationUpdates !== 'store'" in command
-    serialized = (ROOT / ".github/workflows/snap-store.yml").read_text()
-    assert "SNAPCRAFT_STORE_CREDENTIALS" not in serialized
-    assert "snapcraft upload" not in serialized
+
+    upload, promote = jobs["upload"], jobs["promote"]
+    assert upload["needs"] == "package"
+    assert upload["if"].startswith("github.ref_type == 'tag' &&")
+    assert upload["environment"] == promote["environment"] == "snap-store"
+    upload_run = "\n".join(s.get("run", "") for s in upload["steps"])
+    assert "set -o pipefail" in upload_run
+    assert "concurrency" not in upload
+    assert upload_run.index("snapcraft upload") < upload_run.index("newest=$(newest_tag)")
+    assert upload_run.index("set -o pipefail") < upload_run.index("git ls-remote")
+    assert 'if [ -z "$newest" ]' in upload_run
+    promote_run = "\n".join(s.get("run", "") for s in promote["steps"])
+    assert 'snapcraft release "$SNAP_NAME" "$REVISION" stable' in promote_run
+    assert '"$GITHUB_TRIGGERING_ACTOR" != "$GITHUB_REPOSITORY_OWNER"' in promote["steps"][0]["run"]
+    # Stable is reachable only through the explicit promote dispatch.
+    assert "--release=stable" not in serialized and "candidate,stable" not in serialized
+    assert "stable" not in upload_run
+    # Credentials appear only in the environment-protected store jobs.
+    assert serialized.count("secrets.SNAPCRAFT_STORE_CREDENTIALS") == 2
+
+@pytest.mark.parametrize(
+    "tag,newest,released",
+    [("v0.5.8", "v0.5.8", True), ("v0.5.8", "v0.5.10", False), ("v0.5.8", "", None)],
+)
+def test_snap_upload_releases_candidate_only_for_the_newest_tag(tmp_path, tag, newest, released):
+    """An older tag's build must never move candidate back (checked after upload)."""
+    import os
+    import subprocess
+    import yaml
+
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/snap-store.yml").read_text(), Loader=yaml.BaseLoader
+    )
+    step = next(s for s in workflow["jobs"]["upload"]["steps"] if s.get("name") == "Upload to candidate")
+    (tmp_path / "artifact").mkdir()
+    (tmp_path / "artifact" / "VoiceStudio-Electron-0.5.8-linux-x64.snap").write_text("")
+    log = tmp_path / "calls"
+    tags = "".join(f"abc\trefs/tags/{t}\n" for t in ["v0.5.7", newest] if t)
+    stubs = {
+        "sudo": "exit 0",
+        "git": f"printf '{tags}'" if newest else "exit 0",
+        "snapcraft": 'echo "snapcraft $*" >> "$LOG"; '
+        'case "$1" in upload) echo "Revision 42 created for \'voicestudio\'";; esac',
+    }
+    for name, body in stubs.items():
+        stub = tmp_path / name
+        stub.write_text("#!/bin/bash\n" + body + "\n")
+        stub.chmod(0o755)
+    env = dict(
+        os.environ,
+        PATH=f"{tmp_path}{os.pathsep}{os.environ['PATH']}",
+        LOG=str(log),
+        SNAP_NAME="voicestudio",
+        SNAPCRAFT_STORE_CREDENTIALS="x",
+        GITHUB_REF_NAME=tag,
+        GITHUB_REPOSITORY="o/r",
+        GITHUB_SHA="0" * 40,
+        GITHUB_STEP_SUMMARY=str(tmp_path / "summary"),
+    )
+    result = subprocess.run(
+        ["bash", "-e", "-c", step["run"]], cwd=tmp_path, env=env, capture_output=True, text=True
+    )
+    calls = log.read_text().splitlines()
+    assert calls[0].startswith("snapcraft upload artifact/")
+    assert "--release" not in calls[0]
+    if released is None:
+        assert result.returncode != 0 and len(calls) == 1
+        return
+    assert result.returncode == 0, result.stderr
+    assert calls[1:] == (["snapcraft release voicestudio 42 candidate"] if released else [])
+    assert "Store revision: 42" in (tmp_path / "summary").read_text()
+
 
 @pytest.mark.parametrize("tag,allowed", [("", False), ("v0.5.4", False), ("v0.5.3", True)])
 def test_release_downloads_legacy_feeds_only_from_final_tauri_tag(tmp_path, tag, allowed):
@@ -136,7 +238,9 @@ def test_electron_release_scopes_signing_secrets_and_gates_unsigned_owner_dispat
     assert [step["name"] for step in scoped] == ["Package without publishing"]
     assert credentials.issubset(scoped[0]["env"])
     guard = next(step for step in jobs["validate"]["steps"] if step.get("name") == "Require an exact version tag")
-    assert 'test "$DISPATCH_ACTOR" = "$OWNER" && test "$RERUN_ACTOR" = "$OWNER"' in guard["run"]
+    # Who may publish unsigned is exercised in test_unsigned_publish_needs_owner_or_listed_publisher.
+    assert 'may_publish_unsigned "$DISPATCH_ACTOR" && may_publish_unsigned "$RERUN_ACTOR"' in guard["run"]
+    assert guard["env"]["OWNER"] == "${{ github.repository_owner }}"
     assert guard["env"]["DISPATCH_ACTOR"] == "${{ github.actor }}"
     assert guard["env"]["RERUN_ACTOR"] == "${{ github.triggering_actor }}"
     publish = jobs["release"]["steps"][-1]
@@ -161,7 +265,7 @@ def test_packaging_omits_empty_signing_credentials(tmp_path, credentials, expect
     env = {k: v for k, v in os.environ.items() if k not in {'CSC_LINK', 'CSC_KEY_PASSWORD'}}
     env.update(credentials)
     capture = tmp_path / 'signing-env'
-    env.update(PATH=str(tmp_path) + os.pathsep + env['PATH'], CAPTURE_PATH=str(capture))
+    env.update(PATH=str(tmp_path) + os.pathsep + env['PATH'], CAPTURE_PATH=str(capture), RUNNER_TEMP=str(tmp_path))
     script = step['run'].replace('${{ matrix.flags }}', '--mac --arm64').replace('${{ matrix.platform }}', 'darwin').replace('${{ matrix.arch }}', 'arm64')
     subprocess.run(['bash', '-e', '-c', script], env=env, check=True)
     assert capture.read_text() == expected
@@ -191,5 +295,33 @@ def test_release_tag_override_preserves_exact_tag_checkout(tmp_path, workflow_re
     env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ['PATH'], REF=ref,
                WORKFLOW_REF=workflow_ref, RELEASE_TAG_OVERRIDE=override, ALLOW_UNSIGNED='false',
                TEST_HEAD='tagged' if head_matches else 'different')
+    result = subprocess.run(['bash', '-e', '-c', guard['run']], env=env, capture_output=True)
+    assert (result.returncode == 0) == ok, result.stderr
+
+
+@pytest.mark.parametrize('publishers,dispatcher,rerunner,ok', [
+    ('', 'owner', 'owner', True),
+    ('', 'maintainer', 'maintainer', False),
+    ('maintainer', 'maintainer', 'maintainer', True),
+    (' other , maintainer ', 'maintainer', 'maintainer', True),
+    ('maintainer', 'maintainer', 'stranger', False),
+    ('maintainer', 'stranger', 'maintainer', False),
+    ('maint', 'maintainer', 'maintainer', False),
+    ('maintainer,', '', '', False),
+])
+def test_unsigned_publish_needs_owner_or_listed_publisher(tmp_path, publishers, dispatcher, rerunner, ok):
+    import os
+    import subprocess
+    import yaml
+    workflow = yaml.load((ROOT / '.github/workflows/electron-release.yml').read_text(), Loader=yaml.BaseLoader)
+    for name, body in [('node', 'echo 1.2.3'), ('git', 'echo tagged')]:
+        executable = tmp_path / name
+        executable.write_text('#!/bin/sh\n' + body + '\n')
+        executable.chmod(0o755)
+    guard = next(s for s in workflow['jobs']['validate']['steps'] if 'run' in s)
+    assert guard['env']['UNSIGNED_PUBLISHERS'] == '${{ vars.UNSIGNED_RELEASE_PUBLISHERS }}'
+    env = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ['PATH'], REF='refs/tags/v1.2.3',
+               WORKFLOW_REF='refs/tags/v1.2.3', RELEASE_TAG_OVERRIDE='', ALLOW_UNSIGNED='true',
+               OWNER='owner', UNSIGNED_PUBLISHERS=publishers, DISPATCH_ACTOR=dispatcher, RERUN_ACTOR=rerunner)
     result = subprocess.run(['bash', '-e', '-c', guard['run']], env=env, capture_output=True)
     assert (result.returncode == 0) == ok, result.stderr

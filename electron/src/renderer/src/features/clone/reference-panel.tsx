@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router';
 import { AgentFixButton } from '@/components/agent-fix-button';
 import type { useReferenceTranscript } from '@/hooks/use-reference-transcript';
+import { useReferenceAsrInstall } from '@/hooks/use-reference-asr-install';
+import { Progress } from '@/components/ui/progress';
 import { profileAudioUrl } from '@/lib/api/client';
 import { PortraitSearch } from './portrait-search';
 import { ProfileImageEditor } from './profile-image-editor';
@@ -8,6 +10,7 @@ import { ProfilePhoto } from './profile-photo';
 import { useForm } from '@tanstack/react-form';
 import {
   ChevronDownIcon,
+  DownloadIcon,
   FileAudioIcon,
   LoaderCircleIcon,
   MicIcon,
@@ -190,6 +193,45 @@ export function SaveProfileForm({
   );
 }
 
+function ReferenceAsrInstall({
+  model,
+  onInstalled,
+}: {
+  model: NonNullable<ReturnType<typeof useReferenceTranscript>['recommended']>;
+  onInstalled: () => void;
+}) {
+  const { t } = useTranslation();
+  const install = useReferenceAsrInstall(model.repo_id, onInstalled);
+  return (
+    <div className="space-y-2">
+      <Button
+        type="button"
+        size="sm"
+        disabled={install.installing}
+        onClick={() => void install.start()}
+      >
+        {install.installing ? (
+          <LoaderCircleIcon className="animate-spin motion-reduce:animate-none" />
+        ) : (
+          <DownloadIcon />
+        )}
+        {t('referenceAsr.install', { label: model.label, size: model.size_gb })}
+      </Button>
+      {install.installing && (
+        <div role="status" className="space-y-1">
+          <span>{t('referenceAsr.installing', { label: model.label })}</span>
+          <Progress value={install.progress} aria-label={t('modelMaintenance.downloading')} />
+        </div>
+      )}
+      {install.error && (
+        <p role="alert" className="text-destructive">
+          {t('asr_missing.install_failed', { message: install.error })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function OptionalDetails({
   transcription,
 }: {
@@ -251,6 +293,12 @@ export function OptionalDetails({
             {transcription?.state === 'unavailable' && (
               <div className="space-y-1 text-xs text-muted-foreground">
                 <p>{t('asr_missing.message')}</p>
+                {transcription.recommended && (
+                  <ReferenceAsrInstall
+                    model={transcription.recommended}
+                    onInstalled={transcription.retry}
+                  />
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   <AgentFixButton request="Restore local reference-audio transcription. Install and activate the best compatible ASR model through VoiceStudio, preserve the uploaded reference and manual transcript, then verify automatic transcription is ready to retry." />
                   <Button

@@ -206,7 +206,7 @@ def test_list_backends_shape(registry_sandbox):
         "instruct_vocabulary",
         # Reference-length truth (#2281): seconds of a clone clip the engine
         # uses and how it picks them; None when not verified in-repo.
-        "max_ref_seconds", "ref_strategy",
+        "max_ref_seconds", "ref_strategy", "preset_voices", "default_voice",
         # True when services.sidecar_install can provision the engine in-app
         # (the Settings Install button keys off this).
         "one_click_install",

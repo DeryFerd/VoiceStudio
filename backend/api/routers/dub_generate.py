@@ -1580,7 +1580,11 @@ async def dub_generate(job_id: str, req: DubRequest):
                 video_slow_cap=float(getattr(_fo, "video_slow_cap", None) or _fit_defaults.video_slow_cap),
                 gap_guard_s=float(_fo.gap_guard_s) if _fo is not None and _fo.gap_guard_s is not None else _fit_defaults.gap_guard_s,
                 allow_video_retime=bool(_fo.allow_video_retime) if _fo is not None and _fo.allow_video_retime is not None else _fit_defaults.allow_video_retime,
-                min_audio_rate=_underrun_min_rate(),
+                min_audio_rate=(
+                    float(_fo.min_audio_rate)
+                    if _fo is not None and _fo.min_audio_rate is not None
+                    else _underrun_min_rate()
+                ),
             )
             fit_plan = plan_fit(
                 [
@@ -1912,6 +1916,7 @@ async def dub_generate(job_id: str, req: DubRequest):
                         "video_slow_cap": fit_params.video_slow_cap,
                         "gap_guard_s": fit_params.gap_guard_s,
                         "allow_video_retime": fit_params.allow_video_retime,
+                        "min_audio_rate": fit_params.min_audio_rate,
                     }
                     fit_fp = fit_fingerprint(_fit_params_payload)
                     job.setdefault("fit_plans", {})[lang_code] = {

@@ -1,7 +1,8 @@
 # Bundled binaries
 
-This directory holds platform-specific binaries that ship inside the
-VoiceStudio installer. Today:
+This directory holds the paths for platform-specific native binaries. The files
+in git are zero-byte placeholders and the desktop installers do not ship real
+binaries yet (#2780); CI builds them as workflow artifacts. Today:
 
 | File | Built from | Purpose |
 |------|------------|---------|

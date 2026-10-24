@@ -1,6 +1,9 @@
 name: Electron desktop release
 
 # Builds are safe by default. Only an explicit publish dispatch exposes a release.
+# Two channels, both cut from main: `vX.Y.Z` is Stable (GitHub's `latest`),
+# `vX.Y.Z-beta.N` is Beta (a prerelease that never becomes `latest`). No other
+# prerelease shape (-rc, -alpha, ...) is accepted.
 on:
   push:
     tags: ['v*']
@@ -34,6 +37,8 @@ jobs:
     # The archived sunset tag was assembled separately; future tags are Electron-only.
     if: github.event_name == 'workflow_dispatch' || github.ref_name != vars.TAURI_SUNSET_TAG
     runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -47,10 +52,21 @@ jobs:
           DISPATCH_ACTOR: ${{ github.actor }}
           RERUN_ACTOR: ${{ github.triggering_actor }}
           OWNER: ${{ github.repository_owner }}
+          # Comma-separated logins the owner trusts with unsigned publishes. Only repo
+          # admins can edit Actions variables, so the owner stays in control of it.
+          UNSIGNED_PUBLISHERS: ${{ vars.UNSIGNED_RELEASE_PUBLISHERS }}
         run: |
+          may_publish_unsigned() {
+            [ -n "$1" ] || return 1
+            [ "$1" = "$OWNER" ] && return 0
+            case ",$(printf '%s' "$UNSIGNED_PUBLISHERS" | tr -d '[:space:]')," in
+              *",$1,"*) return 0 ;;
+            esac
+            return 1
+          }
           if [ "$ALLOW_UNSIGNED" = true ]; then
-            test "$DISPATCH_ACTOR" = "$OWNER" && test "$RERUN_ACTOR" = "$OWNER" || {
-              echo "Only the repository owner may accept unsigned installers"; exit 1;
+            may_publish_unsigned "$DISPATCH_ACTOR" && may_publish_unsigned "$RERUN_ACTOR" || {
+              echo "Only the repository owner or an account in UNSIGNED_RELEASE_PUBLISHERS may accept unsigned installers"; exit 1;
             }
           fi
           if [ -n "$RELEASE_TAG_OVERRIDE" ]; then
@@ -59,6 +75,11 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           test "$REF" = "refs/tags/v$VERSION" || { echo "Select the exact version tag"; exit 1; }
           test "$(git rev-parse HEAD)" = "$(git rev-parse "$REF^{commit}")" || { echo "Checkout does not match the release tag"; exit 1; }
+      - name: Resolve the release channel
+        id: channel
+        run: |
+          # stable (X.Y.Z) or beta (X.Y.Z-beta.N); any other shape fails here.
+          echo "channel=$(python3 scripts/prepare_electron_release.py --print-channel)" >> "$GITHUB_OUTPUT"
   package:
     needs: validate
     runs-on: ${{ matrix.runner }}
@@ -102,7 +123,7 @@ jobs:
         shell: bash
     env:
       VOICESTUDIO_RUST_TARGET: ${{ matrix.target }}
-      VOICESTUDIO_UPDATE_CHANNEL: electron-stable-${{ matrix.platform }}-${{ matrix.arch }}
+      VOICESTUDIO_UPDATE_CHANNEL: electron-${{ needs.validate.outputs.channel }}-${{ matrix.platform }}-${{ matrix.arch }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       VITE_POSTHOG_KEY: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
       VITE_POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
@@ -172,8 +193,21 @@ jobs:
           # signer. Omit absent credentials rather than passing empty strings.
           if [ -z "${CSC_LINK:-}" ]; then
             unset CSC_LINK CSC_KEY_PASSWORD
+          elif [ "${{ matrix.platform }}" = darwin ]; then
+            # With discovery off and no identity name, electron-builder never looks in
+            # the keychain it imported CSC_LINK into and skips signing (v0.5.7-beta.1).
+            # Discovery is limited to that imported keychain, not the runner's.
+            export CSC_IDENTITY_AUTO_DISCOVERY=true
           fi
-          bun x electron-builder --config electron-builder.config.mjs ${{ matrix.flags }} --publish never
+          # Apple's ticket server can drop the staple lookup after notarization
+          # succeeded (error 68, v0.5.7-beta.2); only that failure builds again.
+          set -o pipefail
+          attempt=1
+          until bun x electron-builder --config electron-builder.config.mjs ${{ matrix.flags }} --publish never 2>&1 | tee "$RUNNER_TEMP/electron-builder.log"; do
+            if [ "$attempt" -ge 2 ] || ! grep -q "Failed to staple" "$RUNNER_TEMP/electron-builder.log"; then exit 1; fi
+            attempt=$((attempt + 1))
+            echo "::warning::Stapling the notarization ticket failed; building again"
+          done
           if [ "$RUNNER_OS" = Linux ]; then
             node scripts/embed-appimage-update.mjs
           fi
@@ -198,6 +232,61 @@ jobs:
             $signature = Get-AuthenticodeSignature $installer.FullName
             if ($signature.Status -ne 'Valid') { throw "Installer signature is not trusted: $($installer.Name)" }
           }
+      # Measure what each leg actually ships; the release notes are built from these
+      # reports. v0.5.7-beta.1 shipped a macOS bundle whose signing was skipped silently.
+      - name: Report and enforce macOS signing
+        if: matrix.platform == 'darwin'
+        env:
+          HAS_CREDENTIALS: ${{ secrets.ELECTRON_MACOS_CSC_LINK != '' }}
+        run: |
+          APP=$(find electron/release -maxdepth 2 -name VoiceStudio.app -type d -print -quit)
+          test -n "$APP" || { echo "No VoiceStudio.app to verify"; exit 1; }
+          # An invalid bundle signature makes browser downloads open as "damaged".
+          codesign --verify --deep --strict "$APP" || { echo "macOS bundle signature is invalid"; exit 1; }
+          # stapler validate reaches Apple over the network; retry so a dropped
+          # connection is not reported as an unsigned app (v0.5.7-beta.2 tag run).
+          validate_stapled() {
+            for attempt in 1 2 3 4; do
+              xcrun stapler validate "$APP" && return 0
+              sleep $((attempt * 10))
+            done
+            return 1
+          }
+          if codesign -dvv "$APP" 2>&1 | grep -q '^Authority=Developer ID Application:' && validate_stapled; then
+            STATUS=notarized
+          elif [ "$HAS_CREDENTIALS" = true ]; then
+            echo "Developer ID credentials are configured but the app is not signed and notarized with them"; exit 1
+          else
+            STATUS=adhoc
+          fi
+          mkdir -p electron/release-signing
+          printf '{"platform":"darwin","arch":"%s","status":"%s"}\n' "${{ matrix.arch }}" "$STATUS" > "electron/release-signing/signing-darwin-${{ matrix.arch }}.json"
+      - name: Report and enforce Windows signing
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        env:
+          HAS_CREDENTIALS: ${{ secrets.ELECTRON_WINDOWS_CSC_LINK != '' }}
+        run: |
+          $installers = @(Get-ChildItem electron/release/VoiceStudio-Electron-*.exe)
+          if ($installers.Count -eq 0) { throw "No installer to verify" }
+          $unsigned = @($installers | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })
+          if ($unsigned.Count -eq 0) { $status = 'signed' }
+          elseif ($env:HAS_CREDENTIALS -eq 'true') { throw "Windows signing is configured but these installers are not validly signed: $($unsigned.Name -join ', ')" }
+          else { $status = 'unsigned' }
+          New-Item -ItemType Directory -Force electron/release-signing | Out-Null
+          Set-Content "electron/release-signing/signing-win32-${{ matrix.arch }}.json" ('{"platform":"win32","arch":"${{ matrix.arch }}","status":"' + $status + '"}')
+      - name: Report Linux signing
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p electron/release-signing
+          printf '{"platform":"linux","arch":"%s","status":"not-applicable"}\n' "${{ matrix.arch }}" > "electron/release-signing/signing-linux-${{ matrix.arch }}.json"
+      - name: Save the signing report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: electron-signing-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 14
+          if-no-files-found: error
+          path: electron/release-signing/signing-*.json
       - name: Packaged startup smoke test
         working-directory: electron
         run: |
@@ -220,7 +309,7 @@ jobs:
             electron/release/store-artifact-manifest-*.json
 
   release:
-    needs: package
+    needs: [validate, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -231,6 +320,7 @@ jobs:
       TAG: ${{ inputs.release_tag || github.ref_name }}
       SUNSET_TAG: ${{ vars.TAURI_SUNSET_TAG }}
       PUBLISH: ${{ inputs.publish }}
+      CHANNEL: ${{ needs.validate.outputs.channel }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -242,40 +332,59 @@ jobs:
           path: release-assets
       - name: Validate all platforms before creating a release
         run: |
-          python3 scripts/prepare_electron_release.py --assets release-assets --tag "$TAG"
+          python3 scripts/prepare_electron_release.py --assets release-assets --tag "$TAG" --repo "$GITHUB_REPOSITORY"
       - name: Preserve the final Tauri updater feeds
+        # Archived Tauri clients read `latest/download`, which never serves a
+        # prerelease, so only Stable releases carry the sunset feeds.
+        if: env.CHANNEL == 'stable'
         run: |
           test "$SUNSET_TAG" = "v0.5.3" || { echo "TAURI_SUNSET_TAG must be v0.5.3 before releasing"; exit 1; }
           # Every release carries copies pointing to immutable v0.5.3 payloads
           # so archived Tauri clients never receive Electron installers.
           gh release download "$SUNSET_TAG" --pattern latest.json --dir release-assets
           gh release download "$SUNSET_TAG" --pattern latest-user.json --dir release-assets
-          python3 scripts/prepare_electron_release.py --assets release-assets --tag "$TAG" --sunset-tag "$SUNSET_TAG"
-      - name: Disclose explicitly accepted unsigned artifacts
-        if: inputs.allow_unsigned == true
+          python3 scripts/prepare_electron_release.py --assets release-assets --tag "$TAG" --sunset-tag "$SUNSET_TAG" --repo "$GITHUB_REPOSITORY"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: electron-signing-*
+          merge-multiple: true
+          path: release-signing
+      - name: Describe installer signing per platform
+        # The checkout is the release tag, which predates this helper when an older
+        # tag is rebuilt from main; use the helper from the workflow's own commit.
         run: |
-          cat >> release-assets/RELEASE_NOTES.md <<'EOF'
-
-          ### Electron installer trust
-          These Electron installers are unsigned or ad-hoc signed and are not Apple-notarized.
-          Windows/macOS may show trust warnings. macOS automatic updates are unverified;
-          use manual installer updates. Tauri updater signatures remain independently verified.
-          EOF
+          gh api -H "Accept: application/vnd.github.raw" \
+            "repos/$GITHUB_REPOSITORY/contents/scripts/release_signing_notes.py?ref=$GITHUB_SHA" \
+            > "$RUNNER_TEMP/release_signing_notes.py"
+          # The table leads the notes so downloaders see it before the changelog.
+          { python3 "$RUNNER_TEMP/release_signing_notes.py" release-signing; echo; cat release-assets/RELEASE_NOTES.md; } > "$RUNNER_TEMP/RELEASE_NOTES.md"
+          mv "$RUNNER_TEMP/RELEASE_NOTES.md" release-assets/RELEASE_NOTES.md
       - name: Create or update draft
         run: |
+          # A beta is always a prerelease so GitHub never makes it `latest`.
+          PRERELEASE=false
+          if [ "$CHANNEL" = beta ]; then PRERELEASE=true; fi
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --verify-tag --draft --title "$TAG — VoiceStudio" --notes-file release-assets/RELEASE_NOTES.md
+            gh release create "$TAG" --verify-tag --draft --prerelease="$PRERELEASE" --title "$TAG — VoiceStudio" --notes-file release-assets/RELEASE_NOTES.md
           fi
           test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = true || { echo "Refusing to replace a published release"; exit 1; }
-          gh release edit "$TAG" --notes-file release-assets/RELEASE_NOTES.md
+          gh release edit "$TAG" --prerelease="$PRERELEASE" --notes-file release-assets/RELEASE_NOTES.md
           find release-assets -maxdepth 1 -type f ! -name RELEASE_NOTES.md -print0 | xargs -0 gh release upload "$TAG" --clobber
       - name: Publish only when explicitly requested
         if: github.event_name == 'workflow_dispatch' && inputs.publish == true
-        run: gh release edit "$TAG" --draft=false --latest
+        run: |
+          if [ "$CHANNEL" = beta ]; then
+            gh release edit "$TAG" --draft=false --prerelease=true --latest=false
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi
       # docker.yml publishes release images on `release: published`, which a
       # GITHUB_TOKEN publish cannot trigger; dispatch its release backfill path.
+      # Only Stable moves `:stable`; a beta gets `:beta` and its exact tag.
       - name: Publish release container images
         if: github.event_name == 'workflow_dispatch' && inputs.publish == true
         run: |
+          PROMOTE=false
+          if [ "$CHANNEL" = stable ]; then PROMOTE=true; fi
           gh workflow run docker.yml --ref main \
-            -f backfill_release=true -f release_ref="$TAG" -f promote_stable=true
+            -f backfill_release=true -f release_ref="$TAG" -f promote_stable="$PROMOTE"

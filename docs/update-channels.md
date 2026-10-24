@@ -1,16 +1,30 @@
 # Desktop updates
 
-VoiceStudio's desktop app offers **stable releases only**. It checks for an
+VoiceStudio's desktop app follows **Stable** releases unless you opt in to
+**Beta**. It checks for an
 update about 10 seconds after launch and every six hours while it stays open;
 **Settings → Updates** also has a manual check. The app never downloads an
 update until you ask, and an available update is only offered, never forced.
 
 | Build | Where it comes from | Who it's for |
 |-------|--------------------|--------------|
-| **Stable** | The latest published `vX.Y.Z` GitHub Release. | Everyone. This is the only update channel. |
+| **Stable** | The latest published `vX.Y.Z` GitHub Release. | Everyone. This is the default. |
+| **Beta** | The newest `vX.Y.Z-beta.N` prerelease, cut from `main` before the matching stable release. | Testers who want fixes early and can live with bugs. Opt in under **Settings → Updates → Update channel**. |
 
-There is no Preview update channel and no preview desktop feed. To try changes
-before they are released:
+Switching channel takes effect immediately and is remembered across restarts.
+It is locked while an update is downloading or waiting to restart.
+
+- **Beta rolls forward onto Stable.** When a stable release passes your beta
+  (for example `0.5.9` after `0.5.9-beta.3`), Beta installs it, so you never
+  linger on an old beta.
+- **Switching back to Stable never downgrades.** If your beta is newer than the
+  latest stable, you stay on it until the next stable release.
+- Beta builds are GitHub *prereleases*: they never become the `latest` release
+  and Stable users never see them. Microsoft Store, Snap Store and Mac App
+  Store builds are Stable-only.
+- Beta Linux AppImages update through the in-app updater, not AppImageUpdate.
+
+There is no separate preview desktop feed. To try changes between betas:
 
 - **Run `main` from source** — see the platform install guides
   ([macOS](install/macos.md#building-from-source) ·
@@ -28,7 +42,9 @@ has finished and current drafts are flushed.
 
 There are **no accounts or updater telemetry**. A check fetches one small
 platform/architecture-specific manifest from
-`github.com/debpalash/VoiceStudio/releases/latest/download/`; it carries the
+`github.com/debpalash/VoiceStudio/releases/latest/download/` (Stable), or, on
+Beta, from the newest beta or stable release found through the public GitHub
+releases list; it carries the
 package's SHA-512 checksum, and the app rejects a package that fails it. On
 Linux the in-app updater uses the AppImage; update a `.deb` installation by
 installing the newer `.deb`. Source checkouts do not self-update.

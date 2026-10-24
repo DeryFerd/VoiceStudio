@@ -1969,3 +1969,13 @@ def test_corrupt_non_utf8_markers_read_as_absent_not_crash(monkeypatch):
     (extra_dir / si._SOURCE_REVISION_MARKER).write_bytes(b"\xff\xfe\x80")
     extra = si.ExtraSource("extra", "rev", "https://example.invalid/x.tar.gz", "needed.txt")
     assert si._extra_source_present(extra, extra_dir) is False
+
+
+def test_engines_dir_env_relocates_managed_roots(monkeypatch, tmp_path):
+    """#2683: OMNIVOICE_ENGINES_DIR moves engine venvs off the data drive."""
+    spec = next(iter(si.SPECS.values()))
+    default_root = si.managed_root(spec)
+    assert default_root == Path(si.DATA_DIR) / "engines" / spec.engine_id
+    elsewhere = tmp_path / "bigdrive"
+    monkeypatch.setenv("OMNIVOICE_ENGINES_DIR", str(elsewhere))
+    assert si.managed_root(spec) == elsewhere / spec.engine_id

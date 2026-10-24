@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.*
 import java.io.File
 
  data class StudioState(val connectionId: Long = 0, val hostUrl: String? = null, val loading: Boolean = true, val connected: Boolean = false, val busy: Boolean = false, val catalogLoading: Boolean = false,
-    val error: ClientFailure? = null, val profiles: List<Profile> = emptyList(), val engines: EngineFamily = EngineFamily(),
+    val error: ClientFailure? = null, val canRetry: Boolean = false, val profiles: List<Profile> = emptyList(), val engines: EngineFamily = EngineFamily(),
     val history: List<HistoryItem> = emptyList(), val dubHistory: List<DubHistory> = emptyList(), val audio: String? = null)
 
 class StudioViewModel @JvmOverloads constructor(application: Application, val store: SessionStore = SessionStore(application)) : AndroidViewModel(application) {
@@ -22,6 +22,11 @@ class StudioViewModel @JvmOverloads constructor(application: Application, val st
     var api: VoiceStudioApi? = null
         private set
     private var operation: Job? = null
+    private var retryAction: (() ->Unit)? = null
+    val phone = PhoneStudio(application,viewModelScope,::fail) {error,retry -> fail(error,retry)}
+    val reports = ContentReports(viewModelScope)
+    // Host takes made in this session: playback path -> engine id and full typed text, for reports.
+    private val computerTakes = mutableMapOf<String,Pair<String,String>>()
     init {
         viewModelScope.launch {
             val prefs = store.preferences.first()
@@ -44,6 +49,7 @@ class StudioViewModel @JvmOverloads constructor(application: Application, val st
         }
     }
     private fun clearHostState(host: String? = null, profiles: List<Profile> = emptyList(), error: ClientFailure? = null) {
+        computerTakes.clear()
         mutable.value = StudioState(connectionId = mutable.value.connectionId + 1, hostUrl = host,
             loading = false, connected = host != null, busy = mutable.value.busy, catalogLoading = host != null, profiles = profiles, error = error)
     }
@@ -61,16 +67,19 @@ class StudioViewModel @JvmOverloads constructor(application: Application, val st
             } finally { mutable.update { it.copy(busy = false) } }
         }
     }
-    fun clearError() { mutable.update { it.copy(error = null) } }
-    fun fail(error: Throwable) {
+    fun clearError() { retryAction=null;mutable.update { it.copy(error = null,canRetry=false) } }
+    fun retryError() {val retry=retryAction;clearError();retry?.invoke()}
+    fun fail(error: Throwable) = fail(error,null)
+    fun fail(error: Throwable,retry: (() ->Unit)?) {
         if(error is CancellationException) return
-        mutable.update { it.copy(error = error as? ClientFailure ?: ClientFailure("mobile.android.operation_failed")) }
+        retryAction=retry
+        mutable.update {it.copy(error=error as? ClientFailure ?: ClientFailure("mobile.android.operation_failed"),canRetry=retry!=null)}
     }
     fun run(block: suspend () -> Unit) {
         if(mutable.value.busy) return
         operation = viewModelScope.launch(start = CoroutineStart.LAZY) {
             mutable.update { it.copy(busy = true, error = null) }
-            try { block() } catch(e: CancellationException) { throw e } catch(e: Exception) { fail(e) }
+            try { block() } catch(e: CancellationException) { throw e } catch(e: Exception) { fail(e) {run(block)} }
             finally { if(operation === currentCoroutineContext()[Job]) mutable.update { it.copy(busy = false) } }
         }
         operation?.start()
@@ -129,11 +138,18 @@ class StudioViewModel @JvmOverloads constructor(application: Application, val st
         val current = api ?: return@run
         val result = current.generate(text, voice, engine, language)
         if(api !== current) return@run
-        mutable.update { it.copy(audio = current.audioPath(result.audioPath)) }
+        val audio = current.audioPath(result.audioPath)
+        computerTakes[audio] = engine to text
+        mutable.update { it.copy(audio = audio) }
         val history = current.history()
         if(api === current) mutable.update { it.copy(history = history) }
     }
     fun play(path: String) { mutable.update { it.copy(audio = path) } }
+    /** A host take: the engine this app asked for when it made it, else unknown. */
+    fun computerSpeakSubject(audioPath: String, fallbackText: String = ""): com.voicestudio.mobile.network.ReportSubject {
+        val take = computerTakes[audioPath]
+        return ReportSubjects.computerSpeak(audioPath, take?.second ?: fallbackText, take?.first)
+    }
     fun star(item: HistoryItem) = run { api?.star(item.id, !item.isStarred); reload() }
     fun deleteHistory(item: HistoryItem) = run { api?.deleteHistory(item.id); reload() }
     fun clone(name: String, file: File) = run { api?.clone(name, file); file.delete(); reload() }

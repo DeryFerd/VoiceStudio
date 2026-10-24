@@ -118,13 +118,12 @@ func unprovenLLMEndpoints(_ url: String) { #expect(!TranslationEngine.isLoopback
 @Test func dubHistoryMetadataUsesActualHostFieldsAndToleratesOlderRows() throws {
     let item = try JSONDecoder().decode(DubHistoryItem.self, from: data(#"{"id":"dub","filename":"vs-dub-test.wav","language":"Spanish","language_code":"es","duration":125,"created_at":1700000000}"#))
     #expect(item.title == "vs-dub-test.wav")
-    let metadata = item.metadata(locale: Locale(identifier: "en"))
-    #expect(metadata.contains("Spanish"))
-    #expect(metadata.contains("2:05"))
-    #expect(metadata.contains("2023"))
+    let l10n = try L10n(locale: "en", catalogs: catalogs())
+    let metadata = item.metadata(l10n: l10n)
+    #expect(metadata == "Spanish dub, 2:05 long")
     let old = try JSONDecoder().decode(DubHistoryItem.self, from: data(#"{"id":"old"}"#))
     #expect(old.title == "old")
-    #expect(old.metadata(locale: Locale(identifier: "en")) == "old")
+    #expect(old.metadata(l10n: l10n) == "Dub finished dub, 0:00 long")
 }
 
 @Test func searchEmptyAndRemoveCopyAreLocalized() throws {

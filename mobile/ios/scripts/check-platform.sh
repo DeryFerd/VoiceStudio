@@ -13,5 +13,8 @@ if [ -z "$MODULES" ]; then
     exit 1
 fi
 swiftc -typecheck -swift-version 6 -strict-concurrency=complete -I "$MODULES" \
+    -Xcc -fmodule-map-file="$IOS_DIR/VoiceStudioKit/Sources/VSNative/include/module.modulemap" \
+    -Xcc -I"$IOS_DIR/VoiceStudioKit/Sources/VSNative/include" \
     "$IOS_DIR/VoiceStudio/Platform/HostMediaLoader.swift" \
-    "$IOS_DIR/VoiceStudio/Platform/SmokeTransport.swift"
+    "$IOS_DIR/VoiceStudio/Platform/SmokeTransport.swift" \
+    "$IOS_DIR/VoiceStudio/Platform/PhoneModels.swift"

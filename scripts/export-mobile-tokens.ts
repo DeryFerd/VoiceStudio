@@ -223,6 +223,11 @@ const tokens = {
     control: rem(light.get('--control-radius')!),
   },
   spacing: { gap: rem(light.get('--workspace-gap')!), inset: rem(light.get('--workspace-inset')!) },
+  ios: {
+    cardRadius: rem(light.get('--ios-card-radius')!),
+    fieldRadius: rem(light.get('--ios-field-radius')!),
+    homeWordmarkSize: rem(light.get('--ios-home-wordmark-size')!),
+  },
 };
 
 // ---------- emitters ----------
@@ -250,6 +255,7 @@ function swift(): string {
     s += `    public static let text${typeName(k)} = (size: ${v.size.toFixed(2)}, lineHeight: ${v.lineHeight.toFixed(2)})\n`;
   for (const [k, v] of Object.entries(tokens.radius)) s += `    public static let radius${typeName(k)}: Double = ${v.toFixed(2)}\n`;
   for (const [k, v] of Object.entries(tokens.spacing)) s += `    public static let spacing${typeName(k)}: Double = ${v.toFixed(2)}\n`;
+  for (const [k, v] of Object.entries(tokens.ios)) s += `    public static let ios${typeName(k)}: Double = ${v.toFixed(2)}\n`;
   return s + '}\n';
 }
 
@@ -271,6 +277,7 @@ function kotlin(): string {
   }
   for (const [k, v] of Object.entries(tokens.radius)) s += `    const val RADIUS_${k.toUpperCase()}: Float = ${v.toFixed(2)}f\n`;
   for (const [k, v] of Object.entries(tokens.spacing)) s += `    const val SPACING_${k.toUpperCase()}: Float = ${v.toFixed(2)}f\n`;
+  for (const [k, v] of Object.entries(tokens.ios)) s += `    const val IOS_${k.replace(/[A-Z]/g, (c) => '_' + c).toUpperCase()}: Float = ${v.toFixed(2)}f\n`;
   return s + '}\n';
 }
 

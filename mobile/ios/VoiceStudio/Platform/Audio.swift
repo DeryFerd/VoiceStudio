@@ -5,6 +5,11 @@ import Observation
 import VoiceStudioKit
 import UniformTypeIdentifiers
 
+@MainActor func activatePlaybackSession() throws {
+    try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+    try AVAudioSession.sharedInstance().setActive(true)
+}
+
 @MainActor @Observable final class AudioPlayer {
     private var player: AVPlayer?
     private var ticker: Task<Void, Never>?
@@ -22,13 +27,17 @@ import UniformTypeIdentifiers
         try Task.checkCancellation()
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
         try data.write(to: path, options: .atomic)
+        let asset = AVURLAsset(url: path)
+        let duration: Double, waveform: [Float]
+        do {
+            duration = try await asset.load(.duration).seconds
+            waveform = try await Self.waveform(url: path)
+            try Task.checkCancellation()
+            guard revision == self.revision else { throw CancellationError() }
+        } catch { try? FileManager.default.removeItem(at: path); throw error }
+        // `file` shows the player view, so it is set only once the player can play.
         if let old = file { try? FileManager.default.removeItem(at: old) }
         file = path
-        let asset = AVURLAsset(url: path)
-        let duration = try await asset.load(.duration).seconds
-        let waveform = try await Self.waveform(url: path)
-        try Task.checkCancellation()
-        guard revision == self.revision else { throw CancellationError() }
         self.duration = duration.isFinite ? duration : 0; position = 0
         self.waveform = waveform
         player = AVPlayer(playerItem: AVPlayerItem(asset: asset))
@@ -64,8 +73,7 @@ import UniformTypeIdentifiers
     func play() {
         guard let player else { return }
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
+            try activatePlaybackSession()
         } catch { self.error = ClientError("mobile.errors.audio"); return }
         if duration > 0 && position >= duration { seek(0) }
         player.play(); playing = true
@@ -129,20 +137,20 @@ struct AudioPlayerView: View {
             HStack(spacing: VSTokens.spacingGap) {
                 Button(model.t(player.playing ? "common.pause" : "common.play"), systemImage: player.playing ? "pause.fill" : "play.fill") {
                     if player.playing { player.pause() } else { player.play() }
-                }.labelStyle(.iconOnly).buttonStyle(VSButtonStyle(kind: .tertiary)).accessibilityIdentifier("audio.play")
+                }.labelStyle(.iconOnly).studioButton(.tertiary).accessibilityIdentifier("audio.play")
                 Slider(value: Binding(get: { min(player.position, max(1, player.duration)) }, set: { player.seek($0) }), in: 0...max(1, player.duration))
                     .accessibilityLabel(model.t("player.seek"))
                     .accessibilityValue(PlaybackTime.format(player.position))
                 if let file = player.file {
                     ShareLink(item: file) { Label(model.t("mobile.speak.share"), systemImage: "square.and.arrow.up") }
-                        .labelStyle(.iconOnly).buttonStyle(VSButtonStyle(kind: .tertiary))
+                        .labelStyle(.iconOnly).studioButton(.tertiary)
                 }
             }
             HStack {
                 Text(PlaybackTime.format(player.position))
                 Spacer(minLength: 0)
                 Text(PlaybackTime.format(player.duration))
-            }.font(.custom("InterVariable", size: VSTokens.textCaption.size, relativeTo: .caption))
+            }.font(.caption)
                 .monospacedDigit().foregroundStyle(theme.color("textMuted"))
         }
         .onChange(of: player.error) { _, error in if let error { model.error = error; player.error = nil } }
@@ -165,7 +173,7 @@ struct AudioPlayerView: View {
         try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker]); try session.setActive(true)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("wav")
         let recorder = try AVAudioRecorder(url: url, settings: [AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 24000, AVNumberOfChannelsKey: 1, AVLinearPCMBitDepthKey: 16])
-        guard recorder.record() else { throw ClientError("mobile.errors.audio") }
+        guard recorder.record(forDuration: 29) else { throw ClientError("mobile.errors.audio") }
         self.recorder = recorder; file = url; recording = true; seconds = 0
         timer = Task { [weak self] in while !Task.isCancelled { try? await Task.sleep(for: .seconds(1)); guard let self, recording else { return }; seconds += 1 } }
     }

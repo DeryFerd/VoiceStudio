@@ -16,6 +16,14 @@ describe('backendFailureHints', () => {
     ]);
   });
 
+  it('names Smart App Control instead of suggesting an antivirus exclusion (#3224)', () => {
+    expect(
+      backendFailureHints(
+        'Could not start C:\\runtime\\python.exe: spawn UNKNOWN. Windows Smart App Control blocked it.',
+      ),
+    ).toEqual(['backend.hint_smart_app_control']);
+  });
+
   it('explains a startup budget that ran out on a slow host (#2445)', () => {
     expect(
       backendFailureHints(

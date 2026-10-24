@@ -1,0 +1,134 @@
+# iOS TestFlight — signs the companion app with the team's App Store Connect API
+# key and uploads it to TestFlight. Owner-dispatched from `main` only; nothing is
+# submitted for App Store review (see docs/mobile.md → TestFlight).
+
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    if: github.ref == 'refs/heads/main'
+    # App Store Connect only accepts builds from the current iOS SDK (Xcode 26+).
+    runs-on: macos-26
+    timeout-minutes: 60
+    # Holds the App Store Connect secrets; restrict it to `main` in repository settings.
+    environment: app-store-connect
+    env:
+      # Unique and increasing per upload, including reruns of the same run.
+      VOICESTUDIO_IOS_BUILD_NUMBER: ${{ github.run_number }}.${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Require signing credentials
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY TEAM_ID; do
+            test -n "${!name}" || { echo "Missing $name; see docs/mobile.md → TestFlight"; exit 1; }
+          done
+
+      # iOS xcframeworks for the pinned on-device runtimes (sherpa-onnx, onnxruntime,
+      # llama.cpp, omnivoice.cpp); needs Xcode, so it only runs here.
+      - name: Cache native runtimes
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: mobile/native/ios/build
+          key: ios-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/ios/**', '!mobile/native/ios/build/**') }}
+
+      - name: Build native runtimes
+        env:
+          # Read-only token: avoids the anonymous GitHub API rate limit on shared runners.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          brew install cmake ninja 2>/dev/null || true
+          bash mobile/native/ios/build.sh ios
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec mobile/ios/VoiceStudio/project.yml
+
+      - name: Write App Store Connect API key
+        env:
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$ASC_KEY" > "$RUNNER_TEMP/asc_api_key.p8"
+
+      # Automatic signing with the API key creates the cloud-managed Apple
+      # Distribution certificate and App Store profile; no .p12 is stored.
+      - name: Archive signed app
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild -project mobile/ios/VoiceStudio/VoiceStudio.xcodeproj \
+            -scheme VoiceStudio -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/VoiceStudio.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc_api_key.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            archive
+
+      # Automatic signing archives with the team's development identity; the
+      # export below re-signs for App Store distribution and App Store Connect
+      # rejects anything else. The archive must still be validly signed by this team.
+      - name: Verify archive signature and version
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP="$RUNNER_TEMP/VoiceStudio.xcarchive/Products/Applications/VoiceStudio.app"
+          codesign --verify --deep --strict "$APP"
+          codesign -dvv "$APP" 2>&1 | grep -qx "TeamIdentifier=$TEAM_ID"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Info.plist")" = "$VOICESTUDIO_IOS_BUILD_NUMBER"
+          # App Store Connect rejects any embedded framework without both version keys.
+          for plist in "$APP"/Frameworks/*.framework/Info.plist; do
+            [ -e "$plist" ] || continue
+            for key in CFBundleShortVersionString CFBundleVersion; do
+              /usr/libexec/PlistBuddy -c "Print $key" "$plist" >/dev/null || { echo "$plist is missing $key"; exit 1; }
+            done
+          done
+
+      - name: Upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          /usr/libexec/PlistBuddy -c 'Add :method string app-store-connect' \
+            -c 'Add :destination string upload' \
+            -c "Add :teamID string $TEAM_ID" \
+            -c 'Add :signingStyle string automatic' \
+            -c 'Add :manageAppVersionAndBuildNumber bool false' \
+            -c 'Add :testFlightInternalTestingOnly bool true' \
+            "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/VoiceStudio.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/asc_api_key.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Remove API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc_api_key.p8"

@@ -119,6 +119,7 @@ export function HuggingFaceToken() {
           className="min-w-48 flex-1"
           type="password"
           aria-label={t('settings.hf_token_input')}
+          placeholder="hf_…"
           value={token}
           autoComplete="new-password"
           spellCheck={false}

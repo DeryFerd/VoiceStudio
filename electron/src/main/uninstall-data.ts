@@ -11,7 +11,8 @@ import {
 export interface UninstallRoots {
   data: string;
   environment: string;
-  runtimeEnvironment?: string | null;
+  /** The runtime Electron created; a list when data/models share its folder and must stay separate targets. */
+  runtimeEnvironment?: string | string[] | null;
   logs: string | null;
   userEnvironment: string;
   models: string;
@@ -58,9 +59,11 @@ export async function scanUninstallTargets(roots: UninstallRoots): Promise<Unins
   const candidates = uniqueRoots([
     { key: 'data', path: roots.data, shared: false },
     { key: 'env', path: roots.environment, shared: false },
-    ...(roots.runtimeEnvironment
-      ? [{ key: 'env' as const, path: roots.runtimeEnvironment, shared: false }]
-      : []),
+    ...[roots.runtimeEnvironment ?? []].flat().map((path) => ({
+      key: 'env' as const,
+      path,
+      shared: false,
+    })),
     ...(roots.logs ? [{ key: 'logs' as const, path: roots.logs, shared: false }] : []),
     { key: 'userenv', path: roots.userEnvironment, shared: false },
     ...(!modelNested

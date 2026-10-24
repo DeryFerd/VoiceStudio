@@ -162,7 +162,7 @@ Each phase produces a testable artifact. Don't proceed to the next phase until t
 3. Frontend `src/pages/SetupWizard.jsx`:
    - Shown when `/setup/status` says models missing.
    - Per-file progress bars driven by the SSE stream.
-   - Disk-space check; error state if <10 GB free.
+   - Disk-space check; error state if <2 GB free, warning below 10 GB.
    - Retry on network failure.
 4. App-level route guard: if `setupWizardNeeded`, render `<SetupWizard>` instead of `<Launchpad>`.
 
@@ -224,7 +224,7 @@ For our current goal (friend on the same M2 air), **stop at Phase D**. Cross-pla
 | DMG size >800 MB | Medium | Keep nvidia/triton/matplotlib out of the spec; defer optional packs to lazy download |
 | First-run download fails halfway | Medium | SSE retry + resumable `hf_hub_download` (supported natively). Show disk-space check upfront |
 | Gatekeeper blocks unsigned app | Certain | Document right-click → Open as the one-time step. Long-term: buy Apple Developer ID |
-| User's friend has <10 GB free | Low | Pre-check in `/setup/status`. Refuse to start download if insufficient. Point user to clear space |
+| User's friend has <2 GB free | Low | Pre-check in `/setup/status`. Refuse to start download if insufficient. Point user to clear space |
 | Apple Silicon build runs on Intel Mac | Possible | Warn in installer + app header. Don't promise cross-arch without actual Intel build |
 
 ---

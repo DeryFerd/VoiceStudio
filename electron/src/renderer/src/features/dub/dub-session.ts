@@ -120,6 +120,7 @@ export interface DubSession {
     video_slow_cap?: number;
     gap_guard_s?: number;
     allow_video_retime?: boolean;
+    min_audio_rate?: number;
   };
   steps?: number;
   guidance?: number;
@@ -308,6 +309,17 @@ export const setDubProduction = (
 ) => {
   if (['idle', 'editing', 'done'].includes(dubSession.state.phase) && !dubSession.state.recovery)
     patch(value);
+};
+/** Smart Fit speed limits. An undefined value restores the server default. */
+export const setDubFitOptions = (
+  value: Partial<Pick<NonNullable<DubSession['fitOptions']>, 'audio_rate_cap' | 'min_audio_rate'>>,
+) => {
+  if (!['idle', 'editing', 'done'].includes(dubSession.state.phase) || dubSession.state.recovery)
+    return;
+  const next = { ...dubSession.state.fitOptions, ...value };
+  for (const key of Object.keys(value) as (keyof typeof value)[])
+    if (value[key] === undefined) delete next[key];
+  patch({ fitOptions: Object.keys(next).length ? next : undefined });
 };
 export const setDubExportPreferences = (value: Partial<DubExportPreferences>) => {
   if (!controller && !cancelling && !dubSession.state.recovery)

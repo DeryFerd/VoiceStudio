@@ -21,7 +21,7 @@ private struct KeyboardAccessible: ViewModifier {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(model.t("mobile.keyboard.done")) { Keyboard.dismiss() }
-                        .buttonStyle(VSButtonStyle(kind: .tertiary))
+                        .studioButton(.tertiary)
                         .accessibilityIdentifier("keyboard.done")
                 }
             }

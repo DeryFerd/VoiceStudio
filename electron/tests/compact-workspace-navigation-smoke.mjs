@@ -4,6 +4,13 @@ const browser = await chromium.launch({
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
   headless: true,
 });
+async function expectFocus(page, locator) {
+  await page.waitForFunction(
+    (element) => element === document.activeElement,
+    await locator.elementHandle(),
+    { timeout: 3000 },
+  );
+}
 try {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   await page.addInitScript(() => localStorage.setItem('voicestudio.setup.complete.v1', '1'));
@@ -67,13 +74,13 @@ try {
   await clone.waitFor();
   await page.keyboard.press('Escape');
   await clone.waitFor({ state: 'hidden' });
-  assert.equal(await voice.evaluate((element) => element === document.activeElement), true);
+  await expectFocus(page, voice);
   await page.keyboard.press('ArrowRight');
   await clone.waitFor();
-  assert.equal(await clone.evaluate((element) => element === document.activeElement), true);
+  await expectFocus(page, clone);
   await page.keyboard.press('ArrowLeft');
   await clone.waitFor({ state: 'hidden' });
-  assert.equal(await voice.evaluate((element) => element === document.activeElement), true);
+  await expectFocus(page, voice);
   await voice.dblclick();
   await rail.waitFor({ state: 'hidden' });
   assert.equal((await page.getByRole('button', { name: 'Close', exact: true }).count()) > 0, true);

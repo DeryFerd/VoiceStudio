@@ -104,9 +104,7 @@
     "dub": "Traduisez et doublez des fichiers audio ou vidéo.",
     "stories": "Créez des scènes avec plusieurs voix.",
     "audiobook": "Créez des livres audio avec des chapitres.",
-    "transcribe": "Transformez des enregistrements en texte.",
-    "collapseFooter": "Réduire le pied de page",
-    "expandFooter": "Développer le pied de page"
+    "transcribe": "Transformez des enregistrements en texte."
   },
   "longformPersistence": {
     "storage_unavailable_title": "Impossible de charger les projets",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} segments validés",
     "cancelled": "Annulé",
     "fitting": "Ajustement du minutage"
-  },
-  "sponsorSlot": {
-    "book": "Réservez votre emplacement",
-    "preview": "Aperçu du sponsor",
-    "message": "Votre marque, site web et message",
-    "email_app": "Ouvrir la messagerie",
-    "copy_email": "Copier l’adresse e-mail"
   },
   "supportPlans": {
     "remove": "Retirer la barre des sponsors",

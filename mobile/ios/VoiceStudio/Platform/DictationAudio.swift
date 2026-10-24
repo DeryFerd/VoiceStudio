@@ -36,10 +36,10 @@ import VoiceStudioKit
     }
 }
 /// The converter is confined to AVAudioEngine's serial audio callback.
-private final class PCMConverter: @unchecked Sendable {
+final class PCMConverter: @unchecked Sendable {
     let converter: AVAudioConverter
     let output: AVAudioFormat
-    init(converter: AVAudioConverter, output: AVAudioFormat) { self.converter = converter; self.output = output }
+    init(converter: AVAudioConverter, output: AVAudioFormat) { self.converter = converter; self.output = output; converter.downmix = true }
     func convert(_ input: AVAudioPCMBuffer) throws -> Data {
         let capacity = AVAudioFrameCount(ceil(Double(input.frameLength) * 16000 / input.format.sampleRate)) + 32
         guard let result = AVAudioPCMBuffer(pcmFormat: output, frameCapacity: capacity) else { throw ClientError("mobile.errors.audio") }

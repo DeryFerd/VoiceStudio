@@ -72,6 +72,10 @@
 }
 
 :root {
+  /* Native iOS content geometry; exported alongside the shared mobile palette. */
+  --ios-card-radius: 1.5rem;
+  --ios-field-radius: 1rem;
+  --ios-home-wordmark-size: 1.75rem;
   --workspace-footer-height: 40px;
   --control-radius: 0.5rem;
   --workspace-gap: 1rem;
@@ -179,10 +183,12 @@
   -webkit-app-region: no-drag;
 }
 .native-controls-right {
-  padding-right: 148px;
+  /* + the top-right corner (account and notifications, account-corner.tsx). */
+  padding-right: calc(148px + var(--corner-space, 0px));
 }
-.macos-notification-safe-area main .workspace-titlebar {
-  padding-right: 3.5rem;
+.macos-notification-safe-area main .workspace-titlebar,
+.account-corner-safe {
+  padding-right: calc(0.875rem + var(--corner-space, 0px));
 }
 
 /* Keep the Lucide family visually consistent across controls and pane headings. */

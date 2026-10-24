@@ -54,12 +54,34 @@
 }
 
 .home-contributor-avatar {
+  position: relative;
   display: block;
   width: var(--contributor-size);
   height: var(--contributor-size);
   padding: 3px;
   border-radius: 50%;
   background: var(--card);
+}
+
+/* Core maintainers share a small badge in the app’s accent color. */
+.home-core-maintainer {
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--background);
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.home-core-maintainer svg {
+  width: 8px;
+  height: 8px;
+  fill: currentColor;
 }
 
 .home-contributor-all {

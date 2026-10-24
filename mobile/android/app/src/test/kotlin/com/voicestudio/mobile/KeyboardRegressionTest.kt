@@ -71,7 +71,7 @@ class KeyboardRegressionTest {
                 Action("mobile.speak.generate") {generated=true}
             }
         }
-        val editor=compose.onNodeWithText("Type what you want to hear…")
+        val editor=compose.onNode(hasSetTextAction())
         editor.performClick().performTextInput("First line\nSecond line")
         compose.onNodeWithText("Done").performClick()
         editor.assertIsNotFocused()

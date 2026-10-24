@@ -85,6 +85,11 @@ describe('sanitizeInstruct', () => {
 });
 
 describe('toGenerateForm', () => {
+  it('sends the picked preset voice only when one is set (#2938)', () => {
+    expect(toGenerateForm(BASE_INPUT).has('preset_voice')).toBe(false);
+    expect(toGenerateForm({ ...BASE_INPUT, presetVoice: 'F3' }).get('preset_voice')).toBe('F3');
+  });
+
   it('keeps existing defaults and sends explicit quality choices', () => {
     const defaults = toGenerateForm(BASE_INPUT);
     expect(defaults.get('wav_bits')).toBe('16');

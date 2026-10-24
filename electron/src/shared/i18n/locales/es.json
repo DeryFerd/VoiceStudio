@@ -104,9 +104,7 @@
     "dub": "Traduce y dobla audio o vídeo.",
     "stories": "Crea escenas con varias voces.",
     "audiobook": "Crea audiolibros con capítulos.",
-    "transcribe": "Convierte grabaciones en texto.",
-    "collapseFooter": "Contraer pie de página",
-    "expandFooter": "Expandir pie de página"
+    "transcribe": "Convierte grabaciones en texto."
   },
   "longformPersistence": {
     "storage_unavailable_title": "No se pudieron cargar los proyectos",
@@ -2749,13 +2747,6 @@
     "progress": "{{done}} / {{total}} segmentos validados",
     "cancelled": "Cancelado",
     "fitting": "Ajustando tiempos"
-  },
-  "sponsorSlot": {
-    "book": "Reserva tu espacio",
-    "preview": "Vista previa del patrocinador",
-    "message": "Tu marca, sitio web y mensaje",
-    "email_app": "Abrir correo",
-    "copy_email": "Copiar correo"
   },
   "supportPlans": {
     "remove": "Quitar barra de patrocinadores",

@@ -61,6 +61,11 @@ it('names the feature Dubbing consistently while preserving the existing route',
 it('credits qualifying contributors and opens their GitHub profiles externally', () => {
   render(<HomePage />);
   const credits = screen.getAllByRole('listitem');
+  expect(
+    Array.from(document.querySelectorAll('[data-core-maintainer]'), (badge) =>
+      badge.getAttribute('data-core-maintainer'),
+    ),
+  ).toEqual(['debpalash', 'velixio']);
   expect(credits).toHaveLength(homeContributors.length + 1);
   expect(
     [1, 2, 3].map((row) => credits.filter((credit) => credit.style.gridRow === String(row)).length),

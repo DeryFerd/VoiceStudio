@@ -104,9 +104,7 @@
     "dub": "오디오나 영상을 번역하고 더빙하세요.",
     "stories": "여러 목소리로 장면을 만드세요.",
     "audiobook": "챕터가 있는 오디오북을 만드세요.",
-    "transcribe": "녹음을 텍스트로 변환하세요.",
-    "collapseFooter": "바닥글 접기",
-    "expandFooter": "바닥글 펼치기"
+    "transcribe": "녹음을 텍스트로 변환하세요."
   },
   "longformPersistence": {
     "storage_unavailable_title": "프로젝트를 불러올 수 없습니다",
@@ -3219,13 +3217,6 @@
     "progress": "{{done}} / {{total}}개 구간 검증됨",
     "cancelled": "취소됨",
     "fitting": "타이밍 조정 중"
-  },
-  "sponsorSlot": {
-    "book": "스폰서 자리 신청",
-    "preview": "스폰서 미리보기",
-    "message": "브랜드, 웹사이트 및 메시지",
-    "email_app": "이메일 앱 열기",
-    "copy_email": "이메일 주소 복사"
   },
   "supportPlans": {
     "remove": "스폰서 바 제거",

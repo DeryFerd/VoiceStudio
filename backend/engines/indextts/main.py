@@ -85,7 +85,11 @@ def _measure_vram_mb() -> float:
     (MM2-08). The parent can't see a child's VRAM, so we self-report it in the
     pong. Degrades to 0 on CPU / when torch isn't loaded yet — never raises."""
     try:
-        import torch  # already a dep inside the indextts venv
+        # A ping must stay cheap: importing torch here can take a long time on a cold
+        # start (#2837). Until the model has loaded, nothing is allocated.
+        torch = sys.modules.get("torch")
+        if torch is None:
+            return 0.0
         if torch.cuda.is_available():
             return round(torch.cuda.memory_allocated() / (1024 ** 2), 1)
         mps = getattr(torch.backends, "mps", None)

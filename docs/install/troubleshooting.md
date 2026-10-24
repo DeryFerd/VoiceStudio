@@ -89,6 +89,10 @@ Sidecar stderr is scrubbed for home directories and secrets before logging.
 This does not download an ASR model automatically: if no installed
 recognizer can transcribe the clip and no local model fallback is available,
 provide the matching transcript or explicitly install a speech-to-text model.
+The Clone page offers an **Install** button for the model recommended for your
+hardware (it downloads only after you click it) and then retries the transcript.
+The transcript preview also uses any other installed speech-to-text model when
+the selected one is not on disk.
 Unknown or unverifiable ASR selections are skipped for automatic reference
 transcription. An explicitly selected OpenAI-compatible ASR provider retains its
 opt-in behavior; it does not need local model weights. Default ASR remains local.
@@ -103,7 +107,17 @@ receive a stable `docs_topic` and a safe fallback message, never private excepti
 | `HOST_MEMORY_EXHAUSTED` | The machine ran out of system memory, so the engine could not finish. Close other memory-heavy apps, unload unused models with **Flush models**, render a shorter passage, or select a lighter TTS engine. On Windows, enlarging the page file also helps. A CPU-only machine has no GPU memory to free — this is RAM, not VRAM. |
 | `WINDOWS_APP_CONTROL_BLOCKED` | Windows application control blocked a required file. Ask the administrator to allow the trusted VoiceStudio runtime, then restart the app. |
 | `AUDIO_IO_FAILED` | Check the audio format, free disk space, and file permissions; review the folder in Settings → Storage. |
+| `ENGINE_DEPENDENCY_MISSING` | A Python package the engine imports is not installed. Open Model Catalogue, select the engine and use **Install / Repair**, then restart VoiceStudio. Terminal: retrying the same request fails the same way. |
+| `REFERENCE_STT_MISSING` | The voice has no transcript and no speech-to-text model is installed to write one. Type the reference clip's words into the transcript box (clips up to 20 seconds), or install and select a speech-to-text model in Model Catalogue. |
 | `HF_MIRROR_UNREACHABLE` | The configured Hugging Face mirror could not be reached while fetching the engine's weights. Restore the official endpoint in Settings → Models → Hugging Face mirror, then retry. |
+
+Every unclassified 500 also carries `error_type` (the Python exception class, never
+its message), and bug reports record it as "Backend error class" together with the
+"Backend failure topic". A reverse proxy that times out (`502`/`504` with its own HTML
+page) is reported as a proxy problem, not a VoiceStudio one: raise its read timeout
+(for nginx, `proxy_read_timeout`) for long generations. Choosing the best 15-second
+window of a long reference clip happens before the generate time budget starts, so a
+slow CPU speech-to-text model no longer causes `TTS generate exceeded 300s`.
 
 Unsupported GPU builds and application-control blocks are terminal for the current
 stream: the client does not automatically render the whole passage again. After
@@ -263,11 +277,11 @@ before the token works for downloads.
 
 **Fix:**
 
-1. Open **Settings → API Keys** in the app and paste a working HF token (or set
+1. Open **Settings → Credentials** in the app and paste a working HF token (or set
    `HF_TOKEN` in your env). See [docs/setup/huggingface-token.md](../setup/huggingface-token.md).
 2. Visit https://huggingface.co/pyannote/speaker-diarization-3.1 while signed
    in with the same HF account → click **"Agree and access repository"**.
-3. Retry the job. The token state in **Settings → API Keys** should now show
+3. Retry the job. The token state in **Settings → Credentials** should now show
    the "App" row with a green check next to your username.
 
 If the token and license are already valid but an older build still reports
@@ -292,7 +306,7 @@ itself does not grant access.
 1. Visit https://huggingface.co/kyutai/pocket-tts while signed in, review the
    license and prohibited-use conditions, share the requested contact details,
    and accept the conditions.
-2. Open **Settings → API Keys** and save a read token from that same account.
+2. Open **Settings → Credentials** and save a read token from that same account.
 3. Open **Model Catalogue**, review and accept the PocketTTS terms locally,
    then retry. VoiceStudio stores this acknowledgement only on your machine.
 
@@ -844,6 +858,14 @@ rather than failing with "Can't reach the local backend". Nothing to do — it
 clears itself as soon as the job releases the event loop. If the dot turns
 **red** and names an exit code, that is a real crash; use the sections above.
 
+The backend also never waits on its own log output: stdout/stderr go through a
+bounded buffer when the shell reads them through pipes, so a slow log reader (a
+model download's progress bar, a busy shell) can no longer freeze the event
+loop. If the buffer overflows, the log shows one `[log] N output chunk(s)
+dropped` line. Set `OMNIVOICE_BLOCKING_STDIO=1` to restore plain blocking
+writes. When the loop does stall, the backend log names the blocking call
+(`OMNIVOICE_LOOP_STALL_S`, default 4 s, `0` disables).
+
 **Two things changed here** ([#1190](https://github.com/debpalash/VoiceStudio/issues/1190)):
 
 - **Waiting in line is no longer counted as compute.** The generate budget used
@@ -1322,6 +1344,18 @@ the message:
   blocked executable. Add VoiceStudio's runtime folder to your antivirus
   exclusions (Windows Security → Virus & threat protection → Manage settings →
   Exclusions) and make sure it is not inside OneDrive, then retry.
+- **`… spawn UNKNOWN. Windows Smart App Control blocked it.`** — Smart App
+  Control (Windows 11) blocks programs without a known reputation, including the
+  runtime's `python.exe`; Event Viewer → Applications and Services Logs →
+  Microsoft → Windows → CodeIntegrity → Operational shows event 3077 for it.
+  Unlike antivirus it has **no per-app exceptions**, so an exclusion cannot help.
+  Either turn it off (Windows Security → App & browser control → Smart App
+  Control settings; Windows cannot turn it back on without a reset) or connect
+  VoiceStudio to an engine running on another computer. The app says this only
+  when it reads Smart App Control as on or in evaluation
+  (`VerifiedAndReputablePolicyState` 1 or 2 under
+  `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy`); otherwise it shows the
+  antivirus advice above (#3224).
 - **`Backend did not answer on port 3900 within N s`** — the wait for the
   backend ran out. The budget (`OMNIVOICE_STARTUP_BUDGET_S`) now starts when the
   backend process is spawned, not when the launch began, defaults to 300 s (600 s
@@ -1332,15 +1366,17 @@ the message:
   ran out of time is treated as inconclusive instead of sending an intact
   runtime back to the setup screen. The first start after an install is the
   slowest because antivirus scans every new file; later starts are much faster.
+- **Installed app, Python environment deleted** (antivirus, disk cleanup, interrupted update): VoiceStudio rebuilds it by itself on the next launch with the normal setup progress screen, once per launch. If that repair fails the setup screen says so; check the engine log and press Retry. Your voices and projects are never touched.
 - **`The Python environment in <folder> is missing`** or **`… is incomplete:
   <reason>`** (running from a source checkout) — run `bun run setup:api` in the
-  repository and let it finish. *Missing* means no `.venv` exists yet.
+  repository and let it finish (the message names the folder to open the terminal in; it is never taken from the terminal's working directory, so running from `C:\Windows\System32` does not matter). A folder without `pyproject.toml` is not a source checkout: install from the release installer instead. *Missing* means no `.venv` exists yet.
   *Incomplete* quotes the import that failed, e.g. `ModuleNotFoundError: No
   module named 'sentencepiece'` (setup did not finish: rerun it) or `ImportError:
   DLL load failed` (Windows: rerun setup, which installs the Visual C++
   runtime). If the folder is inside OneDrive, Dropbox, iCloud Drive or Google
   Drive, move the checkout to a plain local folder first: online-only
-  placeholders and file locking break the Python environment.
+  placeholders and file locking break the Python environment. The same applies to `error loading dynamically imported module: http://localhost:3902/@fs/…/node_modules/.vite/deps/…` from a dev server running inside OneDrive (installed builds never load from a dev server).
+- **`EPERM: operation not permitted, rename …\.previous-backend`** — a scanner or OneDrive held the runtime folder while VoiceStudio refreshed it. The app retries for about 10 s, then updates the files in place; if it still fails, exclude the runtime folder from antivirus and quit any VoiceStudio left in Task Manager.
 
 A native crash (`3221225477`, `-1073741819`) right after pressing Generate
 shortly after launch was caused by the startup preload and the first generation
@@ -1383,4 +1419,32 @@ If an older installer exits with code `3221225477` at this probe, install the
 updated desktop build and retry **Install local runtime**. CPU and ROCm setup
 now skip the native CUDA compatibility probe; runtime imports are still verified
 before setup finishes. If verification also fails, include the new setup log in
-your report rather than deleting saved voices or projects.
+your report rather than deleting saved voices or projects. The probe is also
+advisory now: if it still crashes natively, setup continues and the import
+verification decides whether the runtime works.
+
+The import verification now prints `VOICESTUDIO_IMPORT=<module>` before loading
+each runtime module, and a crash names the module in the error (`the import
+check stopped while importing "<module>"`). Include that line from the setup log
+in your report: the last `VOICESTUDIO_IMPORT=` line is the module that crashed.
+
+### "Backend exited unexpectedly (exit code 3221225477)" while loading a model
+
+A cut-off model download makes Windows kill the backend with an access violation
+(`0xC0000005`) when the weights are read. VoiceStudio now checks each
+`.safetensors` file's header against its size before loading and re-downloads a
+truncated file automatically. If you point `OMNIVOICE_CHECKPOINT` at your own
+folder, it names the incomplete file instead; delete it and download it again.
+
+### "Backend is running but busy / not responding on port 3900"
+
+If the log shows `Event loop has not run for N s`, the stack dump right below it
+names the call that blocked the backend; include it in your report. Set
+`OMNIVOICE_LOOP_STALL_S` to change the 4 s threshold (`0` turns it off).
+
+### Backend exits with code 3 and "[Errno 13] error while attempting to bind"
+
+Windows or another program refused access to the port, often a reserved range
+(Hyper-V, WSL, Docker). Check with
+`netsh interface ipv4 show excludedportrange protocol=tcp`, then set
+`OMNIVOICE_PORT` to a different free port.

@@ -26,6 +26,7 @@ const mock = vi.hoisted(() => ({
   open: vi.fn().mockResolvedValue(undefined),
   updateState: vi.fn(),
   backendStatus: vi.fn(),
+  hostSnapshot: vi.fn(),
   navigate: vi.fn(),
 }));
 vi.mock('@/lib/api/client', () => ({ apiJson: mock.api }));
@@ -35,7 +36,7 @@ vi.mock('./bridge', () => ({
       ? {
           files: { openExternal: mock.open },
           updates: { getState: mock.updateState },
-          backend: { getStatus: mock.backendStatus },
+          backend: { getStatus: mock.backendStatus, getHostSnapshot: mock.hostSnapshot },
         }
       : null,
 }));
@@ -52,6 +53,7 @@ beforeEach(() => {
     progress: 0,
   });
   mock.backendStatus.mockResolvedValue(null);
+  mock.hostSnapshot.mockResolvedValue(null);
 });
 afterEach(() => {
   cleanup();
@@ -155,6 +157,46 @@ it('includes the durable native crash journal when the backend API is unavailabl
   expect(body).toContain('durable native failure');
 });
 
+it('names the exact build, not just the version', async () => {
+  mock.api.mockRejectedValue(new Error('offline'));
+  render(<ReportBug />);
+  fireEvent.click(screen.getByRole('button', { name: 'reportBug.label' }));
+  await waitFor(() => expect(mock.open).toHaveBeenCalledTimes(1));
+  const body = new URL(mock.open.mock.calls[0]![0]).searchParams.get('body')!;
+  expect(body).toMatch(/\*\*App:\*\* VoiceStudio \S+ \(build [0-9a-f]{9}\)/);
+});
+it('describes the machine and runtime from the app when the backend never started (#3156)', async () => {
+  mock.api.mockRejectedValue(new Error('offline'));
+  mock.hostSnapshot.mockResolvedValue({
+    os: 'win32 Windows 11 Pro (10.0.26100)',
+    arch: 'x64',
+    ramGb: 32,
+    diskFreeGb: 12.5,
+    runtime: { pythonPresent: false, uvPresent: true, pathFlags: ['onedrive', 'non-ascii'] },
+  });
+  render(<ReportBug />);
+  fireEvent.click(screen.getByRole('button', { name: 'reportBug.label' }));
+  await waitFor(() => expect(mock.open).toHaveBeenCalledTimes(1));
+  const body = new URL(mock.open.mock.calls[0]![0]).searchParams.get('body')!;
+  expect(body).toContain('os (app): win32 Windows 11 Pro (10.0.26100)');
+  expect(body).toContain('runtime python: MISSING');
+  expect(body).toContain('runtime path flags: onedrive, non-ascii');
+});
+it('does not repeat machine facts the backend already reported', async () => {
+  mock.api.mockImplementation((path: string) =>
+    Promise.resolve(path === '/system/info' ? { platform: 'linux' } : {}),
+  );
+  mock.hostSnapshot.mockResolvedValue({
+    os: 'linux 6.1',
+    runtime: { pythonPresent: true, uvPresent: true, pathFlags: [] },
+  });
+  render(<ReportBug />);
+  fireEvent.click(screen.getByRole('button', { name: 'reportBug.label' }));
+  await waitFor(() => expect(mock.open).toHaveBeenCalledTimes(1));
+  const body = new URL(mock.open.mock.calls[0]![0]).searchParams.get('body')!;
+  expect(body).not.toContain('os (app)');
+  expect(body).toContain('runtime python: present');
+});
 it('labels the previous unclean shutdown separately and does not acknowledge it', async () => {
   mock.api.mockImplementation((path: string) =>
     Promise.resolve(

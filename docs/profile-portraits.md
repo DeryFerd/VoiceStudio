@@ -73,7 +73,8 @@ The save-profile view uses the editor's full content width. New uploaded or
 recorded references use the selected local dictation pipeline (including its
 configured Parakeet/Whisper fallback). Installed-model readiness is checked before
 transcription; no model downloads are initiated. Missing models leave manual
-transcript entry available. ASR never overwrites text edited while it runs.
+transcript entry available, next to an install button for the recommended model
+(a download starts only when you click it, then transcription retries). ASR never overwrites text edited while it runs.
 Saving waits for transcription; using the reference without saving remains possible.
 
 Saved-voice pencil buttons, and **Edit voice** on the selected voice in the

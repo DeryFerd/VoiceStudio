@@ -17,13 +17,14 @@ export function OutputPanel() {
   if (!result || !objectUrl) return null;
 
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  const playbackUrl = result.audioPath ? audioUrl(result.audioPath) : objectUrl;
 
   return (
     <section
       aria-label={t('clone.output_title')}
-      className="w-full shrink-0 border-t border-border/60 bg-muted/15 px-6 py-3"
+      className="w-full shrink-0 border-t border-border/60 bg-muted/15 px-6 py-2"
     >
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-3">
           <SectionLabel>
             <AudioLinesIcon aria-hidden="true" />
@@ -50,23 +51,20 @@ export function OutputPanel() {
         </div>
         {result && objectUrl ? (
           <>
-            <WaveformPlayer key={objectUrl} src={objectUrl} source="output" height={36} />
-            <AudioFileDetails blob={result.blob} />
-            {result.audioPath && <AudioQuality key={objectUrl} audioPath={result.audioPath} />}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <p
-                className="line-clamp-2 min-w-40 flex-1 text-sm text-muted-foreground"
-                title={text}
-              >
-                {text}
-              </p>
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            <WaveformPlayer key={objectUrl} src={playbackUrl} source="output" height={36} />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <AudioFileDetails blob={result.blob} />
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {t('clone.output_meta', {
                   duration: formatSeconds(result.durationSeconds),
                   gen: formatSeconds(result.genTimeSeconds),
                 })}
               </span>
+              {result.audioPath && <AudioQuality key={objectUrl} audioPath={result.audioPath} />}
             </div>
+            <p className="line-clamp-2 text-sm text-muted-foreground" title={text}>
+              {text}
+            </p>
           </>
         ) : (
           <div className="flex min-h-24 items-center justify-center rounded-lg border border-dashed text-[length:var(--text-label)] text-muted-foreground">

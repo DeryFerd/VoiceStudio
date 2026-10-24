@@ -36,7 +36,7 @@ def test_both_ghcr_paths_are_published_by_both_builds():
 
 def test_current_release_tags_are_backfilled_for_both_gpu_flavors():
     text = open(WORKFLOW, encoding="utf-8").read()
-    assert text.count('[[ "$RELEASE_REF" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+$ ]]') == 2
+    assert text.count('[[ "$RELEASE_REF" =~ ^v[0-9]+\\.[0-9]+\\.[0-9]+(-beta\\.[0-9]+)?$ ]]') == 2
     assert text.count('${RELEASE_REF}^{commit}') == 2
     assert text.count('VERSION="${RELEASE_REF#v}"') == 4
     assert text.count("test \"$PACKAGE_VERSION\" = '1.0.0'") == 2

@@ -236,7 +236,7 @@ export class LiveDictation {
     }
     if (message.type === 'partial') {
       this.publish({
-        text: [...this.committed, message.text || ''].filter(Boolean).join(' '),
+        text: [...this.committed, message.text || ''].filter((part) => part.trim()).join(' '),
       });
       return;
     }
@@ -245,7 +245,10 @@ export class LiveDictation {
     const kind = message.final_kind === undefined ? 'summary' : classifySherpaFinal(message);
     const text = message.refined_text || message.text || '';
     if (kind === 'utterance') {
-      this.committed.push(text);
+      // Silence arrives as empty finals; committing them would add a separator per pause (#3154).
+      const clean = text.trim();
+      if (!clean) return;
+      this.committed.push(clean);
       this.publish({ text: this.committed.join(' ') });
       try {
         this.onResult(message);

@@ -20,7 +20,7 @@ the model's license once.
 
 1. Get a HF token if you don't have one — see
    [docs/setup/huggingface-token.md](../setup/huggingface-token.md).
-2. Set the token via **Settings → API Keys** (or any of the other supported
+2. Set the token via **Settings → Credentials** (or any of the other supported
    paths).
 3. While signed in to HuggingFace with the same account, visit:
    - https://huggingface.co/pyannote/speaker-diarization-3.1 → **"Agree and

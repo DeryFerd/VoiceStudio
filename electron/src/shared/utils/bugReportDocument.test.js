@@ -33,6 +33,25 @@ describe('composeBugReportUrl', () => {
     expect(bodyOf({ error })).toContain('Backend error class: RuntimeError');
   });
 
+  it('reports the exception type and diagnosis topic of a 500 body (#2917)', () => {
+    const error = new Error('VoiceStudio hit an internal error');
+    error.payload = {
+      error_class: 'UNKNOWN',
+      error_type: 'RuntimeError',
+      docs_topic: 'ENGINE_DEPENDENCY_MISSING',
+    };
+    const body = bodyOf({ error });
+    expect(body).toContain('Backend error class: RuntimeError');
+    expect(body).toContain('Backend failure topic: ENGINE_DEPENDENCY_MISSING');
+    expect(body).not.toContain('UNKNOWN');
+  });
+
+  it('reads the topic of a structured detail', () => {
+    const error = new Error('boom');
+    error.payload = { detail: { docs_topic: 'REFERENCE_STT_MISSING' } };
+    expect(bodyOf({ error })).toContain('Backend failure topic: REFERENCE_STT_MISSING');
+  });
+
   it('prefers an explicit errorClass over the payload', () => {
     const error = new Error('boom');
     error.errorClass = 'ValueError';

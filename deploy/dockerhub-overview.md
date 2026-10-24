@@ -124,6 +124,7 @@ see the [Docker install guide](https://github.com/debpalash/VoiceStudio/blob/mai
 | `:sha-xxxxxxx` | Exact commit — produced by every image build (main, releases, manual runs) |
 | `:rocm` | **AMD GPU (ROCm) build** of the rolling preview — the ROCm analogue of `:latest` |
 | `:stable-rocm`, `:0.5.6-rocm`, `:0.5-rocm`, `:sha-xxxxxxx-rocm` | ROCm builds of the corresponding tags above |
+| `:beta`, `:0.5.9-beta.1` | Newest beta prerelease and its exact version. A beta never moves `:stable` or `:0.5`; `-rocm` forms exist too (`:beta-rocm`) |
 
 Release tags are published only when the GitHub Release is published.
 Preview builds always come from `main` and never version-sort below `:stable`,

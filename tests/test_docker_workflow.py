@@ -77,7 +77,8 @@ def test_token_published_releases_still_publish_images():
     runs = "\n".join(step.get("run", "") for step in job["steps"])
     assert "gh workflow run docker.yml" in runs
     assert "backfill_release=true" in runs
-    assert "promote_stable=true" in runs
+    # Stable promotes :stable; a beta dispatches the same path with promotion off.
+    assert 'promote_stable="$PROMOTE"' in runs and "PROMOTE=true" in runs
     # Every -f key must be a real docker.yml dispatch input, or the run fails at publish time.
     command = runs[runs.index("gh workflow run docker.yml"):]
     command = command[: command.find("\n", command.find("promote_stable"))]

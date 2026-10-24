@@ -5,6 +5,7 @@ import { formatBreadcrumbs } from '@shared/utils/breadcrumbs';
 import { contactAge, lastBackendContact } from '@shared/utils/backendContact';
 import { clampCrashTail } from '@shared/utils/crashReport';
 import { scrubText } from '@shared/utils/scrub';
+import { formatHostSnapshot, withDeadline } from '@shared/utils/hostSnapshot';
 import { describeExitCode, isNativeFaultExit } from '@shared/utils/nativeExit';
 import {
   _adaptLastRunCrash,
@@ -98,7 +99,7 @@ export function ReportBug({ error }: { error?: Error | string }) {
         popup.opener = null;
       }
       const signal = AbortSignal.timeout(2500);
-      const [system, engines, previous, nativeStatus, currentLogs] = await Promise.allSettled([
+      const [system, engines, previous, nativeStatus, currentLogs, host] = await Promise.allSettled([
         apiJson<Record<string, unknown>>('/system/info', { signal }),
         apiJson<{ tts?: { active?: string }; asr?: { active?: string } }>('/engines', { signal }),
         apiJson<{ record: LastRunCrashRecord | null; acknowledged: boolean }>(
@@ -109,12 +110,17 @@ export function ReportBug({ error }: { error?: Error | string }) {
         error
           ? apiJson<{ lines?: unknown[] }>('/system/logs?tail=120', { signal })
           : Promise.resolve(null),
+        // A stalled network drive must not hold the report hostage.
+        withDeadline(bridge?.backend?.getHostSnapshot?.() ?? Promise.resolve(null), 3000),
       ]);
       const backend =
         nativeStatus.status === 'fulfilled' && nativeStatus.value
           ? nativeStatus.value
           : cachedBackend;
-      const context = ['**App:** VoiceStudio ' + __APP_VERSION__, '**Shell:** Electron'];
+      const context = [
+        `**App:** VoiceStudio ${__APP_VERSION__} (build ${__BUILD_COMMIT__})`,
+        '**Shell:** Electron',
+      ];
       if (staleBuild) {
         context.push(
           `**Build status:** OUTDATED — v${staleBuild.latest} was already available when this was filed`,
@@ -123,6 +129,7 @@ export function ReportBug({ error }: { error?: Error | string }) {
       if (system.status === 'fulfilled') {
         for (const key of [
           'platform',
+          'build_commit',
           'arch',
           'os_version',
           'python',
@@ -138,6 +145,12 @@ export function ReportBug({ error }: { error?: Error | string }) {
             context.push(key + ': ' + value);
         }
       }
+      // Read by the app itself, so it survives a backend that never started.
+      context.push(
+        ...formatHostSnapshot(host.status === 'fulfilled' ? host.value : null, {
+          machine: system.status !== 'fulfilled',
+        }).map((line) => scrubText(line)),
+      );
       if (engines.status === 'fulfilled' && engines.value.tts?.active)
         context.push('TTS: ' + engines.value.tts.active);
       if (engines.status === 'fulfilled' && engines.value.asr?.active)

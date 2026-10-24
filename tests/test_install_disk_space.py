@@ -34,21 +34,21 @@ def test_rejects_when_download_exceeds_free_space(models_mod, monkeypatch):
     assert msg is not None
     assert "50.0 GB" in msg          # needs X
     assert "20.0 GB" in msg          # have Z
-    assert f"{models_mod.MIN_FREE_GB} GB" in msg  # headroom named
+    assert f"{models_mod.INSTALL_HEADROOM_GB} GB" in msg  # headroom named
     assert "/fake/cache" in msg      # where
 
 
 def test_rejects_when_download_plus_headroom_exceeds_free(models_mod, monkeypatch):
-    # Fits the raw bytes but NOT the MIN_FREE_GB headroom on top → still rejected,
+    # Fits the raw bytes but NOT the INSTALL_HEADROOM_GB headroom on top → still rejected,
     # so "Install all" can't fill the disk to the brim.
-    monkeypatch.setattr(models_mod, "disk_free_bytes", lambda *a, **k: 12 * _GIB)
-    msg = models_mod.disk_space_error(5 * _GIB)  # 5 + 10 headroom = 15 > 12 free
+    monkeypatch.setattr(models_mod, "disk_free_bytes", lambda *a, **k: 6 * _GIB)
+    msg = models_mod.disk_space_error(5 * _GIB)  # 5 + 2 headroom = 7 > 6 free
     assert msg is not None
     assert "5.0 GB" in msg
 
 
 def test_allows_when_enough_space(models_mod, monkeypatch):
-    # 5 GB download + 10 GB headroom = 15 GB required, 100 GB free → proceeds.
+    # 5 GB download + 2 GB headroom = 7 GB required, 100 GB free → proceeds.
     monkeypatch.setattr(models_mod, "disk_free_bytes", lambda *a, **k: 100 * _GIB)
     assert models_mod.disk_space_error(5 * _GIB) is None
 
@@ -225,4 +225,10 @@ def test_catalogue_reports_the_headroom_the_install_guard_enforces(models_mod, m
         out = models_mod.list_models()
     finally:
         models_mod.invalidate_cache()
-    assert out["disk_headroom_gb"] == models_mod.MIN_FREE_GB
+    assert out["disk_headroom_gb"] == models_mod.INSTALL_HEADROOM_GB
+
+
+def test_small_model_fits_on_a_nearly_full_disk(models_mod, monkeypatch):
+    # 3.9 GB free is enough for a 1 GB model; the old 10 GB headroom refused it.
+    monkeypatch.setattr(models_mod, "disk_free_bytes", lambda *a, **k: int(3.9 * _GIB))
+    assert models_mod.disk_space_error(1 * _GIB) is None

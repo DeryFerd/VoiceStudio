@@ -92,14 +92,11 @@ public struct DubHistoryItem: Codable, Identifiable, Sendable {
     public let duration: Double?
     public let created_at: Double?
     public var title: String { filename?.nilIfBlank ?? id }
-    public func metadata(locale: Locale) -> String {
-        var parts = [String]()
-        if let language = language?.nilIfBlank ?? language_code?.nilIfBlank { parts.append(language) }
-        if let duration, duration.isFinite, duration > 0 { parts.append(PlaybackTime.format(duration)) }
-        if let created_at, created_at.isFinite {
-            parts.append(Date(timeIntervalSince1970: created_at).formatted(.dateTime.day().month(.abbreviated).year().locale(locale)))
-        }
-        return parts.isEmpty ? id : parts.joined(separator: " · ")
+    public func metadata(l10n: L10n) -> String {
+        l10n.t("mobile.dub.history_meta", [
+            "language": language?.nilIfBlank ?? l10n.t("mobile.android.stage_done"),
+            "duration": PlaybackTime.format(duration ?? 0)
+        ])
     }
 }
 public struct Readiness: Decodable, Sendable {

@@ -213,6 +213,11 @@ export const usageRoute = createRoute({
   path: '/settings/usage',
   component: SettingsPage,
 });
+export const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings/account',
+  component: SettingsPage,
+});
 export const privacyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings/privacy',
@@ -267,6 +272,7 @@ export const routeTree = rootRoute.addChildren([
   proRoute,
   storageRoute,
   privacyRoute,
+  accountRoute,
   permissionsRoute,
   performanceRoute,
   usageRoute,

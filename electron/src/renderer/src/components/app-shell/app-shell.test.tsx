@@ -13,9 +13,10 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('./workspace-sidebar', () => ({
   WorkspaceSidebar: () => <aside data-testid="main-sidebar" />,
 }));
-vi.mock('./sponsor-footer', () => ({ SponsorFooter: () => null }));
+vi.mock('./context-sidebar', () => ({ ContextSidebar: () => null }));
 vi.mock('./repair-agent-dock', () => ({ RepairAgentDock: () => null }));
 vi.mock('./system-notifications', () => ({ SystemNotifications: () => null }));
+vi.mock('./account-corner', () => ({ AccountCorner: () => <div data-testid="account-corner" /> }));
 vi.mock('@/components/command-palette', () => ({ CommandPalette: () => null }));
 vi.mock('../backend-gate', () => ({ BackendGate: ({ children }: any) => <>{children}</> }));
 vi.mock('../bridge', () => ({ isMac: () => false }));
@@ -33,4 +34,10 @@ it('renders the main sidebar on workspace routes as before', () => {
   route.pathname = '/clone';
   render(<AppShell />);
   expect(screen.getByTestId('main-sidebar')).toBeInTheDocument();
+});
+
+it.each(['/clone', '/settings/account'])('shows the signed-in corner badge on %s', (pathname) => {
+  route.pathname = pathname;
+  render(<AppShell />);
+  expect(screen.getByTestId('account-corner')).toBeInTheDocument();
 });

@@ -54,7 +54,7 @@ class WorkerAvailabilityRegressionTest {
             val context=ApplicationProvider.getApplicationContext<Context>()
             val service=context.packageManager.getServiceInfo(android.content.ComponentName(context,
                 "androidx.work.impl.foreground.SystemForegroundService"),0)
-            assertEquals(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,service.foregroundServiceType)
+            assertTrue(service.foregroundServiceType and ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC != 0)
             try {worker.doWork();fail("Cancellation must propagate")} catch(expected:CancellationException) { }
             assertEquals(1,server.requestCount)
         } finally {server.shutdown()}
