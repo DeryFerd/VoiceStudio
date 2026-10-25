@@ -1,7 +1,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { FilmIcon } from 'lucide-react';
+import { MAC_TRAFFIC_LIGHTS_INLINE_END } from '@shared/utils/windowChrome';
 import { SecondarySidebar } from './workspace-sidebar';
+
+const platform = vi.hoisted(() => ({ mac: false }));
+vi.mock('@/components/bridge', () => ({ isMac: () => platform.mac }));
+vi.mock('@/hooks/use-window-fullscreen', () => ({ useWindowFullscreen: () => false }));
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -150,4 +155,62 @@ it('reports a retained library as inactive when its tab is hidden', () => {
   fireEvent.click(screen.getByRole('tab', { name: 'Projects' }));
   expect(screen.getByRole('textbox', { name: 'Load active' })).toBe(field);
   expect(field).toHaveValue('true');
+});
+
+it('insets its header beside the macOS traffic lights instead of moving it down', () => {
+  platform.mac = true;
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  // The column starts right of a 64px rail, still under the lights' reach.
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 64,
+  } as DOMRect);
+  render(
+    <SecondarySidebar title="Voice" icon={FilmIcon}>
+      <section>Body</section>
+    </SecondarySidebar>,
+  );
+  const header = document.querySelector<HTMLElement>('[data-slot="secondary-sidebar-header"]')!;
+  expect(header.style.paddingTop).toBe('');
+  expect(header.style.paddingInlineStart).toBe(`${MAC_TRAFFIC_LIGHTS_INLINE_END - 64 + 12}px`);
+  platform.mac = false;
+});
+
+it('leaves a column clear of the traffic lights untouched', () => {
+  platform.mac = true;
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 300,
+  } as DOMRect);
+  render(
+    <SecondarySidebar title="Voice" icon={FilmIcon}>
+      <section>Body</section>
+    </SecondarySidebar>,
+  );
+  const header = document.querySelector<HTMLElement>('[data-slot="secondary-sidebar-header"]')!;
+  expect(header.style.paddingInlineStart).toBe('');
+  platform.mac = false;
+});
+
+it('collapses to one expand control, leaving the titlebar row empty', () => {
+  render(
+    <SecondarySidebar title="Voice" icon={FilmIcon} collapsed onCollapsedChange={vi.fn()}>
+      <section>Body</section>
+    </SecondarySidebar>,
+  );
+  const header = document.querySelector<HTMLElement>('[data-slot="secondary-sidebar-header"]')!;
+  expect(header.querySelector('button')).toBeNull();
+  expect(screen.getAllByRole('button', { expanded: false })).toHaveLength(1);
+  expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-expanded', 'false');
 });

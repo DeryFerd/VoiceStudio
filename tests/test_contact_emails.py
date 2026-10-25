@@ -25,7 +25,9 @@ _TEST_PATH = re.compile(r"(^|/)(tests?|__tests__|fixtures)/|\.test\.[a-z]+$|_tes
 # Vendored copyright notices retain upstream identities, not project contacts.
 _NATIVE_LICENCE_PATH = re.compile(
     r"^mobile/(?:ios/VoiceStudio/Resources/NativeLicences/[^/]+\.txt"
-    r"|android/app/src/main/assets/licenses/native-[^/]+\.txt)$"
+    r"|android/app/src/main/assets/licenses/native-[^/]+\.txt"
+    # LAME (LGPL) is vendored unmodified for MP3 export; its source headers name its authors.
+    r"|ios/VoiceStudioKit/Sources/VSNative/Lame/.+)$"
 )
 
 

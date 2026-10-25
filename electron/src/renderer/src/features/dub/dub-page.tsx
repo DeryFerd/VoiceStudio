@@ -1,4 +1,5 @@
 import { DubProjects } from './dub-projects';
+import { segmentTimeLabel } from './segment-time-label';
 import { Menu } from '@base-ui/react/menu';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SecondarySidebar } from '@/components/workspace-sidebar';
@@ -2459,7 +2460,7 @@ export function DubPage() {
                               }
                             />
                             <span>
-                              {Number.isFinite(segment.start) ? segment.start.toFixed(1) : '?'}s
+                              {segmentTimeLabel(segment.start)}
                             </span>
                           </div>
                           <div className="min-w-0">

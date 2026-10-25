@@ -8,3 +8,6 @@
 #
 # RFC 6455 sample Sec-WebSocket-Key in the fake backend test (not a secret).
 f6d634e19902c0fd0e64947e635359d5bc1f85de:electron/tests/fake-health-backend.test.mjs:generic-api-key:59
+
+# Phone API curl documentation uses the literal YOUR_TOKEN placeholder, not a credential.
+97ee0f37079c06a8e2e80eb3625bc60885bc8a27:docs/mobile.md:curl-auth-header:114

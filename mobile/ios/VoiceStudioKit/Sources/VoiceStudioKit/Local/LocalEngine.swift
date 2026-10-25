@@ -90,6 +90,7 @@ func splitUtterances(text: String,tokens: [String],timestamps: [Double],ends: [D
     return pieces.count <= 1 ? single() : pieces
 }
 public protocol LocalEngine: Sendable {
+    func design(model: PhoneModel, text: String, instruction: String, seed: UInt64, progress: @escaping EngineProgressHandler) async throws -> LocalAudio
     func synthesize(model: PhoneModel, text: String, speaker: Int, speed: Float, progress: @escaping EngineProgressHandler) async throws -> LocalAudio
     func clone(model: PhoneModel, text: String, reference: PCMChunk, referenceText: String, progress: @escaping EngineProgressHandler) async throws -> LocalAudio
     func transcribe(model: PhoneModel, audio: PCMChunk, progress: @escaping EngineProgressHandler) async throws -> String
@@ -98,6 +99,7 @@ public protocol LocalEngine: Sendable {
     func translate(model: PhoneModel, text: String, sourceLanguage: String, targetLanguage: String, progress: @escaping EngineProgressHandler) async throws -> String
 }
 public extension LocalEngine {
+    func design(model: PhoneModel, text: String, instruction: String, seed: UInt64, progress: @escaping EngineProgressHandler) async throws -> LocalAudio { throw ClientError("mobile.local.model_incompatible") }
     func transcribeSegments(model: PhoneModel,audio: PCMChunk,progress: @escaping EngineProgressHandler = { _ in }) async throws -> [SpeechSegment] {
         let text = try await transcribe(model: model,audio: audio,progress: progress).trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? [] : [SpeechSegment(start: 0,end: Double(audio.samples.count)/Double(audio.sampleRate),text: text)]
@@ -153,6 +155,7 @@ private final class NativeConfiguration {
         value.codec = c(codec.isEmpty ? model.path(role: "tokenizer", root: root) : codec)
         value.threads = Int32(max(1, min(4, ProcessInfo.processInfo.activeProcessorCount)))
         value.sample_rate = Int32(model.config["sample_rate"]?.number ?? 16000)
+        value.cpu_only = NativeExecutionContext.compute == .cpuOnly ? 1 : 0
     }
     deinit { for p in strings { free(p) } }
 }
@@ -161,6 +164,8 @@ public actor NativeLocalEngine: LocalEngine {
     private let libraries: [ModelRuntime: String]
     public init(store: ModelStore, libraries: [ModelRuntime: String] = [:]) { self.store = store; self.libraries = libraries }
     public nonisolated static func runtimeAvailable(_ runtime: ModelRuntime, library: String = "") -> Bool { vs_runtime_available(runtime.rawValue, library) != 0 }
+    public nonisolated static func cpuRuntimeAvailable(_ runtime: ModelRuntime, library: String = "") -> Bool { vs_cpu_runtime_available(runtime.rawValue, library) != 0 }
+    public nonisolated static func cpuFallbackAvailable(models: [PhoneModel]) -> Bool { models.allSatisfy { cpuRuntimeAvailable($0.runtime) } }
     private static func check(_ rc: Int32) throws {
         switch rc {
         case 0: return
@@ -182,7 +187,7 @@ public actor NativeLocalEngine: LocalEngine {
         do { token = try NativeCancellation() } catch { await store.release(model); throw error }
         let library = libraries[model.runtime] ?? "", store = store
         // The worker owns both leases. Awaiter cancellation cannot release memory in use by C.
-        let work = Task.detached(priority: .userInitiated) {
+        let work = NativeExecutionContext.detached {
             do { try await NativeLease.shared.acquire() }
             catch { token.finish(); await store.release(model); throw error }
             let result: Result<T, any Error>
@@ -278,6 +283,15 @@ public actor NativeLocalEngine: LocalEngine {
             var output = VSAudio(); defer { vs_audio_free(&output) }
             let rc = reference.samples.withUnsafeBufferPointer { vs_clone(&config.value, text, referenceText, $0.baseAddress, Int32($0.count), token.pointer, &output) }
             try Self.check(rc); return try Self.audio(output)
+        }
+    }
+    public func design(model: PhoneModel, text: String, instruction: String, seed: UInt64, progress: @escaping EngineProgressHandler = { _ in }) async throws -> LocalAudio {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.utf16.count <= 2000, instruction.utf8.count <= 2000 else { throw ClientError("mobile.local.model_incompatible") }
+        return try await execute(model,capability: .clone,progress: progress) { m,root,library,token in
+            let config = NativeConfiguration(model: m,root: root,library: library)
+            var output = VSAudio(); defer { vs_audio_free(&output) }
+            try Self.check(vs_design(&config.value,text,instruction,seed,token.pointer,&output))
+            return try Self.audio(output)
         }
     }
     public func translate(model: PhoneModel, text: String, sourceLanguage: String, targetLanguage: String, progress: @escaping EngineProgressHandler = { _ in }) async throws -> String {

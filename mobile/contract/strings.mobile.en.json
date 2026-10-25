@@ -378,6 +378,12 @@
       "retry": "Try again",
       "rate_limited": "Too many reports from this network. Try again later.",
       "invalid": "This report couldn't be sent. Update the app and try again."
+    },
+    "production": {
+      "new": "New project",
+      "script_hint": "Use # Chapter title for chapters and [voice:Name] at the start of a line to switch character. Plain text only; other markup is read aloud.",
+      "conversion_hint": "Choose an audio clip up to 30 seconds. Conversion transcribes it and speaks it in the selected voice; it does not preserve the original performance.",
+      "normalize_text": "Clean up text"
     }
   }
 }

@@ -1,9 +1,11 @@
-import { KeyRoundIcon } from 'lucide-react';
+import { CircleCheckIcon, CircleXIcon, KeyRoundIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { apiJson } from '@/lib/api/client';
 import { SettingsSection, SettingsRow } from './settings-layout';
@@ -92,15 +94,20 @@ export function HuggingFaceToken() {
             {t(source.set ? 'settings.hf_token_set' : 'settings.hf_token_not_set')}
           </span>
           {source.set && source.masked && <code className="text-xs">{source.masked}</code>}
-          {source.set && (
-            <span className="text-xs text-muted-foreground">
-              {source.whoami_ok == null
-                ? t('settings.hf_token_not_checked')
-                : source.whoami_ok
-                  ? source.whoami_user || t('settings.hf_token_verified')
-                  : t('settings.hf_token_whoami_failed')}
-            </span>
-          )}
+          {source.set &&
+            (source.whoami_ok == null ? (
+              <span className="text-xs text-muted-foreground">{t('settings.hf_token_not_checked')}</span>
+            ) : source.whoami_ok ? (
+              <Badge variant="outline" className="border-success/40 bg-success/15 text-success-foreground">
+                <CircleCheckIcon />
+                {source.whoami_user || t('settings.hf_token_verified')}
+              </Badge>
+            ) : (
+              <Badge variant="destructive">
+                <CircleXIcon />
+                {t('settings.hf_token_whoami_failed')}
+              </Badge>
+            ))}
           {query.data?.active === source.source && (
             <span className="rounded bg-primary/10 px-2 py-1 text-xs text-primary">
               {t('settings.hf_token_active')}
@@ -109,16 +116,18 @@ export function HuggingFaceToken() {
         </SettingsRow>
       ))}
       <form
-        className="flex flex-wrap gap-2 p-4"
+        className="space-y-1.5 p-4"
         onSubmit={(event) => {
           event.preventDefault();
           if (token.trim() && !busy) void save();
         }}
       >
+        <Label htmlFor="hf-token-input">{t('settings.hf_token_input')}</Label>
+        <div className="flex flex-wrap gap-2">
         <Input
+          id="hf-token-input"
           className="min-w-48 flex-1"
           type="password"
-          aria-label={t('settings.hf_token_input')}
           placeholder="hf_…"
           value={token}
           autoComplete="new-password"
@@ -143,6 +152,7 @@ export function HuggingFaceToken() {
             {t('settings.hf_token_clear_btn')}
           </Button>
         )}
+        </div>
       </form>
       {clearOpen && (
         <div className="space-y-3 p-4">
@@ -215,7 +225,11 @@ function ProviderCredential({ field }: { field: (typeof PROVIDER_FIELDS)[number]
     });
   return (
     <div>
-      <SettingsRow id={'credential-' + field.key} title={label} description={t(field.helpKey)}>
+      <SettingsRow
+        id={'credential-' + field.key}
+        title={label}
+        description={<span className="text-muted-foreground">{t(field.helpKey)}</span>}
+      >
         <form
           className="flex flex-wrap gap-2"
           onSubmit={(event) => {
@@ -228,6 +242,11 @@ function ProviderCredential({ field }: { field: (typeof PROVIDER_FIELDS)[number]
             autoComplete="new-password"
             spellCheck={false}
             aria-label={label}
+            placeholder={
+              field.placeholderKey
+                ? t(field.placeholderKey)
+                : (field.placeholder ?? (field.isPassword ? '••••••••••••' : undefined))
+            }
             value={value}
             disabled={action.busy}
             onChange={(event) => {

@@ -408,3 +408,18 @@ def test_android_home_contributors_match_electron_snapshot():
     assert set(android_core) == set(core) == {"debpalash", "velixio"}
     for login in electron:  # the Gradle catalog task copies these into the APK assets
         assert list((ROOT / "electron/src/renderer/src/features/home/contributors").glob(f"{login}.*"))
+
+
+@pytest.mark.skipif(shutil.which("bun") is None, reason="needs bun")
+def test_mobile_voice_design_traits_match_electron():
+    result = subprocess.run(["bun", "scripts/export-mobile-design.ts", "--check"], cwd=ROOT, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    catalogue = json.loads((CONTRACT / "design.json").read_text())
+    locales = [json.loads(path.read_text()) for path in (ROOT / "electron/src/renderer/src/i18n/locales").glob("*.json")]
+    for category in catalogue["categories"]:
+        for key in [category["label"], *[option["label"] for option in category["options"]]]:
+            for locale in locales:
+                value = locale
+                for part in key.split("."):
+                    value = value[part]
+                assert isinstance(value, str) and value

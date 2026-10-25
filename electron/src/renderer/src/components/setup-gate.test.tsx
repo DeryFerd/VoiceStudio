@@ -170,3 +170,12 @@ it('the privacy step also waits for the account choice when accounts are offered
     expect(screen.getByRole('button', { name: 'setup.continue_ok' })).toBeEnabled(),
   );
 });
+it('lets a long footer label wrap instead of clipping the Next button', async () => {
+  mock.ready = false;
+  mount();
+  await screen.findByText('Preflight');
+  for (const name of ['setup.back', 'setup.continue_ok']) {
+    const button = screen.getByRole('button', { name });
+    expect(button).toHaveClass('whitespace-normal', 'h-auto');
+  }
+});

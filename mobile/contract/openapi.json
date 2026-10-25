@@ -5508,6 +5508,17 @@
    },
    "_SettingsBody": {
     "properties": {
+     "allow_remote_control": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Allow Remote Control"
+     },
      "disclosure_template": {
       "anyOf": [
        {
@@ -9198,6 +9209,25 @@
      }
     },
     "summary": "Place Call",
+    "tags": [
+     "calls"
+    ]
+   }
+  },
+  "/calls/options": {
+   "get": {
+    "operationId": "get_options_calls_options_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Get Options",
     "tags": [
      "calls"
     ]

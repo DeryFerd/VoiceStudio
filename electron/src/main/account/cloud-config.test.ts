@@ -58,10 +58,10 @@ it('lists exactly the origins the app may contact', () => {
 
 it('lands on the dashboard after sign-in and links to its profile and plan pages', () => {
   const dev = resolveCloudEnvironment({ packaged: false, requested: 'dev' });
-  expect(dev.signedInPage).toBe('https://dev-app.voicestudio.sh/app/desktop-signed-in');
+  expect(dev.signedInPage).toBe('https://dev-app.voicestudio.sh/desktop-signed-in');
   expect(dashboardLinks(resolveCloudEnvironment({ packaged: true }))).toEqual({
-    profile: 'https://app.voicestudio.sh/app/settings/profile',
-    plan: 'https://app.voicestudio.sh/app/settings/plan',
+    profile: 'https://app.voicestudio.sh/settings/profile',
+    plan: 'https://app.voicestudio.sh/settings/plan',
   });
 });
 

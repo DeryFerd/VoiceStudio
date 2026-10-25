@@ -91,7 +91,7 @@ class PhoneDubTest {
         val pipeline=PhoneDubPipeline(store,engine,decoder,media)
         try {pipeline.run(request.id,models);fail()} catch(_:CancellationException) {}
         assertEquals(1,store.checkpoint(request.id).renders.size)
-        store.file(request.id,"render-0-0.pcm").writeText("damaged")
+        store.file(request.id,requireNotNull(store.checkpoint(request.id).renders.first().file)).writeText("damaged")
         pipeline.run(request.id,models)
         assertEquals(4,engine.calls);assertEquals(2,engine.translated)
     }
@@ -170,4 +170,133 @@ class PhoneDubTest {
         val samples=mixed.read(0,7200).samples
         assertTrue(samples.take(2400).all {it==1f});assertTrue(samples.slice(2400 until 4800).all {it==0f});assertTrue(samples.drop(4800).all {it==.8f})
     }
+
+    @Test fun editsInvalidateRendersAndOverrideDefaultVoice()=runTest {
+        val store=store();val source=File(temporary.root,"source.wav").apply {writeText("fixture")}
+        val request=store.create(source,"Source",targets.take(1),models,true,LocalAudio(FloatArray(4800) {.25f},24000),"Default voice",true)
+        val references=mutableListOf<String>();var clones=0;var translations=0
+        val engine=object: FakeLocalEngine() {
+            override suspend fun transcribeSegments(model: PhoneModel,audio: LocalAudio,progress: (Float)->Unit)=listOf(SpeechSegment(0.0,1.0,"First"),SpeechSegment(2.0,3.0,"Second"))
+            override suspend fun translate(model: PhoneModel,text: String,targetLanguage: String,progress: (Float)->Unit): String {translations++;return "Translated"}
+            override suspend fun clone(model: PhoneModel,text: String,reference: LocalAudio,referenceText: String,progress: (Float)->Unit): LocalAudio {clones++;references+=referenceText;return LocalAudio(FloatArray(12000) {.5f},24000)}
+        }
+        val pipeline=PhoneDubPipeline(store,engine,decoder,media)
+        val complete=pipeline.run(request.id,models)
+        assertTrue(complete.done);assertTrue(store.file(request.id,"original.pcm").exists())
+        val edits=complete.segments.toMutableList().also {it[0]=it[0].copy(speech=it[0].speech.copy(start=.05),translations=mapOf("fr" to "Edited translation"))}
+        store.edit(request.id,edits,mapOf(0 to (LocalAudio(FloatArray(4800) {.3f},24000) to "Replacement voice")))
+        assertEquals(complete.outputs,store.checkpoint(request.id).outputs)
+        assertTrue(pipeline.run(request.id,models).done)
+        assertEquals(3,clones);assertEquals(2,translations);assertEquals("Replacement voice",references[2])
+        try {store.edit(request.id,edits.toMutableList().also {it[0]=it[0].copy(speech=it[0].speech.copy(start=-1.0))});fail()} catch(_:IllegalArgumentException) {}
+        assertTrue(store.checkpoint(request.id).done)
+    }
+    @Test fun oneEditedTranslationReusesAllOtherSegmentsAndLanguageOutputs()=runTest {
+        val store=store();val request=request(store);val engine=Engine();val pipeline=PhoneDubPipeline(store,engine,decoder,media)
+        val complete=pipeline.run(request.id,models)
+        val edited=complete.segments.toMutableList().also {it[0]=it[0].copy(translations=it[0].translations+("fr" to "Edited French line"))}
+        val originalPreview=store.preview(request.id,edited[0],"fr",false)
+        assertFalse(originalPreview.file.readBytes().toString(Charsets.ISO_8859_1).contains("VoiceStudio synthetic audio"))
+        assertEquals(128,originalPreview.peaks.size);assertTrue(originalPreview.peaks.all {it>.2f});originalPreview.file.delete()
+        try {store.preview(request.id,edited[0],"fr",true);fail()} catch(e:ClientFailure) {assertEquals("mobile.editing.preview_unavailable",e.key)}
+        store.edit(request.id,edited)
+        assertEquals(complete.outputs,store.checkpoint(request.id).outputs)
+        val updated=pipeline.run(request.id,models)
+        assertEquals(5,engine.cloned);assertEquals(4,engine.translated);assertEquals(3,exports)
+        assertEquals(complete.outputs[1],updated.outputs[1]);assertNotEquals(complete.outputs[0].file,updated.outputs[0].file)
+        val preview=store.preview(request.id,updated.segments[0],"fr",true)
+        assertTrue(preview.file.readBytes().toString(Charsets.ISO_8859_1).contains("VoiceStudio synthetic audio"));preview.file.delete()
+        store.edit(request.id,updated.segments)
+        pipeline.run(request.id,models)
+        assertEquals(5,engine.cloned);assertEquals(3,exports)
+    }
+    @Test fun cancelledRegenerationRetainsPublishedOutputsAndResumesOnlyTheChangedCue()=runTest {
+        val store=store();val request=request(store)
+        val engine=object: Engine() {
+            var interrupt=false
+            override suspend fun clone(model: PhoneModel,text: String,reference: LocalAudio,referenceText: String,progress: (Float)->Unit): LocalAudio {
+                if(interrupt) {interrupt=false;throw CancellationException("edited render")}
+                return super.clone(model,text,reference,referenceText,progress)
+            }
+        }
+        val pipeline=PhoneDubPipeline(store,engine,decoder,media);val complete=pipeline.run(request.id,models)
+        val edits=complete.segments.toMutableList().also {it[0]=it[0].copy(translations=it[0].translations+("fr" to "Replacement"))}
+        store.edit(request.id,edits);engine.interrupt=true
+        try {pipeline.run(request.id,models);fail()} catch(_:CancellationException) {}
+        val interrupted=store.checkpoint(request.id)
+        assertFalse(interrupted.done);assertEquals(complete.outputs,interrupted.outputs)
+        assertTrue(interrupted.outputs.all {sha256(store.file(request.id,it.file))==it.sha256})
+        assertTrue(pipeline.run(request.id,models).done);assertEquals(5,engine.cloned);assertEquals(3,exports)
+    }
+    @Test fun structuralEditsRetainUnchangedCachesAndReextractionRetainsEdits()=runTest {
+        val store=store();val request=request(store);val engine=Engine();val pipeline=PhoneDubPipeline(store,engine,decoder,media)
+        val complete=pipeline.run(request.id,models)
+        val split=DubEditing.split(complete.segments,0,.5)
+        assertEquals(3,split.size);assertNotEquals(split[0].id,split[1].id)
+        store.edit(request.id,split)
+        store.file(request.id,"original.pcm").writeText("interrupted extraction")
+        val updated=pipeline.run(request.id,models)
+        assertEquals(2,decodes);assertEquals(3,updated.segments.size);assertEquals(8,engine.cloned);assertEquals(4,engine.translated)
+        assertEquals(split.map {it.speech},updated.segments.map {it.speech})
+        val merged=DubEditing.merge(updated.segments,0);assertEquals(2,merged.size)
+        store.edit(request.id,merged);assertTrue(pipeline.run(request.id,models).done)
+        assertEquals(10,engine.cloned)
+    }
+
+    @Test fun unchangedTimelinesAvoidPerCueCheckpointSerialization()=runTest {
+        val store=store();val request=request(store)
+        val engine=object: Engine() {
+            override suspend fun transcribeSegments(model: PhoneModel,audio: LocalAudio,progress: (Float)->Unit)=List(16) {index ->SpeechSegment(index*.15,index*.15+.1,"Source sentence $index")}
+        }
+        val pipeline=PhoneDubPipeline(store,engine,decoder,media);val complete=pipeline.run(request.id,models)
+        assertEquals(32,engine.cloned)
+        store.edit(request.id,complete.segments)
+        val before=store.checkpointWrites.get()
+        val unchanged=pipeline.run(request.id,models)
+        assertEquals(1L,store.checkpointWrites.get()-before)
+        assertEquals(32,engine.cloned);assertEquals(2,exports)
+        val changed=unchanged.segments.toMutableList().also {it[0]=it[0].copy(translations=it[0].translations+("fr" to "Edited line"))}
+        store.edit(request.id,changed)
+        val changedBefore=store.checkpointWrites.get();pipeline.run(request.id,models)
+        assertTrue("One changed cue must not serialize every other cue",store.checkpointWrites.get()-changedBefore<=8)
+        assertEquals(33,engine.cloned);assertEquals(3,exports)
+    }
+    @Test fun verifiedRenderCannotReuseChangedReferenceBytesUnderTheSameFileName()=runTest {
+        val store=store();val source=File(temporary.root,"source.wav").apply {writeText("fixture")}
+        val request=store.create(source,"Source",targets.take(1),models,true,LocalAudio(FloatArray(4800) {.25f},24000),"Default voice",true)
+        val used=mutableListOf<Float>();var clones=0
+        val engine=object: FakeLocalEngine() {
+            override suspend fun transcribeSegments(model: PhoneModel,audio: LocalAudio,progress: (Float)->Unit)=listOf(SpeechSegment(0.0,1.0,"First"),SpeechSegment(2.0,3.0,"Second"))
+            override suspend fun translate(model: PhoneModel,text: String,targetLanguage: String,progress: (Float)->Unit)="Translated $text"
+            override suspend fun clone(model: PhoneModel,text: String,reference: LocalAudio,referenceText: String,progress: (Float)->Unit): LocalAudio {clones++;used+=reference.samples.first();return LocalAudio(FloatArray(12000) {.5f},24000)}
+        }
+        val pipeline=PhoneDubPipeline(store,engine,decoder,media);val complete=pipeline.run(request.id,models)
+        store.edit(request.id,complete.segments,mapOf(0 to (LocalAudio(FloatArray(4800) {.3f},24000) to "Custom voice")))
+        val custom=pipeline.run(request.id,models);assertEquals(3,clones)
+        val path=store.file(request.id,requireNotNull(custom.segments[0].referenceFile))
+        writePcm(LocalAudio(FloatArray(4800) {.4f},24000),path)
+        store.edit(request.id,custom.segments)
+        val regenerated=pipeline.run(request.id,models)
+        assertEquals(4,clones);assertEquals(.4f,used.last(),0f)
+        assertNotEquals(custom.outputs[0].file,regenerated.outputs[0].file)
+        assertFalse(store.file(request.id,custom.outputs[0].file).exists())
+        writePcm(LocalAudio(FloatArray(4800) {.45f},24000),store.file(request.id,"voice-reference.pcm"))
+        store.edit(request.id,regenerated.segments);pipeline.run(request.id,models)
+        assertEquals(5,clones);assertEquals(.45f,used.last(),0f)
+    }
+
+    @Test fun gainAndMuteOnlyRemixVerifiedCachedSpeech()=runTest {
+        val store=store();val request=request(store,targets.take(1));val engine=Engine();val pipeline=PhoneDubPipeline(store,engine,decoder,media)
+        val complete=pipeline.run(request.id,models)
+        val edits=complete.segments.mapIndexed {index,segment ->if(index==0) segment.copy(gain=.5) else segment.copy(muted=true)}
+        store.edit(request.id,edits);val mixed=pipeline.run(request.id,models)
+        assertEquals(2,engine.cloned);assertEquals(2,engine.translated);assertEquals(2,exports)
+        assertNotEquals(complete.outputs[0].file,mixed.outputs[0].file);assertEquals(complete.renders.map {it.file},mixed.renders.map {it.file})
+        assertEquals(.5,mixed.segments[0].gain,0.0);assertTrue(mixed.segments[1].muted)
+        val preview=store.preview(request.id,mixed.segments[0],"fr",true)
+        assertTrue(preview.peaks.max() in .249f.. .251f);preview.file.delete()
+        val muted=store.preview(request.id,mixed.segments[1],"fr",true)
+        assertTrue(muted.peaks.all {it==0f});muted.file.delete()
+    }
+
 }

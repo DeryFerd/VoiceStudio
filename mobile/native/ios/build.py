@@ -188,16 +188,15 @@ def stamp_omni_source(verified, output):
     content = '#pragma once\n#define OMNIVOICE_VERSION "' + commit + ' (pinned)"\n'
     cmake = 'set(CONTENT [=[' + content + ']=])\nif(EXISTS "${OUTPUT}")\n  file(READ "${OUTPUT}" EXISTING)\n  if("${EXISTING}" STREQUAL "${CONTENT}")\n    return()\n  endif()\nendif()\nfile(WRITE "${OUTPUT}" "${CONTENT}")\n'
     (target / 'tools/version.cmake').write_text(cmake)
-    patch = HERE / 'patches/omnivoice-metal-transfers.patch'
-    # target sits inside this repo's work tree; without a ceiling git apply resolves
-    # paths against the repo root and silently skips the patch.
+    patches = [HERE / 'patches/omnivoice-metal-transfers.patch', HERE / 'patches/omnivoice-scoped-backend.patch']
+    # Fail closed and apply to the private build tree, never the verified source.
     env = {**os.environ, 'GIT_CEILING_DIRECTORIES': str(target.parent)}
-    if subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)], cwd=target, env=env,
-                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
-        run('git', 'apply', '--check', patch, cwd=target, env=env)
-        run('git', 'apply', patch, cwd=target, env=env)
-    # Fail closed if a tool invocation ever succeeds without applying all hunks.
-    run('git', 'apply', '--reverse', '--check', patch, cwd=target, env=env)
+    for patch in patches:
+        if subprocess.run(['git', 'apply', '--reverse', '--check', str(patch)], cwd=target, env=env,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+            run('git', 'apply', '--check', patch, cwd=target, env=env)
+            run('git', 'apply', patch, cwd=target, env=env)
+        run('git', 'apply', '--reverse', '--check', patch, cwd=target, env=env)
     return target
 
 
@@ -270,7 +269,7 @@ def ios():
     # Fail before downloading if the SDK is absent.
     run('xcrun', '--sdk', 'iphoneos', '--show-sdk-path')
     toolchain = subprocess.check_output(['xcodebuild', '-version'], text=True) + subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-version'], text=True)
-    pin_key = hashlib.sha256((HERE.parent / 'pins.json').read_bytes() + (HERE / 'build.py').read_bytes() + (HERE / 'patches/omnivoice-metal-transfers.patch').read_bytes() + (ROOT / 'mobile/ios/VoiceStudio/Resources/NativeLicences/sources.json').read_bytes() + toolchain.encode()).hexdigest()
+    pin_key = hashlib.sha256((HERE.parent / 'pins.json').read_bytes() + (HERE / 'build.py').read_bytes() + (HERE / 'patches/omnivoice-metal-transfers.patch').read_bytes() + (HERE / 'patches/omnivoice-scoped-backend.patch').read_bytes() + (ROOT / 'mobile/ios/VoiceStudio/Resources/NativeLicences/sources.json').read_bytes() + toolchain.encode()).hexdigest()
     output = BUILD / 'ios' / pin_key
     stable = BUILD / 'xcframeworks'
     sherpa, _ = source(**{k: PINS['sherpa-onnx']['source'][k] for k in ('repo', 'commit')})
@@ -316,7 +315,7 @@ def ios():
             frameworks.append(framework('OmniVoice', library, [omni / 'src/omnivoice.h'], output / sdk, platform_name))
         run('xcodebuild', '-create-xcframework', '-framework', frameworks[0], '-framework', frameworks[1], '-output', output / 'OmniVoice.xcframework')
         notices(output)
-        receipt = {'toolchain': toolchain, 'pins_sha256': digest(HERE.parent / 'pins.json'), 'build_script_sha256': digest(HERE / 'build.py'), 'artifacts': {str(p.relative_to(output)): digest(p) for p in output.rglob('*') if p.is_file()}}
+        receipt = {'toolchain': toolchain, 'pins_sha256': digest(HERE.parent / 'pins.json'), 'build_script_sha256': digest(HERE / 'build.py'), 'patches': {p.name: digest(p) for p in sorted((HERE / 'patches').glob('*.patch'))}, 'artifacts': {str(p.relative_to(output)): digest(p) for p in output.rglob('*') if p.is_file()}}
         (output / 'complete.json').write_text(json.dumps(receipt, indent=2))
     receipt = json.loads((output / 'complete.json').read_text())
     for path, expected in receipt['artifacts'].items():

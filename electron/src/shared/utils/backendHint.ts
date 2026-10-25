@@ -13,6 +13,8 @@
  * it does not recognise yields no hint rather than a wrong one.
  */
 
+import { isNativeFaultExit } from './nativeExit';
+
 export type BackendHintKey =
   | 'backend.hint_spawn_blocked'
   | 'backend.hint_smart_app_control'
@@ -51,4 +53,50 @@ export function backendFailureHints(message: string | undefined): BackendHintKey
   }
   if (inSyncedFolder(message)) hints.push('backend.hint_synced_folder');
   return hints;
+}
+
+/** The one named reason a local engine start failed. */
+export type BackendCause =
+  | 'smart_app_control'
+  | 'spawn_blocked'
+  | 'native_crash'
+  | 'missing_env'
+  | 'permission'
+  | 'synced_folder'
+  | 'slow_start';
+
+/** The single primary action that fixes (or best diagnoses) each cause. */
+export type BackendCauseAction = 'retry' | 'choose_folder' | 'copy_diagnostics';
+
+export const BACKEND_CAUSE_ACTION: Record<BackendCause, BackendCauseAction> = {
+  smart_app_control: 'retry',
+  spawn_blocked: 'retry',
+  native_crash: 'copy_diagnostics',
+  missing_env: 'choose_folder',
+  permission: 'choose_folder',
+  synced_folder: 'choose_folder',
+  slow_start: 'retry',
+};
+
+/**
+ * Collapses a failed-backend message into ONE named cause, most specific
+ * first, or null when nothing is recognised (the raw message is then shown
+ * alone with Retry). Covers `spawn UNKNOWN`, a missing Python environment, a
+ * native crash such as exit code 3221225477 (0xC0000005), and EPERM/EACCES.
+ */
+export function backendFailureCause(message: string | undefined): BackendCause | null {
+  if (!message) return null;
+  if (/\bCould not start\b.*\b(spawn UNKNOWN|UNKNOWN|EPERM|EACCES)\b/s.test(message)) {
+    return /Smart App Control/.test(message) ? 'smart_app_control' : 'spawn_blocked';
+  }
+  if (inSyncedFolder(message)) return 'synced_folder';
+  const code = /exit code (-?\d+)/.exec(message)?.[1];
+  const signal = /signal (SIG[A-Z]+)/.exec(message)?.[1];
+  if (isNativeFaultExit({ exitCode: code ? Number(code) : null, signal })) return 'native_crash';
+  // resolveSpawnPlan: "environment in X is missing (no ...)" / "is incomplete: ...".
+  if (/Python environment\b.*\b(is missing|is incomplete|missing or incomplete)\b/is.test(message))
+    return 'missing_env';
+  if (/\b(EPERM|EACCES|permission denied|access is denied)\b/i.test(message)) return 'permission';
+  if (/did not answer on port \d+ within \d+ s/.test(message)) return 'slow_start';
+  return null;
 }

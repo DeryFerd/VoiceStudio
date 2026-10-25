@@ -5,7 +5,12 @@ public struct PCMFile: Sendable {
     public let url: URL
     public let sampleRate: Int
     public init(_ url: URL, sampleRate: Int = 24000) { self.url = url; self.sampleRate = sampleRate }
-    public var frames: Int { get throws { Int(try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) / 4 } }
+    public var frames: Int { get throws {
+        // URL resource values can retain an old size after an atomic decoder/cache replacement.
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        guard let bytes = attributes[.size] as? NSNumber, bytes.int64Value >= 0, bytes.int64Value.isMultiple(of: 4) else { throw ClientError("mobile.simple.media_failed") }
+        return Int(bytes.int64Value / 4)
+    } }
     public func read(start: Int, count: Int) throws -> PCMChunk {
         guard start >= 0, count > 0, count <= 720000 else { throw ClientError("mobile.simple.media_failed") }
         let handle = try FileHandle(forReadingFrom: url); defer { try? handle.close() }
@@ -114,11 +119,15 @@ public func fitTiming(_ audio: LocalAudio, frames: Int) throws -> PCMChunk {
     }
     return PCMChunk(samples: output, sampleRate: 24000)
 }
-public func mixTimeline(to url: URL, frames: Int, segments: [(Int, PCMFile)]) throws -> PCMFile {
+public func mixTimeline(to url: URL, frames: Int, segments: [(Int, PCMFile)], gains: [Double] = []) throws -> PCMFile {
     guard frames > 0, frames <= 345600000 else { throw ClientError("mobile.simple.audio_long") }
     let handle = try FileHandle(forUpdating: PrivateFiles.empty(url)); defer { try? handle.close() }
     try handle.truncate(atOffset: UInt64(frames)*4)
-    for (start, segment) in segments {
+    guard gains.isEmpty || gains.count == segments.count else { throw ClientError("mobile.simple.media_failed") }
+    for (piece,(start, segment)) in segments.enumerated() {
+        let gain = gains.isEmpty ? 1 : gains[piece]
+        guard gain.isFinite, (0...2).contains(gain) else { throw ClientError("mobile.simple.media_failed") }
+        if gain == 0 { continue }
         guard start >= 0, start < frames else { throw ClientError("mobile.simple.media_failed") }
         let count = min(try segment.frames,frames-start)
         for offset in stride(from: 0, to: count, by: 8192) {
@@ -130,7 +139,7 @@ public func mixTimeline(to url: URL, frames: Int, segments: [(Int, PCMFile)]) th
             var mixed = Data()
             for (index,sample) in samples.enumerated() {
                 let old = bytes.withUnsafeBytes { Float(bitPattern: UInt32(littleEndian: $0.loadUnaligned(fromByteOffset: index*4, as: UInt32.self))) }
-                var value = min(1,max(-1,old+sample)).bitPattern.littleEndian
+                var value = min(1,max(-1,old+sample*Float(gain))).bitPattern.littleEndian
                 withUnsafeBytes(of: &value) { mixed.append(contentsOf: $0) }
             }
             try handle.seek(toOffset: UInt64(start+offset)*4); try handle.write(contentsOf: mixed)

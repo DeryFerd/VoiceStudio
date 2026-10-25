@@ -23,13 +23,119 @@ maintainer team, matching Electron. The badge has a localized core-maintainer de
   Switching between the phone and computer keeps your script.
 - **Voices**: clone a voice from a recording or an audio file. Voices you
   clone on the phone stay on the phone.
-  Stereo recordings use audio from both channels.
+  Stereo recordings use audio from both channels. Whisper transcribes the sample;
+  OmniVoice generates the cloned preview. Both models must be installed. Saving
+  publishes a voice only after that preview succeeds; playback plays the clone,
+  while the original recording stays separate for reference conditioning.
 - **Dub**: pick a video or audio file and target languages; the phone
   transcribes, translates and re-voices it in the original speaker's voice.
   Play completed dubs directly in the app, including after using Dictate;
   switching between video results keeps both picture and sound.
 - **Dictate**: tap the mic and watch the transcript appear live.
 - **Models**: download, update or delete the on-device models.
+- **Voice design**: choose voice traits and a seed, generate a sample with
+  OmniVoice, then save it as a phone voice for Speak, Stories and dubbing.
+- **Stories and Audiobooks**: import UTF-8 text, unencrypted EPUB or text PDFs
+  (up to 64 MB), cast characters, and render on the phone. Scanned PDFs need
+  text recognition first. Share WAV, MP3, AAC/M4A or chaptered M4B; M4B supports up to
+  255 chapters. Use `# Chapter title`, line-leading `[voice:Name]` and
+  `[speed:1.25]`, and `[pause:0.5]` for silence. Pronunciation replacements and
+  unchanged-line caches avoid regenerating unaffected narration. MP3 is encoded
+  locally with the bundled LAME encoder; exports can be canceled. Phone Speak
+  also shares WAV/M4A/MP3, with sample-rate conversion handled automatically.
+- **Batch dubbing**: pick several audio/video files, choose languages and a
+  voice once, and queue them on the phone. Successfully added files leave the
+  selection; remaining files stay available if a later import fails.
+- **Edit a completed phone dub**: change source/translated text, timing and
+  individual voices and 0–200% segment volume (including mute); split/merge
+  segments; undo/redo; import/export SRT or VTT;
+  preview original/generated waveforms. Generate Dub reuses unchanged segments
+  and keeps the previous completed output until replacement succeeds. Volume
+  changes remix existing speech without running the model again. Sources
+  stay on the phone until you delete the job. Older Android jobs whose sources
+  were already removed must be imported again.
+- **Tools**: convert an audio clip of up to 30 seconds into a saved voice, with
+  optional duration matching, or compare two preset/saved voices reading the same
+  text. Record conversion input directly with microphone permission and voice
+  consent; recording stops by 29 seconds. Conversion transcribes and
+  re-synthesizes; it does not transfer the source's pitch or expression.
+- **Audio editor**: trim, fade in/out, adjust gain, normalize actual peaks and
+  apply a noise gate without any model download. Processing streams from disk
+  (up to four hours), preserves the original, and shares WAV/M4A/MP3. Existing
+  synthetic provenance stays marked; a natural recording remains unmarked.
+- **Gallery**: browse installed phone presets offline. My computer browses,
+  previews and imports community voices on the paired host; it never downloads
+  a community reference to the phone. Opening the host gallery may refresh its
+  community manifest, and Preview/Use voice are explicit actions.
+- **Workflows**: import text or audio/video, transcribe, normalize or translate,
+  conditionally skip forward, retry failed steps, and optionally generate speech.
+  Templates provide starting points. Saved inputs, settings and checkpoints let
+  unchanged runs resume. Speak remains the final step.
+- **Calls**: control the paired computer's configured Twilio agent: confirm a
+  call, follow its transcript, take over, type speech or hang up. Pair with an API
+  key, then enable **Allow paired call control** in the computer's Calls settings.
+  Sharing PINs cannot authorize calls; desktop-mode call settings stay on the computer.
+  Only designed or verified-own voices may place calls. Twilio charges apply.
+- **Phone speech API**: choose preset or saved-voice speech, and optionally
+  enable transcription and translation using installed models. Speech returns
+  marked WAV or MP3; `/mcp` offers only the enabled `speak`, `transcribe` and
+  `translate` tools using MCP 2025-11-25. Copy its temporary bearer token to
+  authenticate every request. Loopback is the default; **Allow local network**
+  enables other devices. One model operation runs at a time. The server stops
+  when you leave its screen or background the app.
+- **System integration**: share text/audio/video into a review screen, then
+  explicitly run a task. Home widgets and shortcuts open Speak or Dictate without
+  starting recording or inference. Saved voice-design recipes reopen for editing.
+
+Production workspaces are available from **Home** on both iOS and Android.
+Install models in Models first. Voice design and saved-voice speech use
+OmniVoice and its existing licence gate; translation uses the phone translation
+model. Voice designs save their generated sample, traits and seed. References
+are limited to 30 seconds; longer design results remain playable/shareable.
+
+Stories, books, workflows and queued dubs keep completed work on disk. Android
+runs these through foreground workers with progress and Cancel. iOS owns running
+jobs independently of screens. On supported iOS 26+ devices, GPU work requests
+continued processing with the signed background GPU entitlement; the UI only
+claims it after the OS grants it. An explicit CPU fallback option can cancel,
+checkpoint and continue on CPU when GPU background execution is unavailable.
+Foreground work retains GPU acceleration. Older systems use limited background
+grants. The OS may still pause work; Resume continues an unchanged saved draft.
+After editing a book or workflow, Generate uses the current settings and reuses
+matching cached work. Low battery or critical thermal conditions pause processing. This sustained job
+support covers dubs, stories/books and workflows; short interactive tools and
+the phone API remain foreground tasks. Delete a project/job to remove its media.
+
+
+## Calling the phone speech API
+
+Open **Home → Phone speech API**, choose enabled capabilities and a preset or
+saved voice, then start
+it. For another device, enable local network access and use a displayed address.
+Copy the bearer token; it changes whenever you start a new server.
+
+```sh
+curl http://PHONE_IP:PORT/v1/audio/speech \
+  -H 'Authorization: Bearer YOUR_TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"input":"Hello from my phone","voice":"default","response_format":"wav"}' \
+  --output speech.wav
+```
+
+`default` uses the preset or saved voice selected on the phone. Set
+`response_format` to `mp3` for local MP3 encoding. `GET /v1/models` lists the
+selected model ID for clients that require `model`. Speech accepts up to 2,000
+UTF-16 units and a `speed` from 0.5 to 2. Authenticate
+`GET /health` too. MCP clients connect to `/mcp` with the same bearer token;
+`speak` takes `text`, optional `speed` and `format` (`wav` or `mp3`).
+
+When enabled, `POST /v1/audio/transcriptions` accepts JSON `{"audio":"BASE64_WAV"}`
+containing PCM16 mono WAV (8–24 kHz, up to 30 seconds). This is a bounded JSON
+upload, not a multipart upload. `POST /v1/text/translations` accepts
+`{"input":"Hello","language":"fr"}`; language codes must be supported by the
+selected model. Both return `{"text":"…"}`. MCP `transcribe` takes `audio`;
+`translate` takes `text` and `language`. Requests never download models, select
+an unapproved voice or open a file/URL. Keep VoiceStudio active on this screen.
 
 ## On-device models
 
@@ -101,6 +207,7 @@ are generated from the desktop app and backend, never copied by hand:
 
 ```sh
 bun scripts/export-mobile-tokens.ts        # theme tokens from the Electron theme
+bun scripts/export-mobile-design.ts        # native design traits from Electron
 uv run python scripts/export_openapi.py    # mobile/contract/openapi.json from the backend
 ```
 

@@ -26,6 +26,17 @@ internal fun isWorkspace(route:String)=route in tabs
 @Composable internal fun StudioTopBar(route:String,onBack:()->Unit,onProjects:()->Unit) {
     val title=when {
         route=="home" -> "nav.home"
+        route=="design" -> "nav.design"
+        route=="stories" -> "nav.stories"
+        route=="audiobook" -> "audiobook.title"
+        route=="batch" -> "batch.title"
+        route=="gallery" -> "nav.gallery"
+        route=="workflows" -> "workflows.title"
+        route=="calls" -> "calls.title"
+        route=="local-api" -> "mobile.host.title"
+        route=="tools" -> "tools.title"
+        route=="incoming" -> "mobile.integration.received"
+        route.startsWith("preset/") -> "mobile.tabs.speak"
         route=="models" -> "mobile.local.models"
         route=="projects"||route.startsWith("project/") -> "projects.title"
         route=="host-dubs" -> "mobile.dub.history"

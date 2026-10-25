@@ -102,7 +102,11 @@
     "dub": "翻譯並配音音訊或影片。",
     "stories": "用多種聲音創作場景。",
     "audiobook": "製作分章節的有聲書。",
-    "transcribe": "將錄音轉成文字。"
+    "transcribe": "將錄音轉成文字。",
+    "creatorCoreTeam": "創作者 · 核心團隊",
+    "coreTeam": "核心團隊",
+    "follow": "追蹤",
+    "website": "網站"
   },
   "twilioIntegration": {
     "exposureWarning": "開啟後會開啟一個獨立的本機連接埠，由你的通道發布到網際網路。只接受以你的 Twilio Auth Token 簽署的請求；VoiceStudio 的其餘部分維持私密。",
@@ -370,7 +374,8 @@
   },
   "paneActions": {
     "collapse": "收合面板",
-    "edit": "編輯聲音檔案"
+    "edit": "編輯聲音檔案",
+    "expand": "展開窗格"
   },
   "modelSettings": {
     "models": "模型",
@@ -989,7 +994,8 @@
     "play": "播放",
     "pause": "暫停",
     "seek": "跳轉",
-    "missing": "音訊檔案遺失。"
+    "missing": "音訊檔案遺失。",
+    "now_playing": "正在播放"
   },
   "logs": {
     "no_tauri_log": "磁碟上尚未有 Tauri 登入 — 透過桌面建置啟動以產生一個",
@@ -1874,7 +1880,9 @@
     "deepl_base_url_help": "自訂 DeepL API 端點（預設：https://api.deepl.com/v2）。變更為代理/自架。",
     "microsoft_base_url_help": "自訂 Azure 翻譯端點（預設：https://api.cognitive.microsofttranslator.com）。",
     "region": "區域",
-    "aws_profile": "AWS 設定檔"
+    "aws_profile": "AWS 設定檔",
+    "deepl_key_placeholder": "DeepLAPI 金鑰",
+    "microsoft_key_placeholder": "MicrosoftAPI 金鑰"
   },
   "about": {
     "architecture": "大樓",
@@ -2054,6 +2062,7 @@
     "setup_access": "請允許寫入應用程式資料夾，然後重試。",
     "setup_unsupported_platform": "此 Intel Mac 無法執行本機 AI 後端——PyTorch 未提供 macOS Intel 建置。請在下方連接遠端後端，無需本機安裝。",
     "setup_wrong_architecture": "這是透過 Rosetta 在 Apple Silicon Mac 上執行的 VoiceStudio Intel (x64) 版本，因此無法安裝本機 AI 後端。請結束應用程式，覆蓋安裝 Apple Silicon (arm64) 版 DMG 後重新開啟——你的聲音與專案都會保留。",
+    "setup_missing_system_library": "此 Windows 系統缺少 PyTorch 音訊擴充功能所需的 Microsoft Visual C++ 2015-2022 可再散布元件 (x64)。請從 Microsoft 安裝後按一下重試。",
     "download_apple_silicon": "下載 Apple Silicon 版本",
     "ready": "引擎已就緒",
     "show_log": "顯示日誌",
@@ -2077,7 +2086,23 @@
     "hint_spawn_blocked": "作業系統或安全性軟體拒絕啟動本機引擎。請將 VoiceStudio 的執行階段資料夾加入防毒軟體的排除項目（Windows：Windows 安全性 → 病毒與威脅防護 → 管理設定 → 排除項目），並確認它不在 OneDrive 等雲端同步資料夾內，然後重試。",
     "hint_smart_app_control": "Windows 智慧型應用程式控制封鎖了本機引擎。它不支援針對個別應用程式設定例外，因此新增防毒軟體排除項目沒有幫助。請在 Windows 安全性 → 應用程式與瀏覽器控制 → 智慧型應用程式控制設定 中將其關閉（未重設系統就無法再次開啟），或將 VoiceStudio 連線到另一台電腦上執行的引擎，然後重試。",
     "hint_slow_start": "等待逾時時，引擎仍在啟動。電腦較慢（尤其是沒有獨立顯示卡），以及安裝後的第一次啟動（防毒軟體會掃描每個新檔案）可能需要幾分鐘。請關閉佔用大量記憶體的應用程式後重試；之後的啟動會快很多。",
-    "hint_synced_folder": "此位置位於雲端同步資料夾（OneDrive、Dropbox、iCloud Drive、Google Drive）內。僅限線上的預留位置檔案與檔案鎖定會破壞 Python 環境。請將 VoiceStudio 移到一般本機資料夾（例如 Windows 上的 C:\\VoiceStudio，或 macOS 與 Linux 上的 ~/VoiceStudio），然後重新設定。"
+    "hint_synced_folder": "此位置位於雲端同步資料夾（OneDrive、Dropbox、iCloud Drive、Google Drive）內。僅限線上的預留位置檔案與檔案鎖定會破壞 Python 環境。請將 VoiceStudio 移到一般本機資料夾（例如 Windows 上的 C:\\VoiceStudio，或 macOS 與 Linux 上的 ~/VoiceStudio），然後重新設定。",
+    "cause_smart_app_control": "Windows 智慧型應用程式控制封鎖了引擎",
+    "cause_spawn_blocked": "安全性軟體阻止了引擎啟動",
+    "cause_native_crash": "引擎在啟動時當機（原生錯誤）",
+    "cause_missing_env": "Python 環境遺失或不完整",
+    "cause_permission": "沒有寫入引擎資料夾的權限",
+    "cause_synced_folder": "引擎資料夾位於雲端同步資料夾內",
+    "cause_slow_start": "引擎在較慢的電腦上仍在啟動",
+    "choose_folder": "選擇其他資料夾",
+    "copy_diagnostics": "複製診斷資訊",
+    "diagnostics_copied": "已複製診斷資訊",
+    "details": "詳細資訊",
+    "pill_starting": "正在啟動",
+    "pill_recovering": "正在復原",
+    "pill_failed": "失敗",
+    "pill_repeats": "連續 {{count}} 次",
+    "offline_bar": "引擎忙碌中，正在自動重新連線"
   },
   "bootstrap": {
     "checking": "正在檢查環境…",
@@ -2372,7 +2397,8 @@
     "storage_temp": "暫存檔案",
     "change": "變更…",
     "reset_default": "重設為預設值",
-    "region_label": "下載區域"
+    "region_label": "下載區域",
+    "free_space": "此磁碟可用空間 {{free}} GB，大約需要 {{needed}} GB"
   },
   "asr_missing": {
     "message": "尚未安裝語音轉文字模型 — 此功能需要一個模型來轉錄音訊。",
@@ -2514,7 +2540,18 @@
     "staleTitle": "有可用更新",
     "staleMessage": "您正在使用 VoiceStudio {{current}}，但 {{latest}} 已經發布——這個錯誤可能已在新版本中修復。回報前先查看最新版本？",
     "staleView": "查看更新",
-    "staleFileAnyway": "仍然回報"
+    "staleFileAnyway": "仍然回報",
+    "summary_label": "發生了什麼問題？",
+    "summary_placeholder": "一句話描述，例如：配音在 40% 處停止",
+    "summary_required": "請先填寫一句話描述。",
+    "sent_title": "將傳送的內容",
+    "sent_app": "應用程式版本與組建編號",
+    "sent_system": "作業系統、GPU、記憶體與可用磁碟空間",
+    "sent_engines": "目前啟用的引擎",
+    "sent_logs": "最近的引擎記錄行（已移除家目錄路徑與權杖）",
+    "sent_pages": "最近造訪的頁面名稱",
+    "not_sent": "絕不傳送：你的音訊、文字或聲音。檔案名稱可能出現在記錄或你的描述中，請在提交前檢查 GitHub 預覽。",
+    "submit": "開啟 GitHub Issue"
   },
   "crash": {
     "notice_unclean": "上一個工作階段在 {{ago}}前未正常關閉就結束了。這通常無害 —— 電腦進入了睡眠、應用程式被強制結束，或某個虛擬機/容器停止了。",
@@ -3889,6 +3926,164 @@
       "retry": "重試",
       "rate_limited": "此網路的檢舉次數過多,請稍後再試。",
       "invalid": "無法傳送此檢舉。請更新應用程式後重試。"
+    },
+    "production": {
+      "new": "新增專案",
+      "script_hint": "用 # 章節標題劃分章節，在行首使用 [voice:Name] 切換角色。僅支援純文字，其他標記會被直接朗讀。",
+      "conversion_hint": "選擇不超過30秒的音訊片段。轉換功能會先轉寫，再用所選聲音朗讀；不會保留原始表演方式。",
+      "normalize_text": "整理文字"
+    },
+    "calls": {
+      "remote_control": "允許已配對裝置控制通話",
+      "remote_control_hint": "允許透過 API 金鑰驗證的手機發起及管理通話。通話設定仍由此電腦管理。",
+      "hint": "通話透過已配對的電腦及其設定的 Twilio 號碼進行。請先在該電腦上啟用通話控制。",
+      "authentication": "請使用電腦的 API 金鑰配對以控制通話。共享 PIN 碼無法授權通話。",
+      "billing": "通話將按 Twilio 費率收費。",
+      "clone_hint": "Whisper 只負責轉錄樣本。另一個複製模型會在儲存前產生複製試聽；兩種模型都不可缺少。"
+    },
+    "host": {
+      "title": "手機語音 API",
+      "hint": "透過 OpenAI 風格的語音介面及 MCP（2025-11-25）提供所選已安裝音色。僅在此頁面開啟且應用程式在前景時執行。",
+      "lan": "允許區域網路連線",
+      "lan_hint": "關閉：僅限此手機。開啟：區域網路裝置可使用暫時的 Bearer 權杖連線。請妥善保管權杖。",
+      "start": "啟動伺服器",
+      "copy": "複製 Bearer 權杖",
+      "running": "伺服器執行中",
+      "capabilities_hint": "僅開放所選的已安裝模型與音色。此頁面保持開啟時，語音生成、轉錄與翻譯皆在此手機上執行。",
+      "allow_speech": "允許語音生成",
+      "allow_transcription": "允許轉錄",
+      "allow_translation": "允許翻譯",
+      "voice_source": "音色來源",
+      "preset": "預設音色",
+      "saved": "已儲存音色",
+      "audio_hint": "轉錄接受 base64 編碼的 PCM16 單聲道 WAV，取樣率 8–24 kHz，長度不超過 30 秒。"
+    },
+    "books": {
+      "import_failed": "無法匯入此書。請使用未加密的 EPUB、文字 PDF 或 UTF-8 文字（最大 64 MB）。",
+      "no_text": "找不到可讀文字。掃描版 PDF 需要先進行文字辨識再匯入。",
+      "export_failed": "無法匯出音訊。M4B 最多支援 255 個章節。",
+      "invalid_controls": "請使用 0.5 至 2 的速度、最長 30 秒的停頓，以及非空的發音項目。",
+      "controls_hint": "匯入 EPUB、文字 PDF 或 TXT。加入 [pause:0.5] 插入以秒計的靜音；在行首加入 [speed:1.25] 變更該行速度。未修改的行會重用已儲存的音訊。",
+      "line_speed": "單行速度",
+      "restore_recipe": "編輯已儲存的聲音配方",
+      "save_recipe_copy": "儲存為新聲音"
+    },
+    "editing": {
+      "undo": "復原",
+      "redo": "重做",
+      "subtitles": "字幕",
+      "import_subtitles": "匯入 SRT / VTT",
+      "export_srt": "匯出 SRT",
+      "export_vtt": "匯出 VTT",
+      "source_text": "原文",
+      "original": "原始音訊",
+      "generated": "產生的音訊",
+      "split_at": "分割位置",
+      "split": "分割片段",
+      "merge": "與下一段合併",
+      "replace_subtitles": "取代字幕時間軸？",
+      "replace": "取代",
+      "replace_subtitles_detail": "這將取代此語言的片段時間軸。其他語言可能需要重新翻譯。產生前可以復原。",
+      "preview_unavailable": "請先產生此片段，再試聽音訊。",
+      "subtitle_invalid": "請選擇有效的 SRT 或 VTT 檔案，每個字幕片段不超過 30 秒。",
+      "subtitle_missing": "匯出字幕前請翻譯所有片段。",
+      "split_invalid": "請在片段內選擇分割點，確保兩側都有足夠的文字。",
+      "merge_invalid": "請合併使用相同聲音的相鄰片段，總長度不超過 30 秒。",
+      "waveform": "音訊波形"
+    },
+    "jobs": {
+      "title": "手機處理",
+      "checkpointed": "已完成的步驟已儲存。可隨時取消並繼續。",
+      "power_paused": "為保護電池或降低手機溫度，處理已暫停。情況改善後可繼續。",
+      "background_paused": "已在背景暫停。重新開啟此任務，可從已儲存的步驟繼續。",
+      "requesting_gpu": "正在申請背景 GPU 權限…",
+      "requesting_cpu": "正在申請背景 CPU 時間…",
+      "continued_gpu": "已獲准在背景使用 GPU；iOS 仍可暫停或結束此任務。",
+      "continued_cpu": "已獲准在背景使用 CPU；iOS 仍可暫停或結束此任務。",
+      "switching_cpu": "正在儲存進度並釋放 GPU，然後以 CPU 繼續…",
+      "background_limited": "iOS 會限制背景執行時間。時間用盡時，已完成的步驟會保留。",
+      "background_requestable": "此手機支援申請背景 GPU 使用。每個任務仍需 iOS 核准。",
+      "gpu_unavailable": "此處無法在背景使用 GPU。可用 CPU 繼續，或重新開啟以恢復已儲存的步驟。",
+      "cpu_fallback": "背景 GPU 無法使用時允許以 CPU 繼續",
+      "cpu_tradeoff": "CPU 執行較慢，可能更耗電。前景工作通常使用 GPU。",
+      "cpu_unavailable": "已安裝的版本無法以 CPU 繼續此模型。仍可在前景恢復已儲存的步驟。",
+      "resume_checkpoint": "恢復已儲存的任務",
+      "foreground_service": "只要 Android 允許，前景服務就會讓此任務繼續執行。"
+    },
+    "flow": {
+      "import_media": "匯入音訊或影片",
+      "template_clean": "整理並朗讀",
+      "template_translate": "翻譯並朗讀",
+      "template_transcribe": "轉錄並翻譯",
+      "contains": "文字包含以下內容時繼續（區分大小寫）",
+      "skip": "不包含時略過 {{count}} 個步驟",
+      "skip_label": "不包含時略過的步驟數",
+      "retries": "重試次數：{{count}}",
+      "retries_label": "發生錯誤後重試次數",
+      "step_transcribe": "轉錄媒體",
+      "step_condition": "條件"
+    },
+    "integration": {
+      "received": "收到的內容",
+      "review": "執行任務前請檢查分享的內容。不會自動開始。",
+      "shortcut_speak": "開啟朗讀",
+      "shortcut_dictate": "開啟聽寫",
+      "widget_description": "開啟朗讀或聽寫。只有點選開始後才會錄音。",
+      "text": "文字"
+    },
+    "export": {
+      "failed": "無法匯出音訊。請檢查剩餘儲存空間並重試。"
+    },
+    "processing": {
+      "audio_editor": "音訊編輯器",
+      "hint": "離線語音編輯：24 kHz 單聲道。原始檔案保持不變。",
+      "select_audio": "選擇音訊",
+      "fade_in": "淡入（秒）",
+      "fade_out": "淡出（秒）",
+      "gain_db": "增益（dB）",
+      "normalize": "峰值正規化",
+      "target_peak": "目標峰值（dBFS）",
+      "noise_gate": "雜訊閘",
+      "gate_threshold": "雜訊閘閾值（dBFS）",
+      "process": "套用編輯",
+      "result": "處理後的音訊",
+      "peak": "峰值",
+      "changed_settings": "設定已變更。請套用編輯後試聽或匯出更新後的音訊。",
+      "preview_hint": "原始音訊預覽從裁切起點播放，最長 30 秒。",
+      "invalid": "請檢查裁切時間、淡入淡出長度和音訊位準。",
+      "segment_gain": "片段音量",
+      "mute": "靜音片段",
+      "record_consent": "我有權將此錄音用於聲音轉換。",
+      "merge_levels": "合併片段前，請使用相同的音量和靜音設定。"
+    }
+  },
+  "failureCause": {
+    "details": "詳細資料",
+    "fixes": "建議的解決辦法",
+    "vram": {
+      "title": "GPU 記憶體不足",
+      "fix1": "關閉其他使用 GPU 的應用程式",
+      "fix2": "改用 CPU 或較小的引擎"
+    },
+    "model_missing": {
+      "title": "尚未下載模型",
+      "fix1": "在模型目錄中下載",
+      "fix2": "點選修復進行安裝"
+    },
+    "busy": {
+      "title": "引擎忙碌中",
+      "fix1": "等待目前工作完成",
+      "fix2": "稍後再試"
+    },
+    "timeout": {
+      "title": "產生逾時",
+      "fix1": "嘗試較短的文字",
+      "fix2": "調高代理伺服器逾時時間"
+    },
+    "bad_response": {
+      "title": "伺服器回應異常",
+      "fix1": "在 設定 > 記錄 中檢查後端",
+      "fix2": "重新啟動 VoiceStudio 後再試"
     }
   }
 }

@@ -26,7 +26,7 @@ class PhoneVoicesTest {
     }
     @Test fun voicePersistsReferenceTranscriptConsentRenameAndDelete()=runTest {
         val root=File(temporary.root,"voices");val store=PhoneVoiceStore(root)
-        val voice=store.create(" My voice ",File("unused"),true,fixtureModel(),FakeLocalEngine(),decoder)
+        val voice=store.create(" My voice ",File("unused"),true,fixtureModel(),fixtureModel("clone"),FakeLocalEngine(),decoder)
         assertEquals("My voice",voice.name);assertEquals("Reference transcript",voice.transcript);assertTrue(voice.consentAt>0)
         assertArrayEquals(audio.samples,store.reference(voice).samples,0f)
         assertTrue(store.preview(voice).readBytes().take(4).toByteArray().contentEquals("RIFF".toByteArray()))
@@ -36,7 +36,7 @@ class PhoneVoicesTest {
     }
     @Test fun declinedConsentCannotDecodeOrCreateAnything()=runTest {
         val root=File(temporary.root,"voices")
-        try {PhoneVoiceStore(root).create("Name",File("unused"),false,fixtureModel(),FakeLocalEngine(),decoder);fail()} catch(_:IllegalArgumentException) {}
+        try {PhoneVoiceStore(root).create("Name",File("unused"),false,fixtureModel(),fixtureModel("clone"),FakeLocalEngine(),decoder);fail()} catch(_:IllegalArgumentException) {}
         assertFalse(root.exists())
     }
     @Test fun failedOrCancelledTranscriptionNeverPublishesVoice()=runTest {
@@ -45,15 +45,15 @@ class PhoneVoicesTest {
         val engine=object: FakeLocalEngine() {
             override suspend fun transcribe(model: PhoneModel,audio: LocalAudio,progress: (Float)->Unit): String {waiting.complete(Unit);awaitCancellation()}
         }
-        val task=launch {store.create("Name",File("unused"),true,fixtureModel(),engine,decoder)}
+        val task=launch {store.create("Name",File("unused"),true,fixtureModel(),fixtureModel("clone"),engine,decoder)}
         waiting.await();task.cancelAndJoin();assertTrue(store.list().isEmpty());assertTrue(root.listFiles().orEmpty().isEmpty())
         val silent=object: FakeLocalEngine() {override suspend fun transcribe(model: PhoneModel,audio: LocalAudio,progress: (Float)->Unit)=" "}
-        try {store.create("Name",File("unused"),true,fixtureModel(),silent,decoder);fail()} catch(e:com.voicestudio.mobile.network.ClientFailure) {assertEquals("mobile.simple.no_speech",e.key)}
+        try {store.create("Name",File("unused"),true,fixtureModel(),fixtureModel("clone"),silent,decoder);fail()} catch(e:com.voicestudio.mobile.network.ClientFailure) {assertEquals("mobile.simple.no_speech",e.key)}
         assertTrue(store.list().isEmpty())
     }
     @Test fun oneUnreadableVoiceDoesNotHideHealthyVoices()=runTest {
         val root=File(temporary.root,"voices");val store=PhoneVoiceStore(root)
-        val voice=store.create("Healthy",File("unused"),true,fixtureModel(),FakeLocalEngine(),decoder)
+        val voice=store.create("Healthy",File("unused"),true,fixtureModel(),fixtureModel("clone"),FakeLocalEngine(),decoder)
         File(root,"broken/voice.json").apply {parentFile!!.mkdirs();writeText("not json")}
         File(root,"bad-metadata/voice.json").apply {parentFile!!.mkdirs();writeText(LocalJson.encodeToString(PhoneVoice.serializer(),voice.copy(name="")))}
         assertEquals(listOf(voice),store.list())
@@ -61,6 +61,24 @@ class PhoneVoicesTest {
     @Test fun pathsCannotEscapePrivateVoiceDirectory()=runTest {
         val store=PhoneVoiceStore(File(temporary.root,"voices"))
         try {store.reference(PhoneVoice("../escape","N","T",1,1));fail()} catch(_:IllegalArgumentException) {}
+    }
+    @Test fun cloneEngineIsRequiredAndFailedPreviewNeverPublishes()=runTest {
+        val root=File(temporary.root,"voices");val store=PhoneVoiceStore(root);var clones=0
+        val engine=object: FakeLocalEngine() {
+            override suspend fun clone(model: PhoneModel,text: String,reference: LocalAudio,referenceText: String,progress: (Float)->Unit): LocalAudio {
+                assertEquals("clone",model.capability);assertEquals("Reference transcript",text);assertEquals(text,referenceText)
+                clones++;if(clones==1) throw CancellationException("Interrupted preview")
+                return LocalAudio(FloatArray(4800) {.4f},24000)
+            }
+        }
+        try {store.create("Voice",File("unused"),true,fixtureModel(),fixtureModel(),engine,decoder);fail()} catch(_:IllegalArgumentException) {}
+        assertEquals(0,clones);assertTrue(store.list().isEmpty())
+        try {store.create("Voice",File("unused"),true,fixtureModel(),fixtureModel("clone"),engine,decoder);fail()} catch(_:CancellationException) {}
+        assertEquals(1,clones);assertTrue(store.list().isEmpty());assertTrue(root.listFiles().orEmpty().isEmpty())
+        val voice=store.create("Voice",File("unused"),true,fixtureModel(),fixtureModel("clone"),engine,decoder)
+        assertEquals(2,clones);assertEquals("preview.wav",store.preview(voice).name);assertEquals(fixtureModel("clone").repo,voice.modelRepo)
+        assertTrue(store.preview(voice).readBytes().toString(Charsets.ISO_8859_1).contains("VoiceStudio synthetic audio"))
+        assertFalse(File(root,voice.id+"/reference.wav").readBytes().toString(Charsets.ISO_8859_1).contains("VoiceStudio synthetic audio"))
     }
     @Test fun resamplingKeepsPhaseAcrossOddBufferSizes() {
         val input=FloatArray(44100) {kotlin.math.sin(it*.05).toFloat()}

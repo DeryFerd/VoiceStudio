@@ -64,7 +64,7 @@ export function resolveCloudEnvironment(opts: {
   return {
     name,
     ...endpoints,
-    signedInPage: `${endpoints.dashboard}/app/desktop-signed-in`,
+    signedInPage: `${endpoints.dashboard}/desktop-signed-in`,
     clientId: override || clientId(),
   };
 }
@@ -77,8 +77,8 @@ export function cloudOrigins(env: CloudEnvironment): Set<string> {
 /** The dashboard pages the account screen opens in the browser. */
 export function dashboardLinks(env: CloudEnvironment): { profile: string; plan: string } {
   return {
-    profile: `${env.dashboard}/app/settings/profile`,
-    plan: `${env.dashboard}/app/settings/plan`,
+    profile: `${env.dashboard}/settings/profile`,
+    plan: `${env.dashboard}/settings/plan`,
   };
 }
 

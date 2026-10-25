@@ -592,8 +592,8 @@ export function StatusBar({
             type="button"
             aria-label={t('performanceProfile.title')}
             title={t('performanceProfile.title')}
-            // In the macOS rail's two-column footer the gauge takes its own row above Settings.
-            className={cn(engineLinkClass, 'h-7 w-full', inline && 'order-first col-span-2')}
+            // In the macOS rail's footer column the gauge leads, above Settings.
+            className={cn(engineLinkClass, inline ? 'order-first size-8' : 'h-7 w-full')}
           />
         }
       >
@@ -620,7 +620,7 @@ export function StatusBar({
             aria-label={`${deviceLabel}: ${stageText}`}
             className={cn(
               engineLinkClass,
-              'relative h-7 w-full',
+              inline ? 'relative size-8' : 'relative h-7 w-full',
               !compact && !deviceIconOnly && 'justify-start gap-2 px-2',
             )}
           />

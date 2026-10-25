@@ -23,6 +23,8 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
     val downloads=runtime.downloads
     val engine=runtime.engine
     val voices=PhoneVoiceStore(File(application.noBackupFilesDir,"voices"))
+    val production=ProductionStore(File(application.noBackupFilesDir,"production"))
+    val workflows=PhoneWorkflowStore(File(application.noBackupFilesDir,"workflows"))
     val dubs=PhoneDubStore(File(application.noBackupFilesDir,"dubs"))
     private val mutable=MutableStateFlow(PhoneState())
     val state=mutable.asStateFlow()
@@ -96,12 +98,12 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
         generationFile(item).delete();File(application.noBackupFilesDir,"speech/${item.id}.json").delete()
         mutable.update {it.copy(recent=history(),audio=it.audio?.takeUnless {file -> file==generationFile(item)})}
     }}
-    fun clone(name: String, file: File, model: PhoneModel, consent: Boolean, created: ()->Unit = {}) {
+    fun clone(name: String, file: File, model: PhoneModel, cloneModel: PhoneModel, consent: Boolean, created: ()->Unit = {}) {
         if(inference?.isActive==true) return
         inference=scope.launch {
             mutable.update {it.copy(progress=0f)}
-            try {voices.create(name,file,consent,model,engine,progress={p -> mutable.update {it.copy(progress=p)}});refresh();withContext(Dispatchers.IO) {file.delete()};created()}
-            catch(e:CancellationException) {throw e} catch(e:Exception) {retryFailure(e) {clone(name,file,model,consent,created)}}
+            try {voices.create(name,file,consent,model,cloneModel,engine,progress={p -> mutable.update {it.copy(progress=p)}});refresh();withContext(Dispatchers.IO) {file.delete()};created()}
+            catch(e:CancellationException) {throw e} catch(e:Exception) {retryFailure(e) {clone(name,file,model,cloneModel,consent,created)}}
             finally {mutable.update {it.copy(progress=null)}}
         }
     }
@@ -111,6 +113,7 @@ class PhoneStudio(context: Context, private val scope: CoroutineScope, private v
         try {val records=dubs.list();mutable.update {it.copy(dubs=records)}}
         catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}
     }}
+    fun saveProductionDraft(project: ProductionProject) {scope.launch {try {production.save(project)} catch(e:CancellationException) {throw e} catch(e:Exception) {failure(e)}}}
     fun cancelInference() {inference?.cancel()}
 }
 

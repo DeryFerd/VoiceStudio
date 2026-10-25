@@ -78,7 +78,7 @@ class LocalInferenceTest {
         val engine=PhoneLocalEngine(downloads)
         val source=File(root,"reference.wav");markSynthetic(engine.synthesize(tts,"The quick brown fox jumps over the lazy dog.",language="en"),source)
         val store=PhoneVoiceStore(File(root,"voices"))
-        val voice=store.create("Test voice",source,true,asr,engine)
+        val voice=store.create("Test voice",source,true,asr,clone,engine)
         try {
             assertTrue(voice.transcript.isNotBlank())
             val audio=engine.clone(clone,"Hello from this phone.",store.reference(voice),voice.transcript)

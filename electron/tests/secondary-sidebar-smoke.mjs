@@ -110,14 +110,15 @@ try {
           `Dubbing transcript was squeezed to ${transcript?.width ?? 0}px at ${width}px viewport`,
         );
       }
-      const toggle = side.locator("button[aria-expanded]").first();
-      await toggle.click();
+      await side.getByRole("button", { name: "Collapse pane", exact: true }).click();
       assert.ok(
         await side.evaluate(
           (element) => element.getBoundingClientRect().width < 50,
         ),
       );
-      await toggle.click();
+      // Collapsed, the pane has one expand control and an empty titlebar row.
+      assert.equal(await side.locator("[data-slot=secondary-sidebar-header] button").count(), 0);
+      await side.locator("[data-slot=secondary-sidebar-expand]").click();
       await page.waitForFunction((expected) =>
         document.querySelector("[data-slot=secondary-sidebar]")?.getBoundingClientRect().width === expected,
         expanded.width,

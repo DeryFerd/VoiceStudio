@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,6 +37,15 @@ private val destinations = listOf(
     HomeDestination("dictate", "nav.dictation", "mobile.dictate.tap_to_start", VSIcons.Mic),
     HomeDestination("models", "mobile.local.models", "mobile.local.installed", VSIcons.Download),
     HomeDestination("connect", "mobile.local.my_computer", "mobile.local.pair_settings", VSIcons.Computer),
+    HomeDestination("design", "nav.design", "clone.design_placeholder", Icons.Default.Create),
+    HomeDestination("stories", "nav.stories", "stories.subtitle", Icons.Default.Person),
+    HomeDestination("audiobook", "audiobook.title", "audiobook.subtitle", VSIcons.Folder),
+    HomeDestination("batch", "batch.title", "mobile.dub.pick_media", Icons.AutoMirrored.Filled.List),
+    HomeDestination("gallery", "nav.gallery", "clone.preview_voice", Icons.Default.Person),
+    HomeDestination("workflows", "workflows.title", "workflows.heading", Icons.Default.Share),
+    HomeDestination("calls", "calls.title", "mobile.calls.hint", Icons.Default.Call),
+    HomeDestination("local-api", "mobile.host.title", "mobile.host.hint", Icons.Default.Settings),
+    HomeDestination("tools", "tools.title", "compare.title", Icons.Default.Settings),
 )
 
 @Composable fun HomeScreen(vm: StudioViewModel, navigate: (String)->Unit) {

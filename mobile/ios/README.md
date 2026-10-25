@@ -3,7 +3,7 @@
 Native SwiftUI app for iOS 17+, iPhone and iPad. Speak, voice cloning, Dictate and dubbing run downloaded models on the phone, offline. Pairing a VoiceStudio computer is optional and adds its engines. Every task remembers its own phone/computer choice; the segmented control appears only while paired. All five tabs work without pairing. Settings contains Connect and Models.
 ## Build and checks
 
-Swift 6 Command Line Tools, Python 3.9+ and CMake run the macOS package checks. XcodeGen 2.46 generates the app project. Full Xcode with the iOS SDK is required for the app, native xcframeworks and UI tests. Device signing uses your own development team. The root `package.json` supplies the app version; there is no mobile version mirror.
+Swift 6 Command Line Tools, Python 3.9+ and CMake run the macOS package checks. XcodeGen 2.46 generates the app project. Full Xcode with the iOS SDK is required for the app, native xcframeworks and UI tests. Device signing uses your own development team. The app and Share extension need the `group.sh.voicestudio.mobile` App Group enabled in Signing & Capabilities; use a group registered to your team when customizing the bundle IDs. Both targets must use the same group in their entitlements and `PhoneInbox`/`ShareViewController`. Background GPU continuation also needs the `com.apple.developer.background-tasks.continued-processing.gpu` entitlement in the signed app profile on supported iOS26+ hardware; scheduler approval, not a source entitlement file, determines availability. CPU fallback is explicit and preserves checkpoints. The root `package.json` supplies the app version; there is no mobile version mirror.
 
 Run from the repository root:
 
@@ -20,7 +20,7 @@ swiftc -frontend -parse mobile/ios/VoiceStudio/App/*.swift \
   mobile/ios/VoiceStudioUITests/*.swift
 ```
 
-`check-swift.sh` keeps build/module caches inside `mobile/ios/` and supplies the installed Testing.framework on CLT-only installations. Package tests do not download models. The optional `VOICESTUDIO_SWIFT_SCRATCH` selects a separate scratch directory. `check-platform.sh` type-checks the production host media loader, smoke transport and phone model coordinator against macOS; it does not compile SwiftUI/UIKit.
+`check-swift.sh` keeps build/module caches inside `mobile/ios/` and supplies the installed Testing.framework on CLT-only installations. Package tests do not download models. The optional `VOICESTUDIO_SWIFT_SCRATCH` selects a separate scratch directory. `check-platform.sh` type-checks the portable host media loader and smoke transport against macOS. The phone model coordinator now owns UIKit background jobs, so the full iOS app build checks it together with `PhoneJobs`; the macOS check does not substitute for that build.
 
 Explicit preparation and real inference (model terms are printed; test acceptance stays in the isolated fixture store):
 

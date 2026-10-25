@@ -12,6 +12,7 @@ import com.voicestudio.mobile.designsystem.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import com.voicestudio.mobile.local.BookExport
 import com.voicestudio.mobile.local.PhoneModel
 import com.voicestudio.mobile.features.*
 import java.io.File
@@ -91,25 +92,42 @@ internal fun chooseSpeakModel(models: List<PhoneModel>,installed: Set<String>,ch
     return matching.firstOrNull {it.id==choices[speakModelKey(capability)]} ?: matching.firstOrNull {it.id in installed} ?: matching.firstOrNull()
 }
 
-@Composable fun SpeakScreen(vm: StudioViewModel, initialPhoneVoiceID: String? = null, initialComputerVoiceID: String? = null) {
-    var text by rememberSaveable {mutableStateOf("")}
+@Composable fun SpeakScreen(vm: StudioViewModel, initialPhoneVoiceID: String? = null, initialComputerVoiceID: String? = null, initialPhonePreset: Int? = null, initialPhoneModelID: String? = null, initialText: String? = null) {
+    var text by rememberSaveable(initialText) {mutableStateOf(initialText.orEmpty())}
     com.voicestudio.mobile.features.models.TaskLocation(vm,"speak",setOf("tts","clone")) {location,model ->
         if(location==com.voicestudio.mobile.local.RunLocation.COMPUTER) ComputerSpeakScreen(vm,text,{text=it},initialComputerVoiceID)
         else {
             val phone by vm.phone.state.collectAsState()
             val context=LocalContext.current
             val scope=rememberCoroutineScope()
-            var speaker by rememberSaveable(initialPhoneVoiceID) {mutableStateOf(initialPhoneVoiceID?.let {"phone:"+it} ?: "0")}
+            var speaker by rememberSaveable(initialPhoneVoiceID) {mutableStateOf(initialPhoneVoiceID?.let {"phone:"+it} ?: (initialPhonePreset ?: 0).toString())}
             val voice=phone.voices.firstOrNull {"phone:"+it.id==speaker}
             val capability=if(voice==null) "tts" else "clone"
             val prefs by vm.preferences.collectAsState()
-            val selected=chooseSpeakModel(phone.models,phone.installed,prefs.phoneModels,capability)
+            var requestedModel by remember(initialPhoneModelID) {mutableStateOf(initialPhoneModelID)}
+            LaunchedEffect(prefs.phoneModels[speakModelKey(capability)]) {if(prefs.phoneModels[speakModelKey(capability)]==requestedModel) requestedModel=null}
+            val selected=phone.models.firstOrNull {it.id==requestedModel&&it.capability==capability} ?: chooseSpeakModel(phone.models,phone.installed,prefs.phoneModels,capability)
             LaunchedEffect(phone.voices) {if(speaker.startsWith("phone:")&&voice==null) speaker="0"}
-            val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/wav")) {uri ->
-                val source=phone.audio
+            var exportFormat by rememberSaveable {mutableStateOf("wav")}
+            var exporting by remember {mutableStateOf(false)}
+            var exportJob by remember {mutableStateOf<Job?>(null)}
+            var saveSource by remember {mutableStateOf<File?>(null)}
+            val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/*")) {uri ->
+                val source=saveSource;saveSource=null
                 if(uri!=null&&source!=null) scope.launch {
                     try {withContext(Dispatchers.IO) {context.contentResolver.openOutputStream(uri)!!.use {out -> source.inputStream().use {it.copyTo(out)}}}}
-                    catch(e:Exception) {vm.fail(e)}
+                    catch(e:CancellationException) {throw e} catch(e:Exception) {vm.fail(e)}
+                }
+            }
+            fun export(source: File,saveFile: Boolean) {
+                val format=exportFormat
+                exporting=true
+                exportJob=scope.launch {
+                    try {
+                        val file=BookExport.encode(source,format)
+                        if(saveFile) {saveSource=file;save.launch(file.name)}
+                        else shareLocalFile(context,file,when(format) {"mp3"->"audio/mpeg";"m4a"->"audio/mp4";else->"audio/wav"})
+                    } catch(e:CancellationException) {throw e} catch(e:Exception) {vm.fail(e)} finally {exporting=false;exportJob=null}
                 }
             }
             DisposableEffect(Unit) {onDispose {vm.phone.cancelInference()}}
@@ -120,7 +138,7 @@ internal fun chooseSpeakModel(models: List<PhoneModel>,installed: Set<String>,ch
             LaunchedEffect(selected?.id,voice?.id) {language=if(voice!=null) "auto" else language.takeIf {it in selected?.languages.orEmpty()} ?: selected?.languages?.firstOrNull().orEmpty()}
             val languageChoices=if(voice!=null) listOf(Choice("auto",tr("languagePicker.auto"))) else selected?.languages.orEmpty().map {Choice(it,languageName(it,LocalL10n.current.locale))}
             Screen(bottomBar={
-                Action("mobile.speak.generate",text.isNotBlank()&&selected!=null&&phone.canRun(selected,vm.phone.ramBytes)&&validSpeaker&&phone.progress==null) {
+                Action("mobile.speak.generate",text.isNotBlank()&&selected!=null&&phone.canRun(selected,vm.phone.ramBytes)&&validSpeaker&&phone.progress==null&&!exporting) {
                     vm.phone.speak(selected!!,text,speaker.toIntOrNull() ?: 0,voice,language.takeUnless {it=="auto"})
                 }
             }) {
@@ -140,8 +158,10 @@ internal fun chooseSpeakModel(models: List<PhoneModel>,installed: Set<String>,ch
                 }
                 phone.audio?.let {file ->
                     LocalAudioPlayer(file,vm::fail)
-                    Secondary("mobile.speak.share") {scope.launch {try {shareLocalFile(context,file,"audio/wav")} catch(e:Exception) {vm.fail(e)}}}
-                    Secondary("common.save") {save.launch(file.name)}
+                    ChoicePicker("audiobook.format",exportFormat,listOf(Choice("wav","WAV"),Choice("m4a","AAC / M4A"),Choice("mp3","MP3"))) {exportFormat=it}
+                    Secondary("mobile.speak.share",!exporting) {export(file,false)}
+                    Secondary("common.save",!exporting) {export(file,true)}
+                    if(exporting) {CircularProgressIndicator();Secondary("common.cancel") {exportJob?.cancel()}}
                     phone.recent.firstOrNull {vm.phone.generationFile(it)==file}?.let {take -> ReportButton(vm) {ReportSubjects.phoneSpeak(take)}}
                 }
                 Heading("mobile.speak.recent")

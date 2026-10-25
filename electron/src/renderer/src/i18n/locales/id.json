@@ -102,7 +102,11 @@
     "dub": "Terjemahkan dan sulihsuarakan audio atau video.",
     "stories": "Buat adegan dengan beberapa suara.",
     "audiobook": "Buat buku audio dengan bab.",
-    "transcribe": "Ubah rekaman menjadi teks."
+    "transcribe": "Ubah rekaman menjadi teks.",
+    "creatorCoreTeam": "Pembuat dan Tim Inti",
+    "coreTeam": "Tim Inti",
+    "follow": "Ikuti",
+    "website": "Situs web"
   },
   "twilioIntegration": {
     "exposureWarning": "Mengaktifkan ini membuka port lokal terpisah yang dipublikasikan tunnel Anda ke internet. Hanya permintaan yang ditandatangani dengan Auth Token Twilio Anda yang diterima; bagian lain VoiceStudio tetap privat.",
@@ -370,7 +374,8 @@
   },
   "paneActions": {
     "collapse": "Ciutkan panel",
-    "edit": "Edit profil suara"
+    "edit": "Edit profil suara",
+    "expand": "Luaskan panel"
   },
   "modelSettings": {
     "models": "Model",
@@ -989,7 +994,8 @@
     "play": "Putar",
     "pause": "Jeda",
     "seek": "Cari posisi",
-    "missing": "File audio tidak ditemukan."
+    "missing": "File audio tidak ditemukan.",
+    "now_playing": "Sedang diputar"
   },
   "logs": {
     "no_tauri_log": "Belum ada Tauri yang masuk ke disk — luncurkan melalui versi desktop untuk menghasilkannya",
@@ -1874,7 +1880,9 @@
     "deepl_base_url_help": "Titik akhir API DeepL khusus (default: https://api.deepl.com/v2). Ubah untuk proxy/hosting mandiri.",
     "microsoft_base_url_help": "Titik akhir Azure Translator kustom (default: https://api.cognitive.microsofttranslator.com).",
     "region": "Wilayah",
-    "aws_profile": "Profil AWS"
+    "aws_profile": "Profil AWS",
+    "deepl_key_placeholder": "DeepL kunci API",
+    "microsoft_key_placeholder": "Microsoft kunci API"
   },
   "about": {
     "architecture": "Arsitektur",
@@ -2054,6 +2062,7 @@
     "setup_access": "Izinkan akses tulis ke folder data aplikasi, lalu coba lagi.",
     "setup_unsupported_platform": "Mac Intel ini tidak dapat menjalankan backend AI lokal — PyTorch tidak menyediakan wheel macOS Intel. Hubungkan backend jarak jauh di bawah; instalasi lokal tidak diperlukan.",
     "setup_wrong_architecture": "Ini adalah build Intel (x64) VoiceStudio yang berjalan melalui Rosetta di Mac Apple Silicon, sehingga backend AI lokal tidak dapat dipasang. Tutup aplikasi, pasang DMG Apple Silicon (arm64) di atasnya, lalu buka kembali — suara dan proyek Anda tetap tersimpan.",
+    "setup_missing_system_library": "Sistem Windows ini tidak memiliki Microsoft Visual C++ 2015-2022 Redistributable (x64), yang dibutuhkan ekstensi audio PyTorch. Pasang dari Microsoft, lalu tekan Coba Lagi.",
     "download_apple_silicon": "Unduh build Apple Silicon",
     "ready": "Mesin siap",
     "show_log": "Tampilkan log",
@@ -2077,7 +2086,23 @@
     "hint_spawn_blocked": "Sistem operasi atau perangkat lunak keamanan Anda menolak menjalankan mesin lokal. Tambahkan folder runtime VoiceStudio ke pengecualian antivirus (Windows: Keamanan Windows → Perlindungan virus & ancaman → Kelola pengaturan → Pengecualian), pastikan folder itu tidak berada di dalam folder yang disinkronkan ke cloud seperti OneDrive, lalu coba lagi.",
     "hint_smart_app_control": "Smart App Control Windows memblokir mesin lokal. Fitur ini tidak punya pengecualian per aplikasi, jadi pengecualian antivirus tidak akan membantu. Matikan di Keamanan Windows → Kontrol aplikasi & browser → Pengaturan Smart App Control (Windows tidak bisa menyalakannya lagi tanpa reset), atau hubungkan VoiceStudio ke mesin di komputer lain, lalu coba lagi.",
     "hint_slow_start": "Mesin masih memulai saat batas waktu tunggu habis. Komputer lambat, terutama tanpa GPU khusus, dan peluncuran pertama setelah instalasi (antivirus memindai setiap berkas baru) dapat memerlukan beberapa menit. Tutup aplikasi yang boros memori lalu coba lagi; peluncuran berikutnya jauh lebih cepat.",
-    "hint_synced_folder": "Lokasi ini berada di dalam folder yang disinkronkan ke cloud (OneDrive, Dropbox, iCloud Drive, Google Drive). Placeholder khusus daring dan penguncian berkas merusak lingkungan Python. Pindahkan VoiceStudio ke folder lokal biasa (misalnya C:\\VoiceStudio di Windows atau ~/VoiceStudio di macOS dan Linux), lalu siapkan ulang."
+    "hint_synced_folder": "Lokasi ini berada di dalam folder yang disinkronkan ke cloud (OneDrive, Dropbox, iCloud Drive, Google Drive). Placeholder khusus daring dan penguncian berkas merusak lingkungan Python. Pindahkan VoiceStudio ke folder lokal biasa (misalnya C:\\VoiceStudio di Windows atau ~/VoiceStudio di macOS dan Linux), lalu siapkan ulang.",
+    "cause_smart_app_control": "Smart App Control Windows memblokir mesin",
+    "cause_spawn_blocked": "Perangkat lunak keamanan memblokir mesin agar tidak dimulai",
+    "cause_native_crash": "Mesin mogok saat dimulai (kesalahan native)",
+    "cause_missing_env": "Lingkungan Python hilang atau tidak lengkap",
+    "cause_permission": "Tidak ada izin menulis ke folder mesin",
+    "cause_synced_folder": "Folder mesin berada di dalam folder yang disinkronkan ke cloud",
+    "cause_slow_start": "Mesin masih dimulai di komputer yang lambat",
+    "choose_folder": "Pilih folder lain",
+    "copy_diagnostics": "Salin diagnostik",
+    "diagnostics_copied": "Diagnostik disalin",
+    "details": "Detail",
+    "pill_starting": "Memulai",
+    "pill_recovering": "Memulihkan",
+    "pill_failed": "Gagal",
+    "pill_repeats": "{{count}} kali berturut-turut",
+    "offline_bar": "Mesin sibuk, menyambung kembali otomatis"
   },
   "bootstrap": {
     "checking": "Memeriksa lingkungan…",
@@ -2372,7 +2397,8 @@
     "storage_temp": "File sementara",
     "change": "Ubah…",
     "reset_default": "Atur ulang ke default",
-    "region_label": "Wilayah unduhan"
+    "region_label": "Wilayah unduhan",
+    "free_space": "{{free}} GB tersedia di drive ini, dibutuhkan sekitar {{needed}} GB"
   },
   "asr_missing": {
     "message": "Tidak ada model ucapan-ke-teks yang terpasang — fitur ini membutuhkannya untuk mentranskripsi audio.",
@@ -2514,7 +2540,18 @@
     "staleTitle": "Pembaruan tersedia",
     "staleMessage": "Anda menggunakan VoiceStudio {{current}}, tetapi {{latest}} sudah dirilis — bug ini mungkin sudah diperbaiki di sana. Lihat rilis terbaru sebelum melapor?",
     "staleView": "Lihat pembaruan",
-    "staleFileAnyway": "Tetap laporkan"
+    "staleFileAnyway": "Tetap laporkan",
+    "summary_label": "Apa yang salah?",
+    "summary_placeholder": "Satu baris, misalnya: Dubbing berhenti di 40%",
+    "summary_required": "Tambahkan deskripsi satu baris terlebih dahulu.",
+    "sent_title": "Yang akan dikirim",
+    "sent_app": "Versi dan build aplikasi",
+    "sent_system": "Sistem operasi, GPU, memori, dan ruang disk kosong",
+    "sent_engines": "Mesin mana yang aktif",
+    "sent_logs": "Baris log mesin terbaru, tanpa jalur folder home dan token",
+    "sent_pages": "Nama halaman yang baru dikunjungi",
+    "not_sent": "Tidak pernah dikirim: audio, teks, atau suara Anda. Nama file bisa muncul di log atau deskripsi Anda, jadi periksa pratinjau GitHub sebelum mengirim.",
+    "submit": "Buka issue GitHub"
   },
   "crash": {
     "notice_unclean": "Sesi sebelumnya berakhir tanpa penutupan yang bersih {{ago}} yang lalu. Ini sering tidak berbahaya — mesin tertidur, aplikasi ditutup paksa, atau VM/kontainer berhenti.",
@@ -3889,6 +3926,164 @@
       "retry": "Coba lagi",
       "rate_limited": "Terlalu banyak laporan dari jaringan ini. Coba lagi nanti.",
       "invalid": "Laporan ini tidak dapat dikirim. Perbarui aplikasi dan coba lagi."
+    },
+    "production": {
+      "new": "Proyek baru",
+      "script_hint": "Gunakan # Judul bab untuk bab dan [voice:Name] di awal baris untuk mengganti karakter. Hanya teks biasa; markup lain akan dibacakan.",
+      "conversion_hint": "Pilih klip audio hingga 30 detik. Konversi mentranskripsikan lalu membacakannya dengan suara pilihan; penampilan asli tidak dipertahankan.",
+      "normalize_text": "Rapikan teks"
+    },
+    "calls": {
+      "remote_control": "Izinkan kontrol panggilan dari perangkat terpasang",
+      "remote_control_hint": "Izinkan ponsel yang diautentikasi dengan kunci API untuk memulai dan mengelola panggilan. Pengaturan panggilan tetap di komputer ini.",
+      "hint": "Panggilan menggunakan komputer terpasang dan nomor Twilio yang dikonfigurasi. Aktifkan kontrol panggilan di komputer tersebut terlebih dahulu.",
+      "authentication": "Pasangkan dengan kunci API komputer untuk mengontrol panggilan. PIN berbagi tidak mengizinkan panggilan.",
+      "billing": "Biaya panggilan Twilio berlaku.",
+      "clone_hint": "Whisper mentranskripsikan sampel. Model kloning terpisah membuat pratinjau suara kloning sebelum disimpan; kedua model diperlukan."
+    },
+    "host": {
+      "title": "API suara ponsel",
+      "hint": "Sajikan suara terpasang yang dipilih melalui endpoint ucapan bergaya OpenAI dan MCP (2025-11-25). Hanya berjalan saat layar ini terbuka dan aplikasi aktif.",
+      "lan": "Izinkan jaringan lokal",
+      "lan_hint": "Nonaktif: hanya ponsel ini. Aktif: perangkat di jaringan dapat terhubung dengan token Bearer sementara. Jaga kerahasiaan token.",
+      "start": "Mulai server",
+      "copy": "Salin token Bearer",
+      "running": "Server berjalan",
+      "capabilities_hint": "Sediakan hanya model terpasang dan suara yang Anda pilih. Ucapan, transkripsi, dan terjemahan berjalan di ponsel ini selama layar ini tetap terbuka.",
+      "allow_speech": "Izinkan pembuatan ucapan",
+      "allow_transcription": "Izinkan transkripsi",
+      "allow_translation": "Izinkan terjemahan",
+      "voice_source": "Sumber suara",
+      "preset": "Suara bawaan",
+      "saved": "Suara tersimpan",
+      "audio_hint": "Transkripsi menerima WAV mono PCM16 base64, 8–24 kHz, hingga 30 detik."
+    },
+    "books": {
+      "import_failed": "Buku tidak dapat diimpor. Gunakan EPUB tanpa enkripsi, PDF teks, atau teks UTF-8 (hingga 64 MB).",
+      "no_text": "Tidak ditemukan teks yang dapat dibaca. PDF hasil pindai memerlukan pengenalan teks sebelum diimpor.",
+      "export_failed": "Audio tidak dapat diekspor. M4B mendukung hingga 255 bab.",
+      "invalid_controls": "Gunakan kecepatan 0,5 hingga 2, jeda hingga 30 detik, dan entri pelafalan yang tidak kosong.",
+      "controls_hint": "Impor EPUB, PDF teks, atau TXT. Tambahkan [pause:0.5] untuk hening dalam detik; awali baris dengan [speed:1.25] untuk mengubah kecepatannya. Baris yang tidak berubah memakai ulang audio tersimpan.",
+      "line_speed": "Kecepatan baris",
+      "restore_recipe": "Edit resep suara tersimpan",
+      "save_recipe_copy": "Simpan sebagai suara baru"
+    },
+    "editing": {
+      "undo": "Urungkan",
+      "redo": "Ulangi",
+      "subtitles": "Subtitel",
+      "import_subtitles": "Impor SRT / VTT",
+      "export_srt": "Ekspor SRT",
+      "export_vtt": "Ekspor VTT",
+      "source_text": "Teks sumber",
+      "original": "Audio asli",
+      "generated": "Audio yang dihasilkan",
+      "split_at": "Pisahkan pada",
+      "split": "Pisahkan segmen",
+      "merge": "Gabung dengan berikutnya",
+      "replace_subtitles": "Ganti linimasa subtitel?",
+      "replace": "Ganti",
+      "replace_subtitles_detail": "Ini mengganti linimasa segmen untuk bahasa ini. Bahasa lain mungkin perlu diterjemahkan ulang. Anda dapat mengurungkan sebelum membuat audio.",
+      "preview_unavailable": "Buat segmen ini sebelum mempratinjau audionya.",
+      "subtitle_invalid": "Pilih berkas SRT atau VTT yang valid dengan segmen berdurasi maksimal 30 detik.",
+      "subtitle_missing": "Terjemahkan setiap segmen sebelum mengekspor subtitel.",
+      "split_invalid": "Pilih titik pemisahan di dalam segmen dengan teks yang cukup di kedua sisi.",
+      "merge_invalid": "Gabungkan segmen berdekatan dengan suara yang sama dan durasi total maksimal 30 detik.",
+      "waveform": "Bentuk gelombang audio"
+    },
+    "jobs": {
+      "title": "Pemrosesan di ponsel",
+      "checkpointed": "Langkah yang selesai disimpan. Batalkan dan lanjutkan saat diperlukan.",
+      "power_paused": "Pemrosesan dijeda untuk melindungi baterai atau mendinginkan ponsel. Lanjutkan saat kondisi membaik.",
+      "background_paused": "Dijeda di latar belakang. Buka kembali tugas ini dan lanjutkan dari langkah yang disimpan.",
+      "requesting_gpu": "Meminta akses GPU di latar belakang…",
+      "requesting_cpu": "Meminta waktu CPU di latar belakang…",
+      "continued_gpu": "Kelanjutan GPU diizinkan; iOS tetap dapat menjeda atau mengakhiri tugas.",
+      "continued_cpu": "Kelanjutan CPU diizinkan; iOS tetap dapat menjeda atau mengakhiri tugas.",
+      "switching_cpu": "Menyimpan kemajuan dan melepas GPU sebelum melanjutkan dengan CPU…",
+      "background_limited": "iOS membatasi waktu latar belakang. Langkah yang selesai tetap disimpan jika waktu habis.",
+      "background_requestable": "Ponsel ini mendukung permintaan GPU latar belakang. Setiap tugas tetap memerlukan persetujuan iOS.",
+      "gpu_unavailable": "GPU latar belakang tidak tersedia di sini. Gunakan CPU atau buka kembali untuk melanjutkan langkah tersimpan.",
+      "cpu_fallback": "Izinkan kelanjutan CPU jika GPU latar belakang tidak tersedia",
+      "cpu_tradeoff": "CPU lebih lambat dan dapat memakai lebih banyak baterai. Pekerjaan latar depan biasanya memakai GPU.",
+      "cpu_unavailable": "Versi terpasang tidak dapat melanjutkan model ini dengan CPU. Langkah tersimpan tetap dapat dilanjutkan di latar depan.",
+      "resume_checkpoint": "Lanjutkan tugas tersimpan",
+      "foreground_service": "Layanan latar depan menjaga tugas ini berjalan selama Android mengizinkannya."
+    },
+    "flow": {
+      "import_media": "Impor audio atau video",
+      "template_clean": "Rapikan dan bacakan",
+      "template_translate": "Terjemahkan dan bacakan",
+      "template_transcribe": "Transkripsikan dan terjemahkan",
+      "contains": "Lanjutkan jika teks berisi (peka huruf besar/kecil)",
+      "skip": "Jika tidak ada, lewati {{count}} langkah",
+      "skip_label": "Langkah yang dilewati jika tidak ada",
+      "retries": "Percobaan ulang: {{count}}",
+      "retries_label": "Percobaan ulang setelah kesalahan",
+      "step_transcribe": "Transkripsikan media",
+      "step_condition": "Kondisi"
+    },
+    "integration": {
+      "received": "Konten diterima",
+      "review": "Tinjau konten yang dibagikan sebelum menjalankan tugas. Tidak ada yang dimulai otomatis.",
+      "shortcut_speak": "Buka pembacaan",
+      "shortcut_dictate": "Buka dikte",
+      "widget_description": "Membuka pembacaan atau dikte. Perekaman hanya dimulai setelah mengetuk Mulai.",
+      "text": "Teks"
+    },
+    "export": {
+      "failed": "Audio tidak dapat diekspor. Periksa ruang penyimpanan yang tersedia lalu coba lagi."
+    },
+    "processing": {
+      "audio_editor": "Editor audio",
+      "hint": "Penyuntingan ucapan luring: mono 24 kHz. Sumber Anda tetap utuh.",
+      "select_audio": "Pilih audio",
+      "fade_in": "Fade masuk (detik)",
+      "fade_out": "Fade keluar (detik)",
+      "gain_db": "Penguatan (dB)",
+      "normalize": "Normalisasi puncak",
+      "target_peak": "Puncak sasaran (dBFS)",
+      "noise_gate": "Gerbang derau",
+      "gate_threshold": "Ambang gerbang (dBFS)",
+      "process": "Terapkan suntingan",
+      "result": "Audio yang diproses",
+      "peak": "Puncak",
+      "changed_settings": "Pengaturan berubah. Terapkan suntingan untuk mempratinjau atau mengekspor audio terbaru.",
+      "preview_hint": "Pratinjau sumber memutar hingga 30 detik dari awal pemotongan.",
+      "invalid": "Periksa waktu pemotongan, durasi fade, dan tingkat audio.",
+      "segment_gain": "Volume segmen",
+      "mute": "Bisukan segmen",
+      "record_consent": "Saya memiliki izin menggunakan rekaman ini untuk konversi suara.",
+      "merge_levels": "Gunakan pengaturan volume dan bisu yang sama sebelum menggabungkan segmen."
+    }
+  },
+  "failureCause": {
+    "details": "Detail",
+    "fixes": "Saran perbaikan",
+    "vram": {
+      "title": "GPU kehabisan memori",
+      "fix1": "Tutup aplikasi lain yang memakai GPU",
+      "fix2": "Pilih CPU atau mesin yang lebih kecil"
+    },
+    "model_missing": {
+      "title": "Model belum diunduh",
+      "fix1": "Unduh di Katalog Model",
+      "fix2": "Gunakan Perbaiki untuk memasangnya"
+    },
+    "busy": {
+      "title": "Mesin sedang sibuk",
+      "fix1": "Tunggu tugas saat ini selesai",
+      "fix2": "Coba lagi sebentar lagi"
+    },
+    "timeout": {
+      "title": "Pembuatan melewati batas waktu",
+      "fix1": "Coba bagian yang lebih pendek",
+      "fix2": "Naikkan batas waktu proxy"
+    },
+    "bad_response": {
+      "title": "Respons tak terduga dari server",
+      "fix1": "Periksa backend di Pengaturan > Log",
+      "fix2": "Mulai ulang VoiceStudio lalu coba lagi"
     }
   }
 }

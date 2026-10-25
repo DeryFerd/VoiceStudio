@@ -110,7 +110,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
         )}
       >
         <img src={brandIcon} alt="" className="size-6" />
-        <h1 className="text-sm font-medium">{t('app.name')}</h1>
+        <h1 className="min-w-0 truncate text-sm font-medium">{t('app.name')}</h1>
         {advanced && (
           <div className="ml-auto flex items-center gap-1" aria-label={t('preferences.ui_scale')}>
             <span className="mr-1 text-xs text-muted-foreground">{t('preferences.ui_scale')}</span>
@@ -150,8 +150,9 @@ export function SetupGate({ children }: { children: ReactNode }) {
           <main key={step} className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="mx-auto max-w-3xl space-y-6">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">{t(steps[step].label)}</h2>
+                <h2 className="min-w-0 text-lg font-semibold">{t(steps[step].label)}</h2>
                 <Button
+                  className="h-auto min-h-8 shrink-0 whitespace-normal py-1.5"
                   variant={advanced ? 'secondary' : 'outline'}
                   aria-pressed={advanced}
                   onClick={() => setAdvanced((value) => !value)}
@@ -233,6 +234,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
           </main>
           <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border/50 p-4">
             <Button
+              className="h-auto min-h-8 min-w-0 max-w-[45%] whitespace-normal py-1.5 text-center"
               variant="ghost"
               disabled={step === 0}
               onClick={() => setStep((value) => value - 1)}
@@ -240,6 +242,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
               {t('setup.back')}
             </Button>
             <Button
+              className="h-auto min-h-8 min-w-0 max-w-[55%] whitespace-normal py-1.5 text-center"
               disabled={!canContinue}
               onClick={async () => {
                 if (step !== steps.length - 1) {

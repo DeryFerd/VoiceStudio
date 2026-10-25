@@ -40,6 +40,7 @@ beforeEach(() => {
   delete backendStatus.message;
   delete backendStatus.diagnosis;
   delete backendStatus.setupIssue;
+  delete backendStatus.runtimeFreeGib;
   delete backendStatus.setupPhase;
   delete backendStatus.setupProgress;
   platform.current = 'linux';
@@ -162,7 +163,8 @@ it('still takes over the workspace for a real failure', () => {
 });
 
 it('describes a backend that answers unhealthy from the catalog, not the English detail', () => {
-  backendStatus.message = 'The backend at http://x answers /health but reports that it is not healthy.';
+  backendStatus.message =
+    'The backend at http://x answers /health but reports that it is not healthy.';
   backendStatus.diagnosis = 'unhealthy';
 
   renderGate('failed');
@@ -261,19 +263,24 @@ it('sends Apple Silicon users on the Intel build to the arm64 download (#2598)',
 
   expect(screen.getByText(i18n.t('backend.setup_wrong_architecture'))).toBeVisible();
   expect(
-    screen.getByRole('link', { name: i18n.t('backend.download_apple_silicon') }),
+    screen.getByRole('link', {
+      name: i18n.t('backend.download_apple_silicon'),
+    }),
   ).toHaveAttribute('href', RELEASES_URL);
   expect(
     screen.queryByRole('button', { name: i18n.t('backend.setup_required') }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText(i18n.t('backend.setup_unsupported_platform'))).not.toBeInTheDocument();
   expect(
-    screen.getByRole('textbox', { name: i18n.t('settings.remote_backend_url') }),
+    screen.getByRole('textbox', {
+      name: i18n.t('settings.remote_backend_url'),
+    }),
   ).toBeVisible();
 });
 
 it('shows a populated, usable reconnect form for an expired remote session while queries are paused', async () => {
-  backendStatus.message = 'The remote backend at http://gpu-box:3900 no longer accepts this app’s credentials.';
+  backendStatus.message =
+    'The remote backend at http://gpu-box:3900 no longer accepts this app’s credentials.';
   backendStatus.diagnosis = 'auth_required';
   backendStatus.remote = true;
   // A failed backend takes React Query offline (use-backend-status); the saved
@@ -293,7 +300,11 @@ it('shows a populated, usable reconnect form for an expired remote session while
     expect(screen.getByText(i18n.t('backend.auth_required'))).toBeVisible();
     // Fresh renderer: the URL arrives from the saved connection, and Test/Save work.
     expect(await screen.findByDisplayValue('http://gpu-box:3900')).toBeEnabled();
-    expect(screen.getByRole('button', { name: i18n.t('settings.remote_backend_test') })).toBeEnabled();
+    expect(
+      screen.getByRole('button', {
+        name: i18n.t('settings.remote_backend_test'),
+      }),
+    ).toBeEnabled();
   } finally {
     backendStatus.remote = false;
   }
@@ -316,7 +327,9 @@ it('offers a remote backend instead of a doomed local install on Intel Macs', ()
     screen.queryByRole('button', { name: i18n.t('backend.setup_required') }),
   ).not.toBeInTheDocument();
   expect(
-    screen.getByRole('textbox', { name: i18n.t('settings.remote_backend_url') }),
+    screen.getByRole('textbox', {
+      name: i18n.t('settings.remote_backend_url'),
+    }),
   ).toBeVisible();
 });
 
@@ -329,14 +342,19 @@ it.each([
     'Backend did not answer on port 3900 within 600 s (OMNIVOICE_STARTUP_BUDGET_S). It printed no output.',
     'backend.hint_slow_start',
   ],
-])('adds localized, actionable advice under a recognised failure (#2440, #2445)', (message, key) => {
-  backendStatus.message = message;
+])(
+  'adds localized, actionable advice under a recognised failure (#2440, #2445)',
+  (message, key) => {
+    backendStatus.message = message;
 
-  renderGate('failed');
+    renderGate('failed');
 
-  expect(screen.getByText(message)).toBeInTheDocument();
-  expect(screen.getByTestId('backend-hint')).toHaveTextContent(i18n.t(key));
-});
+    // The raw message moves under Details once a cause is named.
+  fireEvent.click(screen.getByRole('button', { name: i18n.t('backend.details') }));
+  expect(screen.getByLabelText(i18n.t('backend.log_label'))).toHaveTextContent(message);
+    expect(screen.getByTestId('backend-hint')).toHaveTextContent(i18n.t(key));
+  },
+);
 
 it('shows no advice for a failure it cannot classify', () => {
   backendStatus.message = 'Backend exited unexpectedly (exit code 1).';
@@ -344,4 +362,124 @@ it('shows no advice for a failure it cannot classify', () => {
   renderGate('failed');
 
   expect(screen.queryByTestId('backend-hint')).not.toBeInTheDocument();
+});
+
+it('shows the effective install path with free space before setup starts', () => {
+  backendStatus.runtimeFreeGib = 120;
+  renderGate('setup_required');
+
+  expect(screen.getByText('C:\\VoiceStudio\\runtime')).toBeInTheDocument();
+  expect(screen.getByTestId('setup-free-space')).toHaveTextContent(
+    i18n.t('firstrun.free_space', { free: 120, needed: 9 }),
+  );
+  expect(screen.getByTestId('setup-free-space')).not.toHaveClass('text-warning');
+});
+
+it('warns when the install drive has less free space than the install needs', () => {
+  backendStatus.runtimeFreeGib = 3;
+  renderGate('setup_required');
+
+  expect(screen.getByTestId('setup-free-space')).toHaveClass('text-warning');
+  delete backendStatus.runtimeFreeGib;
+});
+
+it('names a native crash and makes Copy diagnostics the primary action', () => {
+  backendStatus.message = 'Backend exited unexpectedly (exit code 3221225477).';
+
+  renderGate('crashed');
+
+  expect(screen.getByTestId('backend-cause')).toHaveTextContent(
+    i18n.t('backend.cause_native_crash'),
+  );
+  expect(screen.getByRole('button', { name: i18n.t('backend.copy_diagnostics') })).toBeEnabled();
+  expect(screen.getByRole('button', { name: i18n.t('backend.retry') })).toBeEnabled();
+});
+
+it('offers Choose another folder for a missing Python environment', async () => {
+  const chooseRuntimeLocation = vi.fn().mockResolvedValue({ path: 'D:\\vs' });
+  const restart = vi.fn().mockResolvedValue(undefined);
+  bridgeStub.current = { backend: { chooseRuntimeLocation, restart } };
+  backendStatus.message = 'The Python environment in C:\\VoiceStudio is missing or incomplete.';
+
+  renderGate('failed');
+
+  expect(screen.getByTestId('backend-cause')).toHaveTextContent(
+    i18n.t('backend.cause_missing_env'),
+  );
+  fireEvent.click(screen.getByRole('button', { name: i18n.t('backend.choose_folder') }));
+  await waitFor(() => expect(restart).toHaveBeenCalled());
+  expect(chooseRuntimeLocation).toHaveBeenCalled();
+});
+
+it('names no cause for an unrecognised failure', () => {
+  backendStatus.message = 'Backend exited unexpectedly (exit code 1).';
+
+  renderGate('failed');
+
+  expect(screen.queryByTestId('backend-cause')).not.toBeInTheDocument();
+});
+
+it('shows one status pill with the stage and elapsed time while starting', () => {
+  backendStatus.elapsedMs = 12_000;
+
+  renderGate('starting');
+
+  const pill = screen.getByTestId('backend-status-pill');
+  expect(pill).toHaveAttribute('data-state', 'starting');
+  expect(pill).toHaveTextContent(i18n.t('backend.pill_starting'));
+  expect(pill).toHaveTextContent(i18n.t('backend.elapsed', { seconds: 12 }));
+});
+
+it('shows a failed pill and keeps the raw log tail under Details', () => {
+  backendStatus.message = 'Backend exited unexpectedly (exit code 3221225477).';
+  backendStatus.logTail = ['line one', 'line two'];
+
+  renderGate('crashed');
+
+  expect(screen.getByTestId('backend-status-pill')).toHaveAttribute('data-state', 'failed');
+  expect(screen.queryByText('line one', { exact: false })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: i18n.t('backend.details') }));
+  expect(screen.getByLabelText(i18n.t('backend.log_label'))).toHaveTextContent('line two');
+});
+
+it('collapses repeated identical failures into one pill counter', () => {
+  backendStatus.message = 'Backend exited unexpectedly (exit code 1).';
+  const view = renderGate('failed');
+  expect(screen.getByTestId('backend-status-pill')).not.toHaveTextContent(/2/);
+
+  backendStatus.stage = 'starting';
+  view.rerender(<QueryClientProvider client={new QueryClient()}><BackendGate><div>workspace</div></BackendGate></QueryClientProvider>);
+  backendStatus.stage = 'failed';
+  view.rerender(<QueryClientProvider client={new QueryClient()}><BackendGate><div>workspace</div></BackendGate></QueryClientProvider>);
+
+  expect(screen.getByTestId('backend-status-pill')).toHaveTextContent(
+    i18n.t('backend.pill_repeats', { count: 2 }),
+  );
+});
+
+it('shows a non-blocking offline bar while a live engine is busy', () => {
+  backendStatus.managed = true;
+
+  renderGate('unresponsive');
+
+  expect(screen.getByTestId('backend-offline-bar')).toHaveTextContent(i18n.t('backend.offline_bar'));
+  expect(screen.queryByTestId('backend-gate-scroll')).not.toBeInTheDocument();
+});
+
+it('forgets that diagnostics were copied once the failure changes', async () => {
+  Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+  backendStatus.message = 'Backend exited unexpectedly (exit code 3221225477).';
+  const view = renderGate('crashed');
+  fireEvent.click(screen.getByRole('button', { name: i18n.t('backend.copy_diagnostics') }));
+  await screen.findByRole('button', { name: i18n.t('backend.diagnostics_copied') });
+
+  backendStatus.message = 'Backend exited unexpectedly (exit code -1073741819).';
+  view.rerender(
+    <QueryClientProvider client={new QueryClient()}>
+      <BackendGate>
+        <div>workspace</div>
+      </BackendGate>
+    </QueryClientProvider>,
+  );
+  expect(screen.getByRole('button', { name: i18n.t('backend.copy_diagnostics') })).toBeEnabled();
 });

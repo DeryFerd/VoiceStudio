@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "$0")" && pwd)"
+python3 "$root/../mp3/verify_source.py"
 export GIT_CEILING_DIRECTORIES="$root/build/sources"
 if [[ "${1:-}" != "--skip-fetch" ]]; then python3 "$root/fetch.py"; fi
 if [[ "${1:-}" == "--fetch-only" ]]; then exit 0; fi

@@ -15,7 +15,10 @@ struct VoicePicker: View {
     }
 }
 struct SpeakView: View {
+    var initialText: String? = nil
     var initialPhoneVoiceID: String? = nil
+    var initialPhonePreset: Int? = nil
+    var initialPhoneModelID: String? = nil
     var initialComputerVoiceID: String? = nil
     @Environment(AppModel.self) private var model
     @Environment(\.vsTheme) private var theme
@@ -25,6 +28,11 @@ struct SpeakView: View {
     @State private var localProgress: EngineProgress?
     @State private var generation: Task<Void, Never>?
     @State private var phoneLanguage = "en"
+    @State private var phoneExportSource: URL?
+    @State private var exportFormat = "wav"
+    @State private var exporting = false
+    @State private var exportTask: Task<Void,Never>?
+    @State private var shared: SharedFile?
     private var phoneVoice: PhoneVoice? { model.phone.voices.first { "phone:"+$0.id.uuidString == speakerID } }
     private var capability: ModelCapability { phoneVoice == nil ? .tts : .clone }
     private var phoneModel: PhoneModel? { model.phone.candidates(capability).first { $0.id == phoneModelID } ?? model.phone.selectedModel("speak-"+capability.rawValue,capability) }
@@ -48,7 +56,7 @@ struct SpeakView: View {
     }
     var body: some View {
         Page {
-            RunOnPicker(preference: $preference, task: "speak", installed: localReady).disabled(generating)
+            RunOnPicker(preference: $preference, task: "speak", installed: localReady).disabled(generating || exporting)
             if route == .connect { NavigationLink(model.t("mobile.settings.connection")) { ConnectView() } }
             speechEditor
             speechOptions
@@ -56,8 +64,13 @@ struct SpeakView: View {
             if player.file != nil || player.playing {
                 AudioPlayerView(player: player)
                 if let result { ReportButton(subject: result, reporting: $reporting).studioButton(.tertiary) }
+                if route != .computer, let source = phoneExportSource {
+                    ChoicePicker(label: model.t("audiobook.format"),selection: $exportFormat,options: [SelectionOption(id: "wav",title: "WAV"),SelectionOption(id: "m4a",title: "AAC / M4A"),SelectionOption(id: "mp3",title: "MP3")]).disabled(exporting)
+                    Button(model.t("mobile.speak.share"),systemImage: "square.and.arrow.up") { exportPhone(source) }.studioButton(.tertiary).disabled(exporting)
+                    if exporting { ProgressView(); Button(model.t("common.cancel")) { exportTask?.cancel() }.studioButton(.tertiary) }
+                }
             }
-            recentGenerations
+            recentGenerations.disabled(exporting)
         }.navigationTitle(model.t("mobile.tabs.speak")).navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             generationControls.padding(.horizontal, Theme.compactInset).padding(.vertical, VSTokens.spacingGap / 2)
@@ -66,17 +79,18 @@ struct SpeakView: View {
         .onChange(of: model.profiles.map(\.id)) { _, _ in selection.reconcile(inventory: model.inventory, profiles: model.profiles) }
         .refreshable { if model.connection.client != nil { await model.perform { try await model.refresh() } }; await model.phone.refresh(); selection.reconcile(inventory: model.inventory, profiles: model.profiles) }
         .contentReportSheet($reporting)
+        .sheet(item: $shared) { ShareSheet(items: [$0.url]) }
         .sheet(item: $deleting) { item in
             DeleteConfirmation(title: model.t("mobile.ios.delete_generation")) {
                 Task { await model.perform { try await model.api().deleteHistory(item.id); model.history = try await model.api().history() } }
             }
         }
-        .onAppear { hostScope = model.hostState.scopeID; preference = initialPhoneVoiceID == nil ? model.phone.preference("speak") : .phone; if let id = initialPhoneVoiceID { speakerID = "phone:" + id }; if let id = initialComputerVoiceID { preference = .computer; selection.chooseProfile(id, profiles: model.profiles, inventory: model.inventory, catalog: model.languages) } }
+        .onAppear { if let initialText,text.isEmpty { text = initialText }; hostScope = model.hostState.scopeID; preference = initialPhoneVoiceID == nil && initialPhonePreset == nil ? model.phone.preference("speak") : .phone; if let id = initialPhoneVoiceID { speakerID = "phone:" + id }; if let preset = initialPhonePreset { speakerID = String(preset); if let id = initialPhoneModelID { phoneModelID = id; model.phone.chooseModel("speak",id) } }; if let id = initialComputerVoiceID { preference = .computer; selection.chooseProfile(id, profiles: model.profiles, inventory: model.inventory, catalog: model.languages) } }
         .task { await model.phone.refresh(); reconcilePhone() }
         .onChange(of: speakerID) { _, _ in reconcilePhone() }
         .onChange(of: phoneModel?.id) { _, _ in reconcilePhone() }
         .onChange(of: model.phone.voices) { _, _ in if speakerID.hasPrefix("phone:") && phoneVoice == nil { speakerID = "0" } }
-        .onDisappear { generation?.cancel(); if hostScope != model.hostState.scopeID { player.clear() } else { player.pause() } }
+        .onDisappear { exportTask?.cancel(); generation?.cancel(); if hostScope != model.hostState.scopeID { player.clear() } else { player.pause() } }
     }
     private var speechEditor: some View {
         ZStack(alignment: .topLeading) {
@@ -151,6 +165,7 @@ struct SpeakView: View {
                     Button(model.t("common.play"),systemImage: "play.fill") { Task { await model.performPhone {
                         guard let store = model.phone.generationStore else { throw ClientError("mobile.errors.file") }
                         try await player.load(Data(contentsOf: await store.file(item)),extension: "wav"); player.play()
+                        phoneExportSource = try await store.file(item)
                         result = phoneSubject(item)
                     } } }
                     ReportButton(subject: phoneSubject(item), reporting: $reporting, context: item.text)
@@ -197,9 +212,11 @@ struct SpeakView: View {
                             let saved = try await model.phone.generationStore?.save(text: submittedText,audio: audio,model: phoneModel)
                             await model.phone.refresh()
                             try await player.load(audio.markSynthetic(), extension: "wav")
+                            phoneExportSource = player.file
                             self.result = saved.map(phoneSubject) ?? .phone(.speak, id: UUID().uuidString, repo: phoneModel.repo, revision: phoneModel.revision, typedText: submittedText)
                             return
                         }
+                        phoneExportSource = nil
                         let hostEngine = selection.engineID.isEmpty ? model.inventory?.tts.active : selection.engineID
                         let result = try await model.hostState.generate(api: model.api(), text: submittedText, profile: selection.profileID, engine: selection.engineID, language: selection.language)
                         if let hostEngine { model.computerEngines[result.id] = hostEngine }
@@ -212,11 +229,21 @@ struct SpeakView: View {
                 Label(model.t(generating ? "mobile.speak.generating" : "mobile.speak.generate"), systemImage: "waveform")
                     .frame(maxWidth: .infinity)
             }.studioButton(.primary)
-                .disabled(model.busy || model.phone.activeDub != nil || generating || (route != .phone && route != .computer) || (route == .computer && !selection.canGenerate(in: model.inventory, profiles: model.profiles)) || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(exporting || model.busy || model.phone.activeDub != nil || generating || (route != .phone && route != .computer) || (route == .computer && !selection.canGenerate(in: model.inventory, profiles: model.profiles)) || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("speak.generate")
             if generating {
                 if let value = localProgress { ProgressView(value: value.fraction).accessibilityLabel(model.t("mobile.ios.progress")) }
                 Button(model.t("common.cancel")) { generation?.cancel() }
+            }
+        }
+    }
+    private func exportPhone(_ source: URL) {
+        let format = exportFormat
+        exporting = true
+        exportTask = Task {
+            defer { exporting = false; exportTask = nil }
+            await model.performPhone {
+                shared = SharedFile(url: try await BookExport.encode(wave: source,format: format))
             }
         }
     }

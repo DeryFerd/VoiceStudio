@@ -102,7 +102,11 @@
     "dub": "音声や動画を翻訳・吹き替え。",
     "stories": "複数の声でシーンを作成。",
     "audiobook": "章立てのオーディオブックを作成。",
-    "transcribe": "録音を文字に起こす。"
+    "transcribe": "録音を文字に起こす。",
+    "creatorCoreTeam": "作者・コアチーム",
+    "coreTeam": "コアチーム",
+    "follow": "フォロー",
+    "website": "ウェブサイト"
   },
   "twilioIntegration": {
     "exposureWarning": "オンにすると、トンネルがインターネットに公開する別のローカルポートが開きます。Twilio Auth Token で署名されたリクエストのみ受け付け、VoiceStudio のその他の部分は非公開のままです。",
@@ -370,7 +374,8 @@
   },
   "paneActions": {
     "collapse": "パネルを折りたたむ",
-    "edit": "音声プロフィールを編集"
+    "edit": "音声プロフィールを編集",
+    "expand": "ペインを展開"
   },
   "modelSettings": {
     "models": "モデル",
@@ -989,7 +994,8 @@
     "play": "再生",
     "pause": "一時停止",
     "seek": "再生位置",
-    "missing": "音声ファイルが見つかりません。"
+    "missing": "音声ファイルが見つかりません。",
+    "now_playing": "再生中"
   },
   "logs": {
     "no_tauri_log": "ディスク上にまだ Tauri ログがありません — デスクトップ ビルド経由で起動してログを作成します",
@@ -1874,7 +1880,9 @@
     "deepl_base_url_help": "カスタム DeepL API エンドポイント (デフォルト: https://api.deepl.com/v2)。プロキシ/セルフホスト用に変更します。",
     "microsoft_base_url_help": "カスタム Azure Translator エンドポイント (既定: https://api.cognitive.microsofttranslator.com)。",
     "region": "リージョン",
-    "aws_profile": "AWSプロファイル"
+    "aws_profile": "AWSプロファイル",
+    "deepl_key_placeholder": "DeepLAPIキー",
+    "microsoft_key_placeholder": "MicrosoftAPIキー"
   },
   "about": {
     "architecture": "建築",
@@ -2054,6 +2062,7 @@
     "setup_access": "アプリのデータフォルダーへの書き込みを許可して、再試行してください。",
     "setup_unsupported_platform": "このIntel MacではローカルAIバックエンドを実行できません — PyTorchにmacOS Intel用wheelがありません。代わりに下でリモートバックエンドに接続してください。ローカルインストールは不要です。",
     "setup_wrong_architecture": "これは Apple Silicon Mac 上の Rosetta で動作している VoiceStudio の Intel (x64) 版のため、ローカル AI バックエンドをインストールできません。アプリを終了し、Apple Silicon (arm64) 版の DMG を上書きインストールしてから再度開いてください。ボイスとプロジェクトはそのまま残ります。",
+    "setup_missing_system_library": "この Windows システムには、PyTorch の音声拡張に必要な Microsoft Visual C++ 2015-2022 再頒布可能パッケージ (x64) が入っていません。Microsoft からインストールしてから、再試行を押してください。",
     "download_apple_silicon": "Apple Silicon 版をダウンロード",
     "ready": "エンジン準備完了",
     "show_log": "ログを表示",
@@ -2077,7 +2086,23 @@
     "hint_spawn_blocked": "OSまたはセキュリティソフトがローカルエンジンの起動を拒否しました。VoiceStudioのランタイムフォルダーをウイルス対策ソフトの除外に追加し（Windows: Windowsセキュリティ → ウイルスと脅威の防止 → 設定の管理 → 除外）、OneDriveなどクラウド同期フォルダー内にないことを確認してから、もう一度お試しください。",
     "hint_smart_app_control": "Windows のスマート アプリ コントロールがローカルエンジンをブロックしました。アプリごとの例外は設定できないため、ウイルス対策の除外は効果がありません。Windows セキュリティ → アプリとブラウザー コントロール → スマート アプリ コントロールの設定 でオフにするか（リセットしないと再びオンにできません）、別のコンピューターで動作するエンジンに VoiceStudio を接続してから、もう一度お試しください。",
     "hint_slow_start": "待機時間が切れた時点で、エンジンはまだ起動中でした。低速なPC（特に専用GPUなし）やインストール後の初回起動（ウイルス対策ソフトがすべての新規ファイルをスキャンします）では、数分かかることがあります。メモリを多く使うアプリを閉じてから、もう一度お試しください。2回目以降の起動はずっと速くなります。",
-    "hint_synced_folder": "この場所はクラウド同期フォルダー（OneDrive、Dropbox、iCloud Drive、Google Drive）内にあります。オンライン専用のプレースホルダーやファイルのロックにより、Python環境が壊れます。VoiceStudioを通常のローカルフォルダー（例: WindowsではC:\\VoiceStudio、macOSとLinuxでは~/VoiceStudio）に移動して、もう一度セットアップしてください。"
+    "hint_synced_folder": "この場所はクラウド同期フォルダー（OneDrive、Dropbox、iCloud Drive、Google Drive）内にあります。オンライン専用のプレースホルダーやファイルのロックにより、Python環境が壊れます。VoiceStudioを通常のローカルフォルダー（例: WindowsではC:\\VoiceStudio、macOSとLinuxでは~/VoiceStudio）に移動して、もう一度セットアップしてください。",
+    "cause_smart_app_control": "Windows のスマート アプリ コントロールがエンジンをブロックしました",
+    "cause_spawn_blocked": "セキュリティソフトがエンジンの起動をブロックしました",
+    "cause_native_crash": "起動中にエンジンがクラッシュしました（ネイティブ障害）",
+    "cause_missing_env": "Python 環境が見つからないか不完全です",
+    "cause_permission": "エンジンのフォルダーへの書き込み権限がありません",
+    "cause_synced_folder": "エンジンのフォルダーがクラウド同期フォルダー内にあります",
+    "cause_slow_start": "動作の遅いパソコンでエンジンがまだ起動中です",
+    "choose_folder": "別のフォルダーを選択",
+    "copy_diagnostics": "診断情報をコピー",
+    "diagnostics_copied": "診断情報をコピーしました",
+    "details": "詳細",
+    "pill_starting": "起動中",
+    "pill_recovering": "復旧中",
+    "pill_failed": "失敗",
+    "pill_repeats": "{{count}} 回連続",
+    "offline_bar": "エンジンがビジー状態です。自動的に再接続します"
   },
   "bootstrap": {
     "checking": "環境の確認中…",
@@ -2372,7 +2397,8 @@
     "storage_temp": "一時ファイル",
     "change": "変更…",
     "reset_default": "デフォルトにリセットする",
-    "region_label": "ダウンロード地域"
+    "region_label": "ダウンロード地域",
+    "free_space": "このドライブの空き容量は {{free}} GB、必要な容量は約 {{needed}} GB です"
   },
   "asr_missing": {
     "message": "音声認識モデルがインストールされていません — この機能で文字起こしを行うにはモデルが必要です。",
@@ -2514,7 +2540,18 @@
     "staleTitle": "アップデートがあります",
     "staleMessage": "VoiceStudio {{current}} を使用していますが、{{latest}} が既に公開されています。このバグは修正済みかもしれません。報告する前に最新リリースを確認しますか？",
     "staleView": "アップデートを見る",
-    "staleFileAnyway": "そのまま報告する"
+    "staleFileAnyway": "そのまま報告する",
+    "summary_label": "何が起きましたか？",
+    "summary_placeholder": "1 行で入力（例：吹き替えが 40% で止まる）",
+    "summary_required": "最初に 1 行の説明を入力してください。",
+    "sent_title": "送信される内容",
+    "sent_app": "アプリのバージョンとビルド",
+    "sent_system": "OS、GPU、メモリ、ディスクの空き容量",
+    "sent_engines": "有効なエンジン",
+    "sent_logs": "エンジンログの直近の行（ホームフォルダーのパスとトークンは除去）",
+    "sent_pages": "最近開いたページの名前",
+    "not_sent": "音声、テキスト、ボイスは送信されません。ファイル名はログや説明文に含まれる場合があるため、送信前に GitHub のプレビューを確認してください。",
+    "submit": "GitHub の Issue を開く"
   },
   "crash": {
     "notice_unclean": "前回のセッションは {{ago}}前に正常終了せずに終わりました。多くの場合は無害です — スリープ、強制終了、または VM/コンテナの停止が原因です。",
@@ -3889,6 +3926,164 @@
       "retry": "再試行",
       "rate_limited": "このネットワークからの報告が多すぎます。しばらくしてからお試しください。",
       "invalid": "この報告を送信できませんでした。アプリを更新して、もう一度お試しください。"
+    },
+    "production": {
+      "new": "新規プロジェクト",
+      "script_hint": "章は # 章タイトル、登場人物の切り替えは行頭の [voice:Name] で指定します。プレーンテキストのみ対応し、その他のマークアップはそのまま読み上げます。",
+      "conversion_hint": "30秒以内の音声クリップを選んでください。文字起こしした内容を選択した声で読み上げます。元の話し方や表現は保持されません。",
+      "normalize_text": "テキストを整える"
+    },
+    "calls": {
+      "remote_control": "ペアリングした端末からの通話操作を許可",
+      "remote_control_hint": "API キーで認証したスマートフォンから通話を発信・管理できます。通話設定はこのコンピューターで管理します。",
+      "hint": "通話にはペアリングしたコンピューターと設定済みの Twilio 番号を使います。先にコンピューターで通話操作を許可してください。",
+      "authentication": "通話操作にはコンピューターの API キーでペアリングしてください。共有 PIN では通話を許可できません。",
+      "billing": "Twilio の通話料金が発生します。",
+      "clone_hint": "Whisper はサンプルを文字起こしします。保存前に別のクローンモデルで音声の試聴を生成するため、両方のモデルが必要です。"
+    },
+    "host": {
+      "title": "スマートフォン音声 API",
+      "hint": "選択したインストール済み音声を OpenAI 形式の音声エンドポイントと MCP（2025-11-25）で提供します。この画面を開き、アプリがアクティブな間だけ動作します。",
+      "lan": "ローカルネットワークを許可",
+      "lan_hint": "オフ：この端末のみ。オン：ネットワーク内の端末が一時的な Bearer トークンで接続できます。トークンは秘密にしてください。",
+      "start": "サーバーを開始",
+      "copy": "Bearer トークンをコピー",
+      "running": "サーバー稼働中",
+      "capabilities_hint": "選択したインストール済みモデルと音声のみを公開します。この画面を開いている間、音声生成・文字起こし・翻訳をこの端末で実行します。",
+      "allow_speech": "音声生成を許可",
+      "allow_transcription": "文字起こしを許可",
+      "allow_translation": "翻訳を許可",
+      "voice_source": "音声の選択元",
+      "preset": "プリセット音声",
+      "saved": "保存済み音声",
+      "audio_hint": "文字起こしは base64 形式の PCM16 モノラル WAV（8～24 kHz、最大30秒）に対応しています。"
+    },
+    "books": {
+      "import_failed": "本を読み込めませんでした。暗号化されていないEPUB、テキストPDF、UTF-8テキストを使用してください（最大64 MB）。",
+      "no_text": "読み取れるテキストがありません。スキャンしたPDFは読み込み前に文字認識が必要です。",
+      "export_failed": "音声を書き出せませんでした。M4Bは最大255章に対応します。",
+      "invalid_controls": "速度は0.5～2、間は30秒以内にし、発音項目を空にしないでください。",
+      "controls_hint": "EPUB、テキストPDF、TXTを読み込めます。[pause:0.5]で秒単位の無音を挿入し、行頭の[speed:1.25]でその行の速度を変えます。変更していない行は保存済み音声を再利用します。",
+      "line_speed": "行の速度",
+      "restore_recipe": "保存済みの音声設定を編集",
+      "save_recipe_copy": "新しい音声として保存"
+    },
+    "editing": {
+      "undo": "元に戻す",
+      "redo": "やり直す",
+      "subtitles": "字幕",
+      "import_subtitles": "SRT / VTTを読み込む",
+      "export_srt": "SRTを書き出す",
+      "export_vtt": "VTTを書き出す",
+      "source_text": "元のテキスト",
+      "original": "元の音声",
+      "generated": "生成された音声",
+      "split_at": "分割位置",
+      "split": "区間を分割",
+      "merge": "次の区間と結合",
+      "replace_subtitles": "字幕のタイムラインを置き換えますか？",
+      "replace": "置き換える",
+      "replace_subtitles_detail": "この言語の区間タイムラインを置き換えます。他の言語は再翻訳が必要になる場合があります。生成前なら元に戻せます。",
+      "preview_unavailable": "音声をプレビューする前に、この区間を生成してください。",
+      "subtitle_invalid": "各区間が30秒以内の有効なSRTまたはVTTファイルを選択してください。",
+      "subtitle_missing": "字幕を書き出す前にすべての区間を翻訳してください。",
+      "split_invalid": "両側に十分なテキストが残るように、区間内の分割位置を選択してください。",
+      "merge_invalid": "同じ声の隣接する区間を、合計30秒以内で結合してください。",
+      "waveform": "音声波形"
+    },
+    "jobs": {
+      "title": "スマートフォンで処理",
+      "checkpointed": "完了したステップは保存されます。必要に応じてキャンセルして再開できます。",
+      "power_paused": "バッテリー保護または端末の冷却のため処理を一時停止しました。状態が改善したら再開してください。",
+      "background_paused": "バックグラウンドで一時停止しました。このタスクを開き直して、保存したステップから再開してください。",
+      "requesting_gpu": "バックグラウンド GPU アクセスを要求中…",
+      "requesting_cpu": "バックグラウンド CPU 時間を要求中…",
+      "continued_gpu": "GPU での継続が許可されました。iOS がタスクを一時停止または終了する場合があります。",
+      "continued_cpu": "CPU での継続が許可されました。iOS がタスクを一時停止または終了する場合があります。",
+      "switching_cpu": "進行状況を保存して GPU を解放し、CPU で続行します…",
+      "background_limited": "バックグラウンド時間は iOS が制限します。時間切れでも完了したステップは保存されます。",
+      "background_requestable": "この端末はバックグラウンド GPU の要求に対応しています。各タスクには iOS の許可が必要です。",
+      "gpu_unavailable": "ここではバックグラウンド GPU を使えません。CPU で続行するか、開き直して保存したステップから再開してください。",
+      "cpu_fallback": "バックグラウンド GPU が使えない場合に CPU での継続を許可",
+      "cpu_tradeoff": "CPU での処理は遅く、電池を多く使う場合があります。通常、フォアグラウンドでは GPU を使います。",
+      "cpu_unavailable": "インストール済みのビルドでは、このモデルを CPU で続行できません。保存したステップはフォアグラウンドで再開できます。",
+      "resume_checkpoint": "保存したタスクを再開",
+      "foreground_service": "Android が許可している間、フォアグラウンドサービスでタスクを続行します。"
+    },
+    "flow": {
+      "import_media": "音声または動画を読み込む",
+      "template_clean": "整形して読み上げ",
+      "template_translate": "翻訳して読み上げ",
+      "template_transcribe": "文字起こしと翻訳",
+      "contains": "次の文字列を含む場合に続行（大文字小文字を区別）",
+      "skip": "含まない場合は {{count}} ステップをスキップ",
+      "skip_label": "含まない場合にスキップするステップ数",
+      "retries": "再試行：{{count}} 回",
+      "retries_label": "エラー後の再試行回数",
+      "step_transcribe": "メディアの文字起こし",
+      "step_condition": "条件"
+    },
+    "integration": {
+      "received": "受信したコンテンツ",
+      "review": "タスクを実行する前に共有された内容を確認してください。自動的には開始しません。",
+      "shortcut_speak": "読み上げを開く",
+      "shortcut_dictate": "音声入力を開く",
+      "widget_description": "読み上げまたは音声入力を開きます。開始をタップするまで録音しません。",
+      "text": "テキスト"
+    },
+    "export": {
+      "failed": "音声を書き出せませんでした。ストレージの空き容量を確認して再試行してください。"
+    },
+    "processing": {
+      "audio_editor": "音声エディター",
+      "hint": "オフライン音声編集：24 kHz・モノラル。元のファイルは変更しません。",
+      "select_audio": "音声を選択",
+      "fade_in": "フェードイン（秒）",
+      "fade_out": "フェードアウト（秒）",
+      "gain_db": "ゲイン（dB）",
+      "normalize": "ピークを正規化",
+      "target_peak": "目標ピーク（dBFS）",
+      "noise_gate": "ノイズゲート",
+      "gate_threshold": "ゲートしきい値（dBFS）",
+      "process": "編集を適用",
+      "result": "処理済み音声",
+      "peak": "ピーク",
+      "changed_settings": "設定が変更されました。編集を適用すると、更新後の音声を試聴・書き出しできます。",
+      "preview_hint": "元の音声はトリミング開始位置から最大30秒間プレビューします。",
+      "invalid": "トリミング時刻、フェードの長さ、音声レベルを確認してください。",
+      "segment_gain": "区間の音量",
+      "mute": "区間をミュート",
+      "record_consent": "この録音を声の変換に使用する許可を得ています。",
+      "merge_levels": "区間を結合する前に、音量とミュートの設定をそろえてください。"
+    }
+  },
+  "failureCause": {
+    "details": "詳細",
+    "fixes": "対処方法",
+    "vram": {
+      "title": "GPUのメモリが不足しました",
+      "fix1": "GPUを使う他のアプリを閉じる",
+      "fix2": "CPUまたはより小さいエンジンを選ぶ"
+    },
+    "model_missing": {
+      "title": "モデルがダウンロードされていません",
+      "fix1": "モデルカタログでダウンロードする",
+      "fix2": "「修復」を使ってインストールする"
+    },
+    "busy": {
+      "title": "エンジンが使用中です",
+      "fix1": "実行中の処理が終わるまで待つ",
+      "fix2": "しばらくしてからもう一度試す"
+    },
+    "timeout": {
+      "title": "生成がタイムアウトしました",
+      "fix1": "より短い文章を試す",
+      "fix2": "プロキシのタイムアウトを延ばす"
+    },
+    "bad_response": {
+      "title": "サーバーから予期しない応答がありました",
+      "fix1": "設定 > ログでバックエンドを確認する",
+      "fix2": "VoiceStudioを再起動して再試行する"
     }
   }
 }

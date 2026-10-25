@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { backendFailureHints, inSyncedFolder } from './backendHint';
+import { backendFailureCause, backendFailureHints, inSyncedFolder } from './backendHint';
 
 // #2440 / #2445 / #2465: the three recurring "backend would not start" reports
 // each have one fix that the raw message never names. The hint maps the stable
@@ -46,6 +46,30 @@ describe('backendFailureHints', () => {
     expect(backendFailureHints('Backend exited unexpectedly (exit code 1).')).toEqual([]);
     // A crash that merely mentions a timeout is not a slow start.
     expect(backendFailureHints('Backend exited unexpectedly. Last output: timed out')).toEqual([]);
+  });
+});
+
+describe('backendFailureCause', () => {
+  it.each([
+    ['Could not start the backend: spawn UNKNOWN', 'spawn_blocked'],
+    ['Could not start the backend: spawn UNKNOWN (Smart App Control)', 'smart_app_control'],
+    ['Backend exited unexpectedly (exit code 3221225477).', 'native_crash'],
+    ['Backend exited unexpectedly (exit code -1073741819).', 'native_crash'],
+    ['Backend exited unexpectedly (signal SIGSEGV).', 'native_crash'],
+    ['The Python environment in C:\\VoiceStudio is missing or incomplete.', 'missing_env'],
+    [
+      'The Python environment in C:\\Users\\a\\OneDrive\\VS is missing or incomplete.',
+      'synced_folder',
+    ],
+    ['The Python environment in C:\\VoiceStudio is missing (no .venv\\Scripts\\python.exe). Install it.', 'missing_env'],
+    ['The Python environment in C:\\VoiceStudio is incomplete: ImportError: torch. Install it.', 'missing_env'],
+    ['EPERM: operation not permitted, mkdir', 'permission'],
+    ['Backend did not answer on port 3900 within 600 s', 'slow_start'],
+  ])('names %s', (message, cause) => expect(backendFailureCause(message)).toBe(cause));
+
+  it('yields null for an unrecognised failure', () => {
+    expect(backendFailureCause(undefined)).toBeNull();
+    expect(backendFailureCause('Backend exited unexpectedly (exit code 1).')).toBeNull();
   });
 });
 

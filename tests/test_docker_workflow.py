@@ -86,3 +86,25 @@ def test_token_published_releases_still_publish_images():
     on = _load(_DOCKER)["on"]
     inputs = set((on.get("workflow_dispatch") or {}).get("inputs") or {})
     assert {"backfill_release", "release_ref", "promote_stable"} <= keys <= inputs, (keys, inputs)
+
+
+def test_image_builds_keep_their_layer_cache_in_ghcr_not_the_actions_cache():
+    """The Actions cache is capped at 10 GB per repository. Docker layers (5+ GB, one of
+    4 GB) filled it and evicted the iOS native-runtime, Gradle and bun caches, so mobile CI
+    rebuilt for 17 minutes. The cache lives in a registry package instead; a failed export
+    must never fail the image publish, and only the CUDA job writes it."""
+    workflow = _load(_DOCKER)
+    assert workflow["env"]["BUILDCACHE_IMAGE"] == "ghcr.io/debpalash/voicestudio-buildcache"
+    builds = [
+        step["with"]
+        for job in _JOBS
+        for step in workflow["jobs"][job]["steps"]
+        if step.get("uses", "").startswith("docker/build-push-action@")
+    ]
+    assert len(builds) == 2
+    for options in builds:
+        assert "type=gha" not in options.get("cache-from", "")
+        assert options["cache-from"].startswith("type=registry,ref=${{ env.BUILDCACHE_IMAGE }}")
+    cuda, rocm = builds
+    assert "ignore-error=true" in cuda["cache-to"] and "mode=max" in cuda["cache-to"]
+    assert "cache-to" not in rocm

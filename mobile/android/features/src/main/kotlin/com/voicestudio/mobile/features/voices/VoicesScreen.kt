@@ -25,11 +25,14 @@ import kotlinx.coroutines.*
 import java.io.File
 
 @Composable fun VoicesScreen(vm:StudioViewModel) {
-    TaskLocation(vm,"clone",setOf("asr")) {location,model -> VoicesContent(vm,location,model)}
+    TaskLocation(vm,"clone",setOf("clone"),dependencies=setOf("asr")) {location,model -> VoicesContent(vm,location,model)}
 }
 @Composable private fun VoicesContent(vm:StudioViewModel,location: RunLocation,model: PhoneModel?) {
     val state by vm.state.collectAsState()
     val phone by vm.phone.state.collectAsState()
+    val preferences by vm.preferences.collectAsState()
+    val asr=phone.models.filter {it.capability=="asr"}.let {items -> items.firstOrNull {it.id==preferences.phoneModels["clone-asr"]} ?: items.firstOrNull {phone.canRun(it,vm.phone.ramBytes)} ?: items.firstOrNull()}
+    val cloneReady=model?.let {it.capability=="clone"&&phone.canRun(it,vm.phone.ramBytes)}==true&&asr?.let {phone.canRun(it,vm.phone.ramBytes)}==true
     val profiles=phone.voices.map {Profile("phone:"+it.id,it.name,audioUrl=it.id)}+state.profiles
     fun local(profile: Profile)=phone.voices.firstOrNull {"phone:"+it.id==profile.id}
     val context=LocalContext.current
@@ -71,9 +74,15 @@ import java.io.File
         if(!cloning&&profiles.isNotEmpty()) Action("mobile.voices.new_clone",!state.busy&&phone.progress==null) {cloning=true}
         if(cloning) {
         if(location!=RunLocation.COMPUTER) {
-            if(model!=null&&!phone.canRun(model,vm.phone.ramBytes)) MissingModelsCard(vm,"mobile.tabs.voices",listOf(model))
+            Text(tr("mobile.calls.clone_hint"),color=role("textMuted"))
+            if(!cloneReady) MissingModelsCard(vm,"mobile.tabs.voices",listOfNotNull(model,asr))
             Secondary("mobile.simple.more") {more=!more}
-            if(more) TaskModelPicker(vm,"clone",setOf("asr"),model)
+            if(more) {
+                Heading("mobile.simple.clone")
+                TaskModelPicker(vm,"clone",setOf("clone"),model)
+                Heading("mobile.simple.asr")
+                TaskModelPicker(vm,"clone-asr",setOf("asr"),asr)
+            }
         }
         Field("mobile.voices.name_label",name,{name=it.take(200)})
         Info("mobile.voices.consent_title","mobile.voices.consent_body")
@@ -84,9 +93,9 @@ import java.io.File
             Secondary("common.stop") {try {sample=recorder.stop().absolutePath;recording=false} catch(e:Exception) {recording=false;sample=null;vm.fail(e)}}
         } else Secondary("mobile.voices.record",onClick=record)
         if(sample!=null&&!recording) Text(tr("mobile.android.sample_ready"))
-        Action("mobile.voices.new_clone",permission&&sample!=null&&name.isNotBlank()&&!state.busy&&!recording&&phone.progress==null&&(location==RunLocation.COMPUTER||(model!=null&&phone.canRun(model,vm.phone.ramBytes)))) {
+        Action("mobile.voices.new_clone",permission&&sample!=null&&name.isNotBlank()&&!state.busy&&!recording&&phone.progress==null&&(location==RunLocation.COMPUTER||cloneReady)) {
             if(location==RunLocation.COMPUTER) {vm.clone(name,File(sample!!));sample=null;name="";permission=false;cloning=false}
-            else vm.phone.clone(name,File(sample!!),model!!,permission) {sample=null;name="";permission=false;cloning=false}
+            else vm.phone.clone(name,File(sample!!),asr!!,model!!,permission) {sample=null;name="";permission=false;cloning=false}
         }
         Secondary("common.cancel",!recording) {vm.phone.cancelInference();cloning=false;sample?.let {File(it).delete()};sample=null}
         }

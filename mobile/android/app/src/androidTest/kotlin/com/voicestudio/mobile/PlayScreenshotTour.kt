@@ -41,7 +41,12 @@ class SmallestSpeechModel: TestRule {
             val args=InstrumentationRegistry.getArguments()
             assumeTrue("Pass playScreenshots=true to capture the Play screenshots",args.getString("playScreenshots")=="true")
             val context=InstrumentationRegistry.getInstrumentation().targetContext
-            val tts=context.assets.open("models.json").bufferedReader().use {ModelCatalog.decode(it.readText())}.models.filter {it.capability=="tts"}.minBy {it.totalBytes}
+            val catalog=context.assets.open("models.json").bufferedReader().use {ModelCatalog.decode(it.readText())}.models
+            val tts=catalog.filter {it.capability=="tts"}.minBy {it.totalBytes}
+            // PhoneVoiceStore.create() requires one asr and one clone model; the scripted
+            // engine below never runs either, so the smallest asr and the first clone suffice.
+            val asr=catalog.filter {it.capability=="asr"}.minBy {it.totalBytes}
+            val clone=catalog.first {it.capability=="clone"}
             val runtime=PhoneRuntime.get(context)
             assertTrue("Use a device with the declared model RAM",tts.fits(runtime.ramBytes))
             if(tts.gated&&!runtime.licence.accepted(tts)) {
@@ -50,7 +55,7 @@ class SmallestSpeechModel: TestRule {
             }
             if(args.getString("downloadSmokeModels")=="true"&&!runtime.downloads.installed(tts)) runBlocking {runtime.downloads.download(tts,true)}
             assertTrue("Explicitly provision the smallest speech model first",runtime.downloads.installed(tts))
-            runBlocking {seedVoice(context,runtime,tts)}
+            runBlocking {seedVoice(context,runtime,tts,asr,clone)}
             base.evaluate()
         }
     }
@@ -61,7 +66,7 @@ class SmallestSpeechModel: TestRule {
      * speech was made from, so the much larger ASR model is not needed; create()
      * still decodes the clip, writes the reference and records consent time.
      */
-    private suspend fun seedVoice(context: android.content.Context, runtime: PhoneRuntime, tts: PhoneModel) {
+    private suspend fun seedVoice(context: android.content.Context, runtime: PhoneRuntime, tts: PhoneModel, asr: PhoneModel, clone: PhoneModel) {
         val voices=PhoneVoiceStore(File(context.noBackupFilesDir,"voices"))
         if(voices.list().any {it.name==VOICE_NAME}) return
         val source=File(context.cacheDir,"play-voice.wav")
@@ -70,7 +75,7 @@ class SmallestSpeechModel: TestRule {
             val scripted=object: LocalEngine by runtime.engine {
                 override suspend fun transcribe(model: PhoneModel, audio: LocalAudio, progress: (Float)->Unit): String = VOICE_LINE
             }
-            voices.create(VOICE_NAME,source,true,tts,scripted)
+            voices.create(VOICE_NAME,source,true,asr,clone,scripted)
         } finally {source.delete()}
         assertTrue("The seeded phone voice must be listed",voices.list().any {it.name==VOICE_NAME})
     }

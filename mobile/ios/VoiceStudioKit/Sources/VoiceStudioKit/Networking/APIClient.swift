@@ -203,3 +203,22 @@ public struct APIClient: Sendable {
         return value
     }
 }
+
+
+public struct CommunityItem: Decodable, Sendable, Identifiable {
+    public let id: String
+    public let name: String
+    public let author: String?
+    public let license: String?
+    public let language: String?
+}
+public struct CommunityPage: Decodable, Sendable { public let total: Int; public let items: [CommunityItem] }
+public struct CommunityVoice: Decodable, Sendable { public let profile_id: String; public let name: String }
+public extension APIClient {
+    func community(offset: Int = 0) async throws -> CommunityPage {
+        guard offset >= 0 else { throw ClientError("mobile.errors.invalid_response") }
+        return try await decode(CommunityPage.self,"/community/items?limit=100&offset=\(offset)")
+    }
+    func useCommunity(_ id: String) async throws -> CommunityVoice { try await decode(CommunityVoice.self,"/community/items/\(try Self.component(id))/use",method: "POST") }
+    func communityAudio(_ id: String) async throws -> Data { try await send(request("/community/items/\(try Self.component(id))/preview")).data }
+}

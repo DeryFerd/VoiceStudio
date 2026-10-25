@@ -60,7 +60,7 @@ try {
       box && box.y >= sidebar.y && box.y + box.height <= sidebar.y + sidebar.height + 1,
       `Stop escapes the setup pane at ${width}px`,
     );
-    await page.locator('[data-slot=secondary-sidebar-header] button').click();
+    await page.getByRole('button', { name: 'Collapse pane', exact: true }).click();
     const editor = page
       .locator('[data-slot=secondary-sidebar]')
       .locator('xpath=following-sibling::section');
@@ -77,7 +77,7 @@ try {
         `Stop is unreachable with collapsed setup at ${width}px (end=${atEnd})`,
       );
     }
-    await page.locator('[data-slot=secondary-sidebar-header] button').click();
+    await page.locator('[data-slot=secondary-sidebar-expand]').click();
   }
   assert.deepEqual(errors, []);
   console.log('Longform Stop stays inside the setup pane at desktop and compact widths.');

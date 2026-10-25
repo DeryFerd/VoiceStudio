@@ -40,6 +40,12 @@ _CHANGE_CASES = [
     ("English", "It costs $5", "It costs five dollars"),
     ("English", "Just $1 more", "Just one dollar more"),
     ("English", "It costs $5.99 now", "It costs five dollars, ninety-nine cents now"),
+    # a zero part is not spoken
+    ("English", "only $0.50 now", "only fifty cents now"),
+    ("English", "just $0.01 more", "just one cent more"),
+    ("English", "it costs $5.00 now", "it costs five dollars now"),
+    ("English", "only $1.00.", "only one dollar."),
+    ("English", "it was $0.00 then", "it was zero dollars then"),
     # Sentence punctuation after an amount is not part of it: the lookahead
     # used to reject any period or comma, so these reached the engine as digits.
     ("English", "It costs $5.", "It costs five dollars."),
@@ -48,6 +54,12 @@ _CHANGE_CASES = [
     ("English", "$12.34, $56.78, and $9.",
      "twelve dollars, thirty-four cents, fifty-six dollars, seventy-eight cents, and nine dollars."),
     ("English", "rated 3.5 stars", "rated three point five stars"),
+    # The written trailing zeros are spoken, not dropped by the float.
+    ("English", "version 3.0 ships", "version three point zero ships"),
+    ("English", "it weighs 2.50 kg", "it weighs two point five zero kg"),
+    ("German", "Version 3.0 kommt", "Version drei Komma null kommt"),
+    ("English", "version \uff13.\uff10 ships", "version three point zero ships"),
+    ("Portuguese", "valor 3.0", "valor três vírgula zero"),
     # English writes decimals with a period, so three digits after it are a
     # decimal here (the same digits are a thousands group in German, below).
     ("English", "pi is 3.141 here", "pi is three point one four one here"),
@@ -62,6 +74,10 @@ _CHANGE_CASES = [
     ("English", "fruit, e.g. apples", "fruit, for example apples"),
     ("English", "good vs. evil", "good versus evil"),
     ("English", "exhibit No. 5", "exhibit number five"),
+    # a number glued to the abbreviation is still spoken as one
+    ("English", "exhibit No.5", "exhibit number five"),
+    ("German", "Nr.5 gewinnt", "Nummer fünf gewinnt"),
+    ("French", "le n°5 gagne", "le numéro cinq gagne"),
     # ISO-ish codes resolve like display names
     ("en", "I have 2 cats", "I have two cats"),
     ("en-US", "I have 2 cats", "I have two cats"),

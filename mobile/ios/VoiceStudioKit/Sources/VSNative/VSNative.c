@@ -202,7 +202,7 @@ void vs_stream_free(VSStream *s) {}
 #if __has_include("generated/omnivoice.h")
 #include "generated/omnivoice.h"
 static bool ov_cancel(void *arg) { return vs_cancelled(arg); }
-int vs_clone(const VSConfig *c,const char *text,const char *ref_text,const float *reference,int32_t n,VSCancel *cancel,VSAudio *out) {
+static int vs_omni(const VSConfig *c,const char *text,const char *ref_text,const float *reference,int32_t n,const char *instruct,uint64_t seed,VSCancel *cancel,VSAudio *out) {
 #if TARGET_OS_IPHONE
     void *lib=(void *)1;
 #else
@@ -212,10 +212,28 @@ int vs_clone(const VSConfig *c,const char *text,const char *ref_text,const float
     int rc=-1;
     if(p_ov_init_default_params && p_ov_init && p_ov_tts_default_params && p_ov_synthesize && p_ov_audio_free && p_ov_free) {
         struct ov_init_params init; p_ov_init_default_params(&init); init.model_path=c->model; init.codec_path=c->codec;
-        struct ov_context *ctx=vs_cancelled(cancel) ? NULL : p_ov_init(&init);
+        typedef struct ov_context *(*ov_scoped_init)(const struct ov_init_params *,const char *);
+        ov_scoped_init scoped = NULL;
+        if(c->cpu_only) {
+            scoped = (ov_scoped_init)dlsym(
+#if TARGET_OS_IPHONE
+                RTLD_DEFAULT,
+#else
+                lib,
+#endif
+                "ov_init_with_backend");
+            // Older libraries cannot honor CPU-only requests: never silently use Metal.
+            if(!scoped) {
+#if !TARGET_OS_IPHONE
+                dlclose(lib);
+#endif
+                return -2;
+            }
+        }
+        struct ov_context *ctx=vs_cancelled(cancel) ? NULL : scoped ? scoped(&init,"CPU") : p_ov_init(&init);
         if(ctx) {
             struct ov_tts_params params; p_ov_tts_default_params(&params); params.text=text; params.lang=c->language;
-            params.ref_audio_24k=reference; params.ref_n_samples=n; params.ref_text=ref_text; params.cancel=ov_cancel; params.cancel_user_data=cancel;
+            params.ref_audio_24k=reference; params.ref_n_samples=n; params.ref_text=ref_text; params.instruct=instruct; params.mg_seed=seed; params.cancel=ov_cancel; params.cancel_user_data=cancel;
             struct ov_audio a={0}; int result=p_ov_synthesize(ctx,&params,&a);
             rc=result == OV_STATUS_CANCELLED ? -4 : result == 0 ? audio_copy(out,a.samples,a.n_samples,a.sample_rate) : -3;
             p_ov_audio_free(&a); p_ov_free(ctx);
@@ -226,8 +244,11 @@ int vs_clone(const VSConfig *c,const char *text,const char *ref_text,const float
 #endif
     return vs_cancelled(cancel) ? -4 : rc;
 }
+int vs_clone(const VSConfig *c,const char *t,const char *rt,const float *r,int32_t n,VSCancel *v,VSAudio *a) { return vs_omni(c,t,rt,r,n,NULL,42,v,a); }
+int vs_design(const VSConfig *c,const char *t,const char *instruct,uint64_t seed,VSCancel *v,VSAudio *a) { return vs_omni(c,t,NULL,NULL,0,instruct,seed,v,a); }
 #else
 int vs_clone(const VSConfig *c,const char *t,const char *rt,const float *r,int32_t n,VSCancel *v,VSAudio *a) { return -1; }
+int vs_design(const VSConfig *c,const char *t,const char *instruct,uint64_t seed,VSCancel *v,VSAudio *a) { return -1; }
 #endif
 
 #if __has_include("generated/llama.h")
@@ -251,12 +272,12 @@ int vs_translate(const VSConfig *c,const char *prompt,int32_t max_tokens,VSCance
     p_llama_backend_init();
     struct llama_model_params mp=p_llama_model_default_params();
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
-    mp.n_gpu_layers=99;
+    mp.n_gpu_layers=c->cpu_only ? 0 : 99;
 #else
     mp.n_gpu_layers=0;
 #endif
     struct llama_model *model=p_llama_model_load_from_file(c->model,mp); if(!model) { rc=-3; goto done; }
-    struct llama_context_params cp=p_llama_context_default_params(); cp.n_ctx=2048; cp.n_batch=2048; cp.n_threads=c->threads; cp.n_threads_batch=c->threads; cp.abort_callback=llama_abort; cp.abort_callback_data=cancel;
+    struct llama_context_params cp=p_llama_context_default_params(); cp.n_ctx=2048; cp.n_batch=2048; cp.n_threads=c->threads; cp.n_threads_batch=c->threads; cp.abort_callback=llama_abort; cp.abort_callback_data=cancel; if(c->cpu_only) { cp.offload_kqv=false; cp.op_offload=false; }
     struct llama_context *ctx=p_llama_init_from_model(model,cp);
     if(!ctx) { p_llama_model_free(model); rc=-3; goto done; }
     const struct llama_vocab *vocab=p_llama_model_get_vocab(model);
@@ -303,5 +324,16 @@ int vs_runtime_available(const char *runtime,const char *library) {
     void *lib=dlopen(library,RTLD_NOW|RTLD_LOCAL); if(!lib) return 0;
     const char *symbol=!strcmp(runtime,"sherpa-onnx") ? "SherpaOnnxCreateOfflineTts" : !strcmp(runtime,"omnivoice.cpp") ? "ov_init" : "llama_model_load_from_file";
     int result=dlsym(lib,symbol)!=NULL; dlclose(lib); return result;
+#endif
+}
+
+int vs_cpu_runtime_available(const char *runtime,const char *library) {
+    if(strcmp(runtime,"omnivoice.cpp")) return vs_runtime_available(runtime,library);
+#if TARGET_OS_IPHONE
+    return dlsym(RTLD_DEFAULT,"ov_init_with_backend") != NULL;
+#else
+    if(!library || !*library) return 0;
+    void *lib=dlopen(library,RTLD_NOW|RTLD_LOCAL); if(!lib) return 0;
+    int available=dlsym(lib,"ov_init_with_backend") != NULL; dlclose(lib); return available;
 #endif
 }

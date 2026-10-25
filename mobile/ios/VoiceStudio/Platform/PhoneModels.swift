@@ -32,6 +32,7 @@ final class WifiState: @unchecked Sendable {
     private(set) var store: ModelStore?
     private(set) var dubs: [PhoneDubRecord] = []
     private(set) var dubStore: PhoneDubStore?
+    @ObservationIgnored private var pendingDubs: [UUID] = []
     private(set) var activeDub: UUID?
     private(set) var dubProgress: PhoneDubProgress?
     @ObservationIgnored var onDubFinished: (@MainActor @Sendable (PhoneDubRequest) async -> Void)?
@@ -40,9 +41,12 @@ final class WifiState: @unchecked Sendable {
     private(set) var recent: [PhoneGeneration] = []
     private(set) var voiceStore: PhoneVoiceStore?
     private(set) var generationStore: PhoneGenerationStore?
+    private(set) var productionStore: ProductionStore?
+    private(set) var workflowStore: PhoneWorkflowStore?
     private(set) var engine: (any LocalEngine)?
     init(bundle: Bundle = .main) {
         allowMobileData = UserDefaults.standard.bool(forKey: "models.mobile-data")
+        pendingDubs = (UserDefaults.standard.stringArray(forKey: "dub.queue") ?? []).compactMap(UUID.init(uuidString:))
         do {
             let root: URL = try {
                 #if DEBUG
@@ -61,6 +65,10 @@ final class WifiState: @unchecked Sendable {
             do { voiceStore = try PhoneVoiceStore(root: root.appendingPathComponent("voices")) }
             catch { self.error = ClientError("mobile.errors.file") }
             do { generationStore = try PhoneGenerationStore(root: root.appendingPathComponent("recent")) }
+            catch { self.error = ClientError("mobile.errors.file") }
+            do { productionStore = try ProductionStore(root: root.appendingPathComponent("production")) }
+            catch { self.error = ClientError("mobile.errors.file") }
+            do { workflowStore = try PhoneWorkflowStore(root: root.appendingPathComponent("workflows")) }
             catch { self.error = ClientError("mobile.errors.file") }
         } catch {
             // Initialization remains usable for the paired-host flows; the Models page explains the failure.
@@ -136,23 +144,61 @@ final class WifiState: @unchecked Sendable {
     var dubModels: [PhoneModel] { [selectedModel("dub-asr",.asr), selectedModel("dub-translate",.translate), selectedModel("dub",.clone)].compactMap { $0 } }
     var dubReady: Bool { dubModels.count == 3 && dubModels.allSatisfy(ready) }
     func startDub(_ id: UUID) {
-        guard dubTask == nil, let dubStore, let engine, let store else { return }
+        if activeDub != id && !pendingDubs.contains(id) { pendingDubs.append(id) }
+        UserDefaults.standard.set(pendingDubs.map(\.uuidString),forKey: "dub.queue")
+        startNextDub()
+    }
+    private func startNextDub() {
+        guard dubTask == nil, !pendingDubs.isEmpty, let dubStore, let engine, let store else { return }
+        let id = pendingDubs.removeFirst()
+        UserDefaults.standard.set(pendingDubs.map(\.uuidString),forKey: "dub.queue")
         activeDub = id
+        let selected = models
+        let job = "dub:"+id.uuidString
+        PhoneJobs.shared.start(id: job,title: L10n().t("mobile.tabs.dub"),cpuFallbackSupported: NativeLocalEngine.cpuFallbackAvailable(models: selected)) { progress in
+            let request = try await dubStore.request(id)
+            let pinned = selected.filter { request.modelPins[$0.id] != nil }
+            let pipeline = PhoneDubPipeline(store: dubStore,engine: engine,authorize: {
+                for item in pinned { try await store.checkPermission(item) }
+            })
+            _ = try await pipeline.run(id: id,models: pinned,report: { value in
+                await MainActor.run { self.dubProgress = value }
+                await progress(EngineProgress(stage: .running,fraction: Double(value.percent)/100))
+            })
+            return PhoneJobResult(file: nil)
+        }
+        watchDub(id,store: dubStore)
+    }
+    /// Reattach the phone-library watcher when resuming the coordinator's original snapshot.
+    func resumeDub(_ id: UUID) {
+        guard activeDub == nil || activeDub == id,let dubStore else { return }
+        guard PhoneJobs.shared.resume(id: "dub:"+id.uuidString) else { return }
+        activeDub = id
+        watchDub(id,store: dubStore)
+    }
+    private func watchDub(_ id: UUID,store dubStore: PhoneDubStore) {
+        dubTask?.cancel()
+        let job = "dub:"+id.uuidString
         dubTask = Task {
-            defer { activeDub = nil; dubProgress = nil; dubTask = nil }
-            do {
-                let request = try await dubStore.request(id)
-                let selected = models.filter { request.modelPins[$0.id] != nil }
-                let pipeline = PhoneDubPipeline(store: dubStore,engine: engine,authorize: {
-                    for item in selected { try await store.checkPermission(item) }
-                })
-                _ = try await pipeline.run(id: id,models: selected,report: { value in await MainActor.run { self.dubProgress = value } })
+            while PhoneJobs.shared.states[job]?.running == true {
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            }
+            guard !Task.isCancelled else { return }
+            let state = PhoneJobs.shared.states[job]
+            if let failure = state?.error { self.error = failure }
+            if state?.result != nil,let request = try? await dubStore.request(id) {
+                guard !Task.isCancelled else { return }
                 await onDubFinished?(request)
-            } catch is CancellationError {} catch { self.error = error as? ClientError ?? ClientError("mobile.simple.dub_failed") }
+            }
+            guard !Task.isCancelled else { return }
             await refresh()
+            // A Resume tap may have replaced this watcher during an await above.
+            guard !Task.isCancelled else { return }
+            activeDub = nil; dubProgress = nil; dubTask = nil
+            if state?.paused != true { startNextDub() }
         }
     }
-    func cancelDub() { dubTask?.cancel() }
+    func cancelDub() { if let activeDub { PhoneJobs.shared.cancel(id: "dub:"+activeDub.uuidString) } }
     private var modelChoices: [String:String] = [:]
     func chooseModel(_ task: String, _ id: String) { modelChoices[task] = id; UserDefaults.standard.set(id,forKey: "model."+task) }
     func selectedModel(_ task: String, _ capability: ModelCapability) -> PhoneModel? {

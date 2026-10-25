@@ -284,16 +284,17 @@ try {
     const compactDeviceBounds = await compactMacSidebar
       .getByRole('button', { name: /Local device/ })
       .boundingBox();
+    // The rail footer is one centered column, like the navigation above it.
     assert.ok(
       compactSettingsBounds &&
         compactDeviceBounds &&
-        compactDeviceBounds.x > compactSettingsBounds.x &&
+        compactDeviceBounds.y >= compactSettingsBounds.y + compactSettingsBounds.height &&
         Math.abs(
-          compactDeviceBounds.y +
-            compactDeviceBounds.height / 2 -
-            (compactSettingsBounds.y + compactSettingsBounds.height / 2),
+          compactDeviceBounds.x +
+            compactDeviceBounds.width / 2 -
+            (compactSettingsBounds.x + compactSettingsBounds.width / 2),
         ) <= 1,
-      `macOS Local device must sit to the right of Settings: ${JSON.stringify({ compactSettingsBounds, compactDeviceBounds })}`,
+      `macOS Local device must sit centered below Settings: ${JSON.stringify({ compactSettingsBounds, compactDeviceBounds })}`,
     );
     const workspaceTitleBounds = await macPage
       .getByRole('heading', { name: 'Voice cloning' })

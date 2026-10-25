@@ -13,6 +13,14 @@ daemon thread owns the real (possibly blocking) write, producers return at
 once, and when the buffer overflows the oldest text is dropped and one notice
 says how much. Terminals and regular files cannot stall like that and are left
 untouched, so behaviour is identical on every platform.
+
+Swapping ``sys.stdout``/``sys.stderr`` is not enough on its own: a log handler
+that already captured the real stream keeps writing to it. uvicorn configures
+its loggers in ``Config.__init__``, before the app module is imported, so the
+desktop launch path (``python -m uvicorn main:app``) hands it the pipe first
+and the buffer second. ``install()`` therefore repoints the already-configured
+handlers at the buffered streams, so the access log cannot block the loop
+either (#3108).
 """
 from __future__ import annotations
 
@@ -134,11 +142,59 @@ class DecoupledStream(io.TextIOBase):
             )
 
 
+def _rebind_log_handlers(pairs: list[tuple[object, object]]) -> int:
+    """Repoint log handlers that already captured one of the original streams.
+
+    ``logging.StreamHandler`` holds the stream it was built with, so a handler
+    configured before ``install()`` keeps writing to the real pipe — the stall
+    this module exists to prevent. uvicorn does exactly that: it configures
+    its loggers in ``Config.__init__``, which runs before the app module (and
+    therefore before ``install()``) is imported, so the desktop launch path
+    (``python -m uvicorn main:app``) binds the access log to the pipe first.
+
+    Returns the number of handlers that were repointed.
+    """
+    import logging
+
+    if not pairs:
+        return 0
+    rebound = 0
+    seen: set[int] = set()
+    loggers: list[logging.Logger] = [logging.getLogger()]
+    # copy() is atomic, so a logger registered by another thread cannot turn
+    # this into "dictionary changed size during iteration".
+    loggers.extend(
+        logger
+        for logger in logging.root.manager.loggerDict.copy().values()
+        if isinstance(logger, logging.Logger)
+    )
+    for logger in loggers:
+        for handler in logger.handlers:
+            if id(handler) in seen:
+                continue
+            seen.add(id(handler))
+            stream = getattr(handler, "stream", None)
+            for original, replacement in pairs:
+                if stream is not original:
+                    continue
+                try:
+                    handler.stream = replacement
+                except AttributeError:
+                    # A handler whose ``stream`` is a read-only property
+                    # (``logging._StderrHandler``) resolves ``sys.stderr``
+                    # lazily, so it already follows the swap.
+                    continue
+                rebound += 1
+                break
+    return rebound
+
+
 def install(*, limit_bytes: int = DEFAULT_LIMIT_BYTES) -> list[DecoupledStream]:
     """Wrap ``sys.stdout``/``sys.stderr`` when they are pipes. Idempotent."""
     if os.environ.get("OMNIVOICE_BLOCKING_STDIO", "").strip().lower() in ("1", "true", "yes", "on"):
         return []
     wrapped: list[DecoupledStream] = []
+    swapped: list[tuple[object, object]] = []
     for name in ("stdout", "stderr"):
         stream = getattr(sys, name, None)
         if stream is None or isinstance(stream, DecoupledStream) or not _is_pipe(stream):
@@ -146,7 +202,10 @@ def install(*, limit_bytes: int = DEFAULT_LIMIT_BYTES) -> list[DecoupledStream]:
         replacement = DecoupledStream(stream, limit_bytes=limit_bytes)
         setattr(sys, name, replacement)
         wrapped.append(replacement)
+        swapped.append((stream, replacement))
     if wrapped:
+        _rebind_log_handlers(swapped)
+
         def _drain_all() -> None:
             for s in wrapped:
                 s.drain()

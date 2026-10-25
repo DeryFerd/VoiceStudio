@@ -6,6 +6,8 @@ import AVKit
 struct PhoneDubView: View {
     var projectID: UUID? = nil
     var libraryOnly = false
+    var batchMode = false
+    @State private var batchSources: [SelectedMedia] = []
     private var records: [PhoneDubRecord] { model.phone.dubs.filter { projectID == nil || $0.id == projectID } }
     @Environment(AppModel.self) private var model
     @Environment(\.vsTheme) private var theme
@@ -17,6 +19,7 @@ struct PhoneDubView: View {
     @State private var voice = ""
     @State private var consent = false
     @State private var audioOnly = false
+    @State private var editing: PhoneDubRecord?
     @State private var shared: SharedFile?
     @State private var saved: SharedFile?
     @State private var playing: SharedFile?
@@ -30,7 +33,11 @@ struct PhoneDubView: View {
             if projectID == nil && !libraryOnly {
                 if connect { NavigationLink(model.t("mobile.simple.reconnect")) { ConnectView() } }
                 Group {
-                    if let source { DubFileCard(name: source.name) { self.source = nil } }
+                    if batchMode {
+                        DubSourceButton { importing = true }
+                        ForEach(batchSources,id: \.url) { item in DubFileCard(name: item.name) { batchSources.removeAll { $0.url == item.url } } }
+                    }
+                    else if let source { DubFileCard(name: source.name) { self.source = nil } }
                     else { DubSourceButton { importing = true } }
                 }.disabled(copying)
                 DubTiles {
@@ -65,6 +72,7 @@ struct PhoneDubView: View {
                                 Button(model.t("mobile.simple.remove_job"), systemImage: "trash", role: .destructive) { remove(record) }.labelStyle(.iconOnly)
                             }
                         }
+                        PhoneJobStatusView(id: "dub:"+record.id.uuidString,requiresGPU: true,cpuFallbackSupported: NativeLocalEngine.cpuFallbackAvailable(models: model.phone.dubModels),onResume: { model.phone.resumeDub(record.id) })
                     }
                     if records.isEmpty { EmptyState(key: "mobile.simple.empty_dubs",icon: "film") }
                     ForEach(records) { record in
@@ -76,6 +84,7 @@ struct PhoneDubView: View {
                                 Button(model.t("mobile.speak.share"),systemImage: "square.and.arrow.up") { open(record,output,action: .share) }
                                 Button(model.t("common.save"),systemImage: "arrow.down.to.line") { open(record,output,action: .save) }
                                 ReportButton(subject: reportSubject(record,output), reporting: $reporting, context: record.request.title + " " + output.name)
+                                if record.checkpoint.done { Button(model.t("clone.edit"),systemImage: "pencil") { editing = record } }
                                 if record.checkpoint.done { Button(model.t("mobile.simple.remove_job"),systemImage: "trash",role: .destructive) { remove(record) } }
                             }.labelStyle(.iconOnly).studioButton(.tertiary)
                         }
@@ -83,20 +92,26 @@ struct PhoneDubView: View {
                 }
             }
         }
-        .navigationTitle(projectID != nil ? (records.first?.request.title ?? model.t("projects.title")) : model.t(libraryOnly ? "projects.title" : "mobile.tabs.dub")).navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(projectID != nil ? (records.first?.request.title ?? model.t("projects.title")) : model.t(libraryOnly ? "projects.title" : batchMode ? "batch.title" : "mobile.tabs.dub")).navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if projectID == nil && !libraryOnly {
                 DubStartButton(busy: copying || model.phone.activeDub != nil, action: start)
-                    .disabled(!ready || !consent || source == nil || targets.isEmpty || model.busy || copying || model.phone.activeDub != nil)
+                    .disabled(!ready || !consent || (batchMode ? batchSources.isEmpty : source == nil) || targets.isEmpty || model.busy || copying || model.phone.activeDub != nil)
             }
         }
-        .fileImporter(isPresented: $importing,allowedContentTypes: [.movie,.audio]) { result in
-            switch result { case .success(let url): source = SelectedMedia(url: url); case .failure: model.error = ClientError("mobile.simple.media_failed") }
+        .fileImporter(isPresented: $importing,allowedContentTypes: [.movie,.audio],allowsMultipleSelection: batchMode) { result in
+            switch result {
+            case .success(let urls):
+                if batchMode { batchSources += urls.filter { url in !batchSources.contains { $0.url == url } }.map { SelectedMedia(url: $0) } }
+                else { source = urls.first.map { SelectedMedia(url: $0) } }
+            case .failure: model.error = ClientError("mobile.simple.media_failed")
+            }
         }
         .sheet(isPresented: $languages) {
             LanguageSelectionSheet(selection: targets, includesUnavailable: false) { targets = $0 }
         }
         .contentReportSheet($reporting)
+        .sheet(item: $editing) { record in NavigationStack { DubEditorView(record: record) } }
         .sheet(item: $shared) { file in ShareSheet(items: [file.url]) }
         .sheet(item: $saved) { file in SaveFileSheet(url: file.url) }
         .sheet(item: $playing) { file in PhoneDubPlayback(url: file.url) }
@@ -108,7 +123,8 @@ struct PhoneDubView: View {
         ChoicePicker(label: model.t("mobile.simple."+capability.rawValue),selection: Binding(get: { model.phone.selectedModel(task,capability)?.id ?? "" },set: { model.phone.chooseModel(task,$0) }),options: model.phone.candidates(capability).map { SelectionOption(id: $0.id,title: $0.name,subtitle: model.t("mobile.simple." + $0.capability.rawValue),enabled: $0.fits()) })
     }
     private func start() {
-        guard let source else { return }
+        let sources = batchMode ? batchSources : source.map { [$0] } ?? []
+        guard !sources.isEmpty else { return }
         let selectedModels = model.phone.dubModels, selectedTargets = choices.filter { targets.contains($0.code) }.map { PhoneDubTarget(code: $0.code,name: $0.name) }
         let chosenVoice = model.phone.voices.first { $0.id.uuidString == voice }, exportAudio = audioOnly
         copying = true
@@ -118,8 +134,13 @@ struct PhoneDubView: View {
                 guard let store = model.phone.dubStore else { throw ClientError("mobile.simple.checkpoint_failed") }
                 let reference: PCMChunk?
                 if let chosenVoice { reference = try await model.phone.voiceStore?.reference(chosenVoice) } else { reference = nil }
-                let request = try await store.create(source: source.url,title: source.name,targets: selectedTargets,models: selectedModels,consent: consent,reference: reference,referenceText: chosenVoice?.transcript,audioOnly: exportAudio)
-                self.source = nil; consent = false; await model.phone.refresh(); model.phone.startDub(request.id)
+                for source in sources {
+                    try Task.checkCancellation()
+                    let request = try await store.create(source: source.url,title: source.name,targets: selectedTargets,models: selectedModels,consent: consent,reference: reference,referenceText: chosenVoice?.transcript,audioOnly: exportAudio)
+                    if batchMode { batchSources.removeAll { $0.url == source.url } } else { self.source = nil }
+                    await model.phone.refresh(); model.phone.startDub(request.id)
+                }
+                consent = false
             }
         }
     }

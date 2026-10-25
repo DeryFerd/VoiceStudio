@@ -28,6 +28,7 @@
     "src/preload/index.d.ts",
     "src/renderer/env.d.ts",
     "src/shared/utils/languageRejection.ts",
+    "src/shared/utils/windowChrome.ts",
     "src/shared/app-config.ts",
     "src/shared/utils/generationFailureMessage.ts",
     "src/shared/utils/generateBudget.ts",

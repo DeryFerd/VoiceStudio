@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useBackendStatus } from '@/hooks/use-backend-status';
 import { isBackendReachable } from '@shared/utils/backendStage';
 import { AccountCorner } from './account-corner';
+import { NowPlayingDock } from '@/components/now-playing-dock';
 
 export function AppShell() {
   const backend = useBackendStatus();
@@ -60,6 +61,7 @@ export function AppShell() {
           </BackendGate>
         )}
       </div>
+      <NowPlayingDock />
       {/* Native drag-region hit testing follows document order. Keep these
           no-drag controls after every workspace titlebar, outside BackendGate. */}
       {/* Top-right corner on every page and platform: account, then the notifications bell. */}

@@ -11,13 +11,14 @@ readelf = prebuilt / 'bin/llvm-readelf'
 for abi in ('arm64-v8a', 'x86_64'):
     directory = root / 'build/jniLibs' / abi
     for runtime, exports in {
-        'omni': ('omniAbi', 'cloneAudio'),
+        'omni': ('omniAbi', 'cloneAudio', 'designAudio'),
         'llama': ('llamaDevices', 'translateText'),
+        'mp3': ('create', 'write', 'finish', 'close'),
     }.items():
         library = directory / ('libvs_' + runtime + '.so')
         symbols = subprocess.check_output([str(readelf), '--dyn-syms', '--wide', str(library)], text=True)
         for name in exports:
-            expected = 'Java_com_voicestudio_mobile_local_NativeBridge_' + name
+            expected = 'Java_com_voicestudio_mobile_local_' + ('NativeMp3Bridge_' if runtime == 'mp3' else 'NativeBridge_') + name
             if expected not in symbols:
                 raise ValueError('Missing JNI export: ' + expected)
         if any('ggml_' in line and ' UND ' not in line for line in symbols.splitlines()):

@@ -27,6 +27,18 @@ import UniformTypeIdentifiers
         try Task.checkCancellation()
         let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
         try data.write(to: path, options: .atomic)
+        try await prepare(path,revision: revision)
+    }
+    /// Books stay on disk; playback does not allocate a whole-book Data buffer.
+    func load(file source: URL) async throws {
+        clear()
+        let revision = self.revision
+        try Task.checkCancellation()
+        let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension(source.pathExtension)
+        try FileManager.default.copyItem(at: source,to: path)
+        try await prepare(path,revision: revision)
+    }
+    private func prepare(_ path: URL,revision: UUID) async throws {
         let asset = AVURLAsset(url: path)
         let duration: Double, waveform: [Float]
         do {

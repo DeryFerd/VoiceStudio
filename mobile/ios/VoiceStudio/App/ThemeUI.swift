@@ -119,6 +119,8 @@ struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var scheme
     @State private var recovery: String?
+    @State private var inbox = PhoneInbox.shared
+    @State private var shortcut: String?
     var body: some View {
         let theme = Theme(palette: model.theme.palette(system: scheme == .dark ? .dark : .light), appearance: model.theme.appearance(system: scheme == .dark ? .dark : .light))
         TabView {
@@ -139,7 +141,22 @@ struct RootView: View {
                 .presentationBackground(theme.color("surfaceOverlay"))
                 .presentationDragIndicator(.visible)
         }
-        .task { await model.phone.refresh() }
+        .task { await model.phone.refresh(); inbox.collect() }
+        .onOpenURL { url in do { try inbox.receive(url) } catch { model.error = error as? ClientError ?? ClientError("mobile.errors.file") } }
+        .onChange(of: inbox.route,initial: true) { _,value in if let value { shortcut = value; inbox.route = nil } }
+        .sheet(item: Binding(get: { model.consentAnswered ? inbox.incoming : nil },set: { inbox.incoming = $0 })) { incoming in
+            NavigationStack { IncomingView(incoming: incoming).toolbar { Button(model.t("common.close")) { inbox.incoming = nil } } }.environment(model).environment(\.vsTheme,theme)
+        }
+        .sheet(isPresented: Binding(get: { shortcut != nil && model.consentAnswered },set: { if !$0 { shortcut = nil } })) {
+            NavigationStack {
+                Group {
+                    if shortcut == "dictate" { DictateView() }
+                    else if shortcut == "workflows" { WorkflowsView() }
+                    else if shortcut == "dub" { DubView() }
+                    else { SpeakView() }
+                }.toolbar { Button(model.t("common.close")) { shortcut = nil } }
+            }.environment(model).environment(\.vsTheme,theme)
+        }
         .onAppear { NativeTheme.apply(theme) }
         .onChange(of: model.theme) { _, _ in NativeTheme.apply(theme) }
         .onChange(of: scheme) { _, _ in NativeTheme.apply(theme) }
@@ -157,7 +174,7 @@ struct RootView: View {
         .safeAreaInset(edge: .top) {
             if let error = model.error ?? model.phone.error {
                 HStack(spacing: VSTokens.spacingGap) {
-                    ErrorNotice(error: error).foregroundStyle(theme.color("error"))
+                    ErrorNotice(error: error).foregroundStyle(theme.color("error")).accessibilityIdentifier("error.notice")
                         .frame(maxWidth: .infinity,alignment: .leading)
                     if error.key.hasPrefix("mobile.local.") {
                         Button(model.t("mobile.simple.download_models")) { model.error = nil; model.phone.error = nil; recovery = "models" }

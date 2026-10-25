@@ -10,6 +10,8 @@ public struct PhoneVoice: Codable, Identifiable, Sendable, Equatable {
     /// The catalogue model that transcribed this voice, for content reports. Absent on voices made before it was recorded.
     public var modelRepo: String? = nil
     public var modelRevision: String? = nil
+    public var designInstruction: String? = nil
+    public var designSeed: UInt64? = nil
 }
 public protocol PhoneAudioDecoder: Sendable {
     func decode(source: URL, output: URL, maxSeconds: Double, progress: @escaping @Sendable (Double) async -> Void) async throws -> PCMFile
@@ -31,8 +33,8 @@ public actor PhoneVoiceStore {
             } catch { return nil }
         }.sorted { $0.createdAt > $1.createdAt }
     }
-    public func create(name: String, source: URL, consent: Bool, asr: PhoneModel, engine: any LocalEngine, decoder: any PhoneAudioDecoder, progress: @escaping EngineProgressHandler = { _ in }) async throws -> PhoneVoice {
-        guard consent, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 200 else { throw ClientError("mobile.simple.clone_failed") }
+    public func create(name: String, source: URL, consent: Bool, asr: PhoneModel, cloneModel: PhoneModel, engine: any LocalEngine, decoder: any PhoneAudioDecoder, progress: @escaping EngineProgressHandler = { _ in }) async throws -> PhoneVoice {
+        guard consent, asr.capability == .asr, cloneModel.capability == .clone, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 200 else { throw ClientError("mobile.simple.clone_failed") }
         let id = UUID(), now = Date()
         // Publish metadata only after extraction and successful ASR. Failed/cancelled work leaves no voice.
         let actualDir = root.appendingPathComponent(id.uuidString)
@@ -42,20 +44,39 @@ public actor PhoneVoiceStore {
             let frames = try pcm.frames
             guard (2400...720000).contains(frames) else { throw ClientError("mobile.simple.audio_long") }
             let reference = try pcm.read(start: 0,count: frames)
-            let transcript = try await engine.transcribe(model: asr, audio: reference, progress: progress).trimmingCharacters(in: .whitespacesAndNewlines)
+            let transcript = try await engine.transcribe(model: asr, audio: reference, progress: { value in await progress(EngineProgress(stage: value.stage,fraction: 0.25+value.fraction*0.25)) }).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !transcript.isEmpty else { throw ClientError("mobile.simple.no_speech") }
             // This is the user's reference, not synthesized output.
             try ReferenceWave.write(reference, to: actualDir.appendingPathComponent("reference.wav"))
+            let preview = try await engine.clone(model: cloneModel,text: transcript,reference: reference,referenceText: transcript,progress: { value in await progress(EngineProgress(stage: value.stage,fraction: 0.5+value.fraction*0.5)) })
+            guard preview.sampleRate > 0, !preview.samples.isEmpty, preview.samples.allSatisfy(\.isFinite) else { throw ClientError("mobile.simple.clone_failed") }
+            try preview.markSynthetic().write(to: actualDir.appendingPathComponent("preview.wav"),options: .atomic)
             try Task.checkCancellation()
-            let voice = PhoneVoice(id: id,name: name.trimmingCharacters(in: .whitespacesAndNewlines),transcript: transcript,createdAt: now,consentAt: now,sampleRate: 24000,modelRepo: asr.repo,modelRevision: asr.revision)
+            let voice = PhoneVoice(id: id,name: name.trimmingCharacters(in: .whitespacesAndNewlines),transcript: transcript,createdAt: now,consentAt: now,sampleRate: 24000,modelRepo: cloneModel.repo,modelRevision: cloneModel.revision)
             try PrivateFiles.write(voice,to: actualDir.appendingPathComponent("voice.json")); return voice
         } catch { try? FileManager.default.removeItem(at: actualDir); throw error }
+    }
+    public func saveDesign(name: String, text: String, audio: LocalAudio, model: PhoneModel, instruction: String, seed: UInt64) throws -> PhoneVoice {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 200, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              audio.sampleRate == 24000, (2400...720000).contains(audio.samples.count), audio.samples.allSatisfy(\.isFinite) else { throw ClientError("mobile.simple.clone_failed") }
+        let id = UUID(), now = Date(), dir = try directory(id)
+        try PrivateFiles.directory(dir)
+        do {
+            try PCMFile.write(PCMChunk(samples: audio.samples,sampleRate: audio.sampleRate),to: dir.appendingPathComponent("reference.pcm"))
+            try audio.markSynthetic().write(to: dir.appendingPathComponent("reference.wav"),options: .atomic)
+            try Task.checkCancellation()
+            let voice = PhoneVoice(id: id,name: name.trimmingCharacters(in: .whitespacesAndNewlines),transcript: text,createdAt: now,consentAt: now,sampleRate: 24000,modelRepo: model.repo,modelRevision: model.revision,designInstruction: instruction,designSeed: seed)
+            try PrivateFiles.write(voice,to: dir.appendingPathComponent("voice.json")); return voice
+        } catch { try? FileManager.default.removeItem(at: dir); throw error }
     }
     public func reference(_ voice: PhoneVoice) throws -> PCMChunk {
         let pcm = PCMFile(try PrivateFiles.child(directory(voice.id),"reference.pcm"))
         return try pcm.read(start: 0,count: pcm.frames)
     }
-    public func preview(_ voice: PhoneVoice) throws -> URL { try PrivateFiles.child(directory(voice.id),"reference.wav") }
+    public func preview(_ voice: PhoneVoice) throws -> URL {
+        let preview = try PrivateFiles.child(directory(voice.id),"preview.wav")
+        return FileManager.default.fileExists(atPath: preview.path) ? preview : try PrivateFiles.child(directory(voice.id),"reference.wav")
+    }
     public func rename(_ voice: PhoneVoice, name: String) throws {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, name.count <= 200 else { throw ClientError("mobile.simple.clone_failed") }
         let url = try PrivateFiles.child(directory(voice.id),"voice.json")

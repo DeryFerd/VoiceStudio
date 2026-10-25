@@ -26,7 +26,7 @@ export const PROVIDER_FIELDS = [
   {
     key: 'DEEPL_API_KEY',
     labelKey: 'credentials.deepl_key',
-    placeholder: 'DeepL API key',
+    placeholderKey: 'credentials.deepl_key_placeholder',
     helpKey: 'credentials.deepl_key',
     isPassword: true,
   },
@@ -39,7 +39,7 @@ export const PROVIDER_FIELDS = [
   {
     key: 'MICROSOFT_API_KEY',
     labelKey: 'credentials.microsoft_key',
-    placeholder: 'Microsoft API key',
+    placeholderKey: 'credentials.microsoft_key_placeholder',
     helpKey: 'credentials.microsoft_key',
     isPassword: true,
   },

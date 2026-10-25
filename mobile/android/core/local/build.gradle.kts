@@ -27,12 +27,14 @@ val fetchRuntimes by tasks.registering(Exec::class) {
 }
 tasks.named("preBuild") { dependsOn(fetchRuntimes) }
 dependencies {
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     compileOnly(files(layout.buildDirectory.file("sherpa/classes.jar")).builtBy(fetchRuntimes))
     implementation(libs.coroutines)
     implementation(libs.serialization)
     implementation(libs.okhttp)
     implementation(libs.core)
     api(project(":core:network"))
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.mockwebserver)

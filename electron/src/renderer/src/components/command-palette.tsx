@@ -12,6 +12,7 @@ import { setWorkspace } from '@/lib/store/workspace';
 import { openTake } from '@/lib/store/takes';
 import { selectCloneProfile } from '@/lib/store/reference';
 import { patchCloneSettings } from '@/lib/store/clone-settings';
+import { SETTINGS_ENTRIES } from '@/features/settings/settings-index';
 import { cn } from '@/lib/utils';
 import { Kbd } from '@/components/ui/kbd';
 import { isMac } from '@/components/bridge';
@@ -289,7 +290,18 @@ export function CommandPalette() {
         },
       })),
   ];
-  const items = source
+  // Settings pages are searchable but stay out of the default list.
+  const needle = query.trim().toLocaleLowerCase();
+  const settingsItems: CommandItem[] = needle
+    ? SETTINGS_ENTRIES.map((entry) => ({
+        id: `settings-${entry.label}`,
+        label: t(entry.label),
+        group: t('nav.settings'),
+        icon: SettingsIcon,
+        run: () => navigate({ to: entry.to }),
+      }))
+    : [];
+  const items = [...source, ...settingsItems]
     .filter((item) => item.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .slice(0, 30);
   const run = (index: number) => {

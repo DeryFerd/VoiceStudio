@@ -102,7 +102,11 @@
     "dub": "Übersetze und synchronisiere Audio oder Video.",
     "stories": "Erstelle Szenen mit mehreren Stimmen.",
     "audiobook": "Erstelle Hörbücher mit Kapiteln.",
-    "transcribe": "Wandle Aufnahmen in Text um."
+    "transcribe": "Wandle Aufnahmen in Text um.",
+    "creatorCoreTeam": "Gründer und Kernteam",
+    "coreTeam": "Kernteam",
+    "follow": "Folgen",
+    "website": "Website"
   },
   "twilioIntegration": {
     "exposureWarning": "Beim Einschalten wird ein separater lokaler Port geöffnet, den dein Tunnel im Internet veröffentlicht. Nur mit deinem Twilio Auth Token signierte Anfragen werden akzeptiert; der Rest von VoiceStudio bleibt privat.",
@@ -370,7 +374,8 @@
   },
   "paneActions": {
     "collapse": "Bereich einklappen",
-    "edit": "Stimmprofil bearbeiten"
+    "edit": "Stimmprofil bearbeiten",
+    "expand": "Bereich ausklappen"
   },
   "modelSettings": {
     "models": "Modelle",
@@ -989,7 +994,8 @@
     "play": "Abspielen",
     "pause": "Pausieren",
     "seek": "Wiedergabeposition",
-    "missing": "Audiodatei fehlt."
+    "missing": "Audiodatei fehlt.",
+    "now_playing": "Wird abgespielt"
   },
   "logs": {
     "no_tauri_log": "Noch kein Tauri-Log auf der Festplatte – starten Sie es über den Desktop-Build, um eines zu erstellen",
@@ -1874,7 +1880,9 @@
     "deepl_base_url_help": "Benutzerdefinierter DeepL-API-Endpunkt (Standard: https://api.deepl.com/v2). Änderung für Proxy/Selbstgehostet.",
     "microsoft_base_url_help": "Benutzerdefinierter Azure Translator-Endpunkt (Standard: https://api.cognitive.microsofttranslator.com).",
     "region": "Region",
-    "aws_profile": "AWS-Profil"
+    "aws_profile": "AWS-Profil",
+    "deepl_key_placeholder": "DeepL API-Schlüssel",
+    "microsoft_key_placeholder": "Microsoft API-Schlüssel"
   },
   "about": {
     "architecture": "Architektur",
@@ -2054,6 +2062,7 @@
     "setup_access": "Erlaube Schreibzugriff auf den Datenordner der App und versuche es erneut.",
     "setup_unsupported_platform": "Dieser Intel-Mac kann das lokale KI-Backend nicht ausführen — PyTorch bietet keine macOS-Intel-Wheels. Verbinde stattdessen unten ein Remote-Backend; keine lokale Installation nötig.",
     "setup_wrong_architecture": "Dies ist die Intel-Version (x64) von VoiceStudio, die über Rosetta auf einem Mac mit Apple Silicon läuft, daher kann das lokale KI-Backend nicht installiert werden. Beende die App, installiere das Apple-Silicon-DMG (arm64) darüber und öffne sie erneut – deine Stimmen und Projekte bleiben erhalten.",
+    "setup_missing_system_library": "Auf diesem Windows-System fehlt das Microsoft Visual C++ 2015-2022 Redistributable (x64), das die PyTorch-Audioerweiterung benötigt. Installiere es von Microsoft und drücke dann auf „Erneut versuchen“.",
     "download_apple_silicon": "Apple-Silicon-Version herunterladen",
     "ready": "Engine bereit",
     "show_log": "Protokoll anzeigen",
@@ -2077,7 +2086,23 @@
     "hint_spawn_blocked": "Dein Betriebssystem oder deine Sicherheitssoftware hat den Start der lokalen Engine verweigert. Füge den Runtime-Ordner von VoiceStudio zu den Ausnahmen deines Virenscanners hinzu (Windows: Windows-Sicherheit → Viren- & Bedrohungsschutz → Einstellungen verwalten → Ausschlüsse), stelle sicher, dass er nicht in einem Cloud-synchronisierten Ordner wie OneDrive liegt, und versuche es dann erneut.",
     "hint_smart_app_control": "Die intelligente App-Steuerung von Windows (Smart App Control) hat die lokale Engine blockiert. Sie kennt keine Ausnahmen für einzelne Apps, daher hilft ein Virenscanner-Ausschluss nicht. Schalte sie unter Windows-Sicherheit → App- und Browsersteuerung → Einstellungen für die intelligente App-Steuerung aus (Windows kann sie ohne Zurücksetzen nicht wieder einschalten) oder verbinde VoiceStudio mit einer Engine auf einem anderen Computer und versuche es erneut.",
     "hint_slow_start": "Die Engine startete noch, als die Wartezeit ablief. Langsame Computer – besonders ohne dedizierte GPU – und der erste Start nach einer Installation (der Virenscanner prüft jede neue Datei) können mehrere Minuten brauchen. Schließe speicherhungrige Apps und versuche es erneut; spätere Starts sind deutlich schneller.",
-    "hint_synced_folder": "Dieser Speicherort liegt in einem Cloud-synchronisierten Ordner (OneDrive, Dropbox, iCloud Drive, Google Drive). Nur-online-Platzhalter und Dateisperren zerstören die Python-Umgebung. Verschiebe VoiceStudio in einen normalen lokalen Ordner (z. B. C:\\VoiceStudio unter Windows oder ~/VoiceStudio unter macOS und Linux) und richte es erneut ein."
+    "hint_synced_folder": "Dieser Speicherort liegt in einem Cloud-synchronisierten Ordner (OneDrive, Dropbox, iCloud Drive, Google Drive). Nur-online-Platzhalter und Dateisperren zerstören die Python-Umgebung. Verschiebe VoiceStudio in einen normalen lokalen Ordner (z. B. C:\\VoiceStudio unter Windows oder ~/VoiceStudio unter macOS und Linux) und richte es erneut ein.",
+    "cause_smart_app_control": "Die intelligente App-Steuerung von Windows hat die Engine blockiert",
+    "cause_spawn_blocked": "Sicherheitssoftware hat den Start der Engine blockiert",
+    "cause_native_crash": "Die Engine ist beim Start abgestürzt (nativer Fehler)",
+    "cause_missing_env": "Die Python-Umgebung fehlt oder ist unvollständig",
+    "cause_permission": "Keine Schreibberechtigung für den Engine-Ordner",
+    "cause_synced_folder": "Der Engine-Ordner liegt in einem Cloud-synchronisierten Ordner",
+    "cause_slow_start": "Die Engine startet auf einem langsamen Computer noch",
+    "choose_folder": "Anderen Ordner wählen",
+    "copy_diagnostics": "Diagnose kopieren",
+    "diagnostics_copied": "Diagnose kopiert",
+    "details": "Details",
+    "pill_starting": "Startet",
+    "pill_recovering": "Erholt sich",
+    "pill_failed": "Fehlgeschlagen",
+    "pill_repeats": "{{count}}× in Folge",
+    "offline_bar": "Engine ausgelastet, Verbindung wird automatisch wiederhergestellt"
   },
   "bootstrap": {
     "checking": "Umgebung wird überprüft…",
@@ -2372,7 +2397,8 @@
     "storage_temp": "Temporäre Dateien",
     "change": "Ändern…",
     "reset_default": "Auf Standard zurücksetzen",
-    "region_label": "Download-Region"
+    "region_label": "Download-Region",
+    "free_space": "{{free}} GB frei auf diesem Laufwerk, etwa {{needed}} GB nötig"
   },
   "asr_missing": {
     "message": "Es ist kein Sprache-zu-Text-Modell installiert — diese Funktion benötigt eines zum Transkribieren.",
@@ -2514,7 +2540,18 @@
     "staleTitle": "Update verfügbar",
     "staleMessage": "Sie verwenden VoiceStudio {{current}}, aber {{latest}} ist bereits erschienen – dieser Fehler ist dort möglicherweise schon behoben. Vor dem Melden die neueste Version ansehen?",
     "staleView": "Update ansehen",
-    "staleFileAnyway": "Trotzdem melden"
+    "staleFileAnyway": "Trotzdem melden",
+    "summary_label": "Was ist schiefgelaufen?",
+    "summary_placeholder": "Eine Zeile, z. B.: Synchronisation bleibt bei 40 % stehen",
+    "summary_required": "Bitte zuerst eine einzeilige Beschreibung eingeben.",
+    "sent_title": "Das wird gesendet",
+    "sent_app": "App-Version und Build",
+    "sent_system": "Betriebssystem, GPU, Arbeitsspeicher und freier Speicherplatz",
+    "sent_engines": "Welche Engines aktiv sind",
+    "sent_logs": "Letzte Engine-Logzeilen, ohne Ihren Home-Ordner-Pfad und Tokens",
+    "sent_pages": "Namen zuletzt besuchter Seiten",
+    "not_sent": "Nie gesendet: Ihr Audio, Text oder Stimmen. Dateinamen können in Logs oder Ihrer Beschreibung vorkommen – prüfen Sie daher die GitHub-Vorschau vor dem Absenden.",
+    "submit": "GitHub-Issue öffnen"
   },
   "crash": {
     "notice_unclean": "Die vorherige Sitzung wurde vor {{ago}} nicht sauber beendet. Das ist oft harmlos — Ruhezustand, erzwungenes Beenden oder eine gestoppte VM/Container.",
@@ -3889,6 +3926,164 @@
       "retry": "Erneut versuchen",
       "rate_limited": "Zu viele Meldungen aus diesem Netzwerk. Versuche es später erneut.",
       "invalid": "Diese Meldung konnte nicht gesendet werden. Aktualisiere die App und versuche es erneut."
+    },
+    "production": {
+      "new": "Neues Projekt",
+      "script_hint": "Verwende # Kapiteltitel für Kapitel und [voice:Name] am Zeilenanfang zum Wechseln der Figur. Nur Klartext; andere Markierungen werden vorgelesen.",
+      "conversion_hint": "Wähle einen Audioclip von höchstens 30 Sekunden. Die Konvertierung transkribiert ihn und spricht den Text mit der gewählten Stimme; die ursprüngliche Darbietung bleibt nicht erhalten.",
+      "normalize_text": "Text bereinigen"
+    },
+    "calls": {
+      "remote_control": "Anrufsteuerung für gekoppelte Geräte erlauben",
+      "remote_control_hint": "Mit API-Schlüssel authentifizierte Telefone dürfen Anrufe starten und verwalten. Anrufeinstellungen bleiben auf diesem Computer.",
+      "hint": "Anrufe laufen über deinen gekoppelten Computer und dessen konfigurierte Twilio-Nummer. Aktiviere dort zuerst die Anrufsteuerung.",
+      "authentication": "Kopple das Telefon mit dem API-Schlüssel des Computers. Eine Freigabe-PIN berechtigt nicht zu Anrufen.",
+      "billing": "Für Anrufe fallen Twilio-Gebühren an.",
+      "clone_hint": "Whisper transkribiert deine Aufnahme. Ein separates Klonmodell erzeugt vor dem Speichern eine geklonte Vorschau; beide Modelle sind erforderlich."
+    },
+    "host": {
+      "title": "Sprach-API des Telefons",
+      "hint": "Stellt die installierte Stimme über einen OpenAI-kompatiblen Sprachendpunkt und MCP (2025-11-25) bereit. Läuft nur bei geöffnetem Bildschirm und aktiver App.",
+      "lan": "Lokales Netzwerk erlauben",
+      "lan_hint": "Aus: nur dieses Telefon. Ein: Geräte im Netzwerk können sich mit dem temporären Bearer-Token verbinden. Halte den Token geheim.",
+      "start": "Server starten",
+      "copy": "Bearer-Token kopieren",
+      "running": "Server läuft",
+      "capabilities_hint": "Gib nur die installierten Modelle und die gewählte Stimme frei. Sprache, Transkription und Übersetzung laufen auf diesem Telefon, solange dieser Bildschirm geöffnet ist.",
+      "allow_speech": "Spracherzeugung erlauben",
+      "allow_transcription": "Transkription erlauben",
+      "allow_translation": "Übersetzung erlauben",
+      "voice_source": "Stimmenquelle",
+      "preset": "Voreingestellte Stimmen",
+      "saved": "Gespeicherte Stimmen",
+      "audio_hint": "Transkription akzeptiert Base64-kodiertes PCM16-Mono-WAV mit 8–24 kHz und bis zu 30 Sekunden."
+    },
+    "books": {
+      "import_failed": "Buch konnte nicht importiert werden. Verwende ein unverschlüsseltes EPUB, Text-PDF oder UTF-8-Text (bis 64 MB).",
+      "no_text": "Kein lesbarer Text gefunden. Gescannte PDFs benötigen vor dem Import eine Texterkennung.",
+      "export_failed": "Audio konnte nicht exportiert werden. M4B unterstützt bis zu 255 Kapitel.",
+      "invalid_controls": "Verwende Geschwindigkeiten von 0,5 bis 2, Pausen bis 30 Sekunden und nicht leere Ausspracheeinträge.",
+      "controls_hint": "EPUB, Text-PDF oder TXT importieren. [pause:0.5] fügt Stille in Sekunden ein; [speed:1.25] am Zeilenanfang ändert die Geschwindigkeit. Unveränderte Zeilen nutzen gespeichertes Audio.",
+      "line_speed": "Zeilengeschwindigkeit",
+      "restore_recipe": "Gespeichertes Stimmrezept bearbeiten",
+      "save_recipe_copy": "Als neue Stimme speichern"
+    },
+    "editing": {
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "subtitles": "Untertitel",
+      "import_subtitles": "SRT / VTT importieren",
+      "export_srt": "SRT exportieren",
+      "export_vtt": "VTT exportieren",
+      "source_text": "Ausgangstext",
+      "original": "Originalton",
+      "generated": "Erzeugter Ton",
+      "split_at": "Teilen bei",
+      "split": "Segment teilen",
+      "merge": "Mit nächstem verbinden",
+      "replace_subtitles": "Untertitel-Zeitleiste ersetzen?",
+      "replace": "Ersetzen",
+      "replace_subtitles_detail": "Dies ersetzt die Segment-Zeitleiste für diese Sprache. Andere Sprachen müssen möglicherweise erneut übersetzt werden. Vor dem Erzeugen kannst du die Änderung rückgängig machen.",
+      "preview_unavailable": "Erzeuge dieses Segment, bevor du seinen Ton vorhörst.",
+      "subtitle_invalid": "Wähle eine gültige SRT- oder VTT-Datei mit Abschnitten von höchstens 30 Sekunden.",
+      "subtitle_missing": "Übersetze alle Segmente, bevor du Untertitel exportierst.",
+      "split_invalid": "Wähle einen Teilungspunkt im Segment mit genügend Text auf beiden Seiten.",
+      "merge_invalid": "Verbinde benachbarte Segmente mit derselben Stimme und einer Gesamtdauer von höchstens 30 Sekunden.",
+      "waveform": "Audiowellenform"
+    },
+    "jobs": {
+      "title": "Verarbeitung auf dem Telefon",
+      "checkpointed": "Abgeschlossene Schritte werden gespeichert. Bei Bedarf abbrechen und fortsetzen.",
+      "power_paused": "Zum Schutz des Akkus oder zum Abkühlen des Telefons pausiert. Bei besseren Bedingungen fortsetzen.",
+      "background_paused": "Im Hintergrund pausiert. Öffne diese Aufgabe erneut und setze sie ab den gespeicherten Schritten fort.",
+      "requesting_gpu": "GPU-Zugriff im Hintergrund wird angefordert…",
+      "requesting_cpu": "CPU-Zeit im Hintergrund wird angefordert…",
+      "continued_gpu": "GPU-Fortsetzung gewährt; iOS kann diese Aufgabe weiterhin pausieren oder beenden.",
+      "continued_cpu": "CPU-Fortsetzung gewährt; iOS kann diese Aufgabe weiterhin pausieren oder beenden.",
+      "switching_cpu": "Fortschritt wird gespeichert und die GPU vor der CPU-Fortsetzung freigegeben…",
+      "background_limited": "iOS begrenzt die Hintergrundzeit. Abgeschlossene Schritte bleiben bei Ablauf gespeichert.",
+      "background_requestable": "Dieses Telefon unterstützt GPU-Anfragen im Hintergrund. Jede Aufgabe benötigt die Freigabe von iOS.",
+      "gpu_unavailable": "Die GPU ist hier im Hintergrund nicht verfügbar. Nutze die CPU oder öffne die Aufgabe zum Fortsetzen erneut.",
+      "cpu_fallback": "CPU-Fortsetzung erlauben, wenn die GPU im Hintergrund nicht verfügbar ist",
+      "cpu_tradeoff": "Die CPU arbeitet langsamer und kann mehr Akku verbrauchen. Im Vordergrund wird normalerweise die GPU verwendet.",
+      "cpu_unavailable": "Diese installierte Version kann das Modell nicht auf der CPU fortsetzen. Gespeicherte Schritte lassen sich im Vordergrund fortsetzen.",
+      "resume_checkpoint": "Gespeicherte Aufgabe fortsetzen",
+      "foreground_service": "Ein Vordergrunddienst hält diese Aufgabe aktiv, solange Android es erlaubt."
+    },
+    "flow": {
+      "import_media": "Audio oder Video importieren",
+      "template_clean": "Bereinigen und vorlesen",
+      "template_translate": "Übersetzen und vorlesen",
+      "template_transcribe": "Transkribieren und übersetzen",
+      "contains": "Fortfahren, wenn Text enthält (Großschreibung beachten)",
+      "skip": "Falls nicht enthalten, {{count}} Schritte überspringen",
+      "skip_label": "Zu überspringende Schritte bei fehlendem Text",
+      "retries": "Wiederholungen: {{count}}",
+      "retries_label": "Wiederholungen nach einem Fehler",
+      "step_transcribe": "Medien transkribieren",
+      "step_condition": "Bedingung"
+    },
+    "integration": {
+      "received": "Empfangener Inhalt",
+      "review": "Prüfe den geteilten Inhalt, bevor du eine Aufgabe startest. Nichts startet automatisch.",
+      "shortcut_speak": "Vorlesen öffnen",
+      "shortcut_dictate": "Diktat öffnen",
+      "widget_description": "Öffnet Vorlesen oder Diktat. Die Aufnahme beginnt erst nach Tippen auf Start.",
+      "text": "Text"
+    },
+    "export": {
+      "failed": "Audio konnte nicht exportiert werden. Prüfe den freien Speicherplatz und versuche es erneut."
+    },
+    "processing": {
+      "audio_editor": "Audioeditor",
+      "hint": "Offline-Sprachbearbeitung: 24 kHz mono. Die Quelle bleibt unverändert.",
+      "select_audio": "Audio auswählen",
+      "fade_in": "Einblenden (Sekunden)",
+      "fade_out": "Ausblenden (Sekunden)",
+      "gain_db": "Verstärkung (dB)",
+      "normalize": "Spitzenpegel normalisieren",
+      "target_peak": "Zielspitzenpegel (dBFS)",
+      "noise_gate": "Rauschgate",
+      "gate_threshold": "Gate-Schwelle (dBFS)",
+      "process": "Änderungen anwenden",
+      "result": "Bearbeitetes Audio",
+      "peak": "Spitzenpegel",
+      "changed_settings": "Einstellungen geändert. Wende die Änderungen an, um das aktualisierte Audio vorzuhören oder zu exportieren.",
+      "preview_hint": "Die Quellvorschau spielt bis zu 30 Sekunden ab dem Schnittanfang.",
+      "invalid": "Prüfe Schnittzeiten, Überblendungsdauer und Audiopegel.",
+      "segment_gain": "Segmentlautstärke",
+      "mute": "Segment stummschalten",
+      "record_consent": "Ich darf diese Aufnahme für die Stimmumwandlung verwenden.",
+      "merge_levels": "Verwende vor dem Verbinden dieselben Lautstärke- und Stummschaltungseinstellungen."
+    }
+  },
+  "failureCause": {
+    "details": "Details",
+    "fixes": "Vorgeschlagene Lösungen",
+    "vram": {
+      "title": "Der GPU ist der Speicher ausgegangen",
+      "fix1": "Andere GPU-Apps schließen",
+      "fix2": "CPU oder eine kleinere Engine wählen"
+    },
+    "model_missing": {
+      "title": "Das Modell ist nicht heruntergeladen",
+      "fix1": "Im Modellkatalog herunterladen",
+      "fix2": "Mit Beheben installieren"
+    },
+    "busy": {
+      "title": "Die Engine ist ausgelastet",
+      "fix1": "Auf den laufenden Auftrag warten",
+      "fix2": "Gleich noch einmal versuchen"
+    },
+    "timeout": {
+      "title": "Zeitüberschreitung bei der Erzeugung",
+      "fix1": "Einen kürzeren Abschnitt versuchen",
+      "fix2": "Proxy-Timeout erhöhen"
+    },
+    "bad_response": {
+      "title": "Unerwartete Antwort des Servers",
+      "fix1": "Backend unter Einstellungen > Protokolle prüfen",
+      "fix2": "VoiceStudio neu starten und erneut versuchen"
     }
   }
 }

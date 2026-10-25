@@ -16,6 +16,7 @@ data class LocalAudio(val samples: FloatArray, val sampleRate: Int)
 @kotlinx.serialization.Serializable data class SpeechSegment(val start: Double,val end: Double,val text: String)
 data class Transcript(val text: String, val final: Boolean, val progress: Float)
 interface LocalEngine {
+    suspend fun design(model: PhoneModel,text: String,instruction: String,seed: Long,progress: (Float)->Unit = {}): LocalAudio = throw ClientFailure("mobile.local.model_incompatible")
     suspend fun synthesize(model: PhoneModel, text: String, speaker: Int = 0, speed: Float = 1f, language: String? = null, progress: (Float)->Unit = {}): LocalAudio
     suspend fun clone(model: PhoneModel, text: String, reference: LocalAudio, referenceText: String, progress: (Float)->Unit = {}): LocalAudio
     suspend fun transcribe(model: PhoneModel, audio: LocalAudio, progress: (Float)->Unit = {}): String
@@ -37,6 +38,7 @@ internal object NativeBridge {
     fun load() {System.loadLibrary("vs_omni");System.loadLibrary("vs_llama")}
     external fun omniAbi(): Int
     external fun llamaDevices(): Int
+    external fun designAudio(model: String,codec: String,text: String,instruction: String,seed: Long,control: NativeControl): FloatArray?
     external fun cloneAudio(model: String, codec: String, text: String, referenceText: String, reference: FloatArray, control: NativeControl): FloatArray?
     external fun translateText(model: String, prompt: String, formatted: Boolean, control: NativeControl): ByteArray?
 }
@@ -141,6 +143,15 @@ class PhoneLocalEngine(private val models: ModelDownloads): LocalEngine {
         val codec=model.role(dir,"codec").ifEmpty {model.role(dir,"audio-tokenizer").ifEmpty {model.role(dir,"tokenizer")}}
         if(codec.isBlank()) throw ClientFailure("mobile.local.model_incompatible")
         val result=NativeBridge.cloneAudio(model.role(dir,"model"),codec,text,referenceText,reference.samples,NativeControl(job,progress) {models.licence.accepted(model)})
+        job.ensureActive();models.licence.requireAccepted(model)
+        LocalAudio(result ?: throw ClientFailure("mobile.local.inference_failed"),24000)
+    }
+    override suspend fun design(model: PhoneModel,text: String,instruction: String,seed: Long,progress: (Float)->Unit): LocalAudio = execute(model,"clone",progress) {dir,job ->
+        require(text.isNotBlank()&&text.length<=2000&&instruction.length<=2000&&seed>=0)
+        NativeBridge.load()
+        val codec=model.role(dir,"codec").ifEmpty {model.role(dir,"audio-tokenizer").ifEmpty {model.role(dir,"tokenizer")}}
+        if(codec.isBlank()) throw ClientFailure("mobile.local.model_incompatible")
+        val result=NativeBridge.designAudio(model.role(dir,"model"),codec,text,instruction,seed,NativeControl(job,progress) {models.licence.accepted(model)})
         job.ensureActive();models.licence.requireAccepted(model)
         LocalAudio(result ?: throw ClientFailure("mobile.local.inference_failed"),24000)
     }

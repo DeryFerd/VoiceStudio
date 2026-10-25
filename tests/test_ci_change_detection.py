@@ -211,8 +211,9 @@ def test_the_electron_jobs_are_gated_on_the_detection_and_survive_its_failure():
         assert jobs[name]["needs"] == "changes", name
         condition = jobs[name]["if"]
         assert "!cancelled()" in condition and "outputs.electron != 'false'" in condition, name
+        assert "needs.changes.result != 'skipped'" in condition, name
     # the merge gate always reports, even if detection broke
-    assert jobs["test-python"]["needs"] == "changes" and jobs["test-python"]["if"] == "${{ !cancelled() }}"
+    assert jobs["test-python"]["needs"] == "changes" and jobs["test-python"]["if"] == "${{ !cancelled() && needs.changes.result != 'skipped' }}"
     # `test` is the required check: it must wait for both halves and always report,
     # and may accept a skipped Electron half only when detection said "false".
     assert set(jobs["test"]["needs"]) == {"changes", "test-python", "test-electron", "electron-smokes"}
@@ -314,3 +315,23 @@ def _matches(path, pattern):
     import fnmatch
     regex = fnmatch.translate(pattern.replace("**", "\0")).replace("\\\0", ".*").replace("\0", ".*")
     return re.match(regex, path) is not None
+
+
+def test_fork_pull_requests_wait_for_approval_before_any_job_runs():
+    jobs = WORKFLOW["jobs"]
+    gate = jobs["approve-external"]
+    assert gate["environment"] == "external-pr"
+    # only fork PRs wait; same-repo branches, pushes and the merge queue skip the job
+    assert "head.repo.full_name != github.repository" in gate["if"]
+    assert "pull_request" in gate["if"]
+    assert jobs["changes"]["needs"] == "approve-external"
+    # a skipped approval (internal PR) must not stop `changes`; a rejected one must
+    assert "needs.approve-external.result != 'failure'" in jobs["changes"]["if"]
+    # every job reachable without `changes` would let a fork PR use a runner unapproved
+    for name, job in jobs.items():
+        if name in {"approve-external", "changes"}:
+            continue
+        needs = job.get("needs", [])
+        needs = [needs] if isinstance(needs, str) else needs
+        assert needs, f"{name} has no needs, so it would run before the approval"
+        assert "changes" in needs or "test-python" in needs, name

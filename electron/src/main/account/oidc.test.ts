@@ -76,6 +76,29 @@ it('rejects a token response without offline_access', async () => {
   ).rejects.toThrow(/offline_access/);
 });
 
+it('accepts a token response that omits scope, as Zitadel does', async () => {
+  // RFC 6749 section 5.1: scope is optional when it equals what was requested.
+  const fetchImpl = vi.fn(async (u: string) =>
+    u.endsWith('openid-configuration')
+      ? json(discovery)
+      : json({ access_token: 'a', refresh_token: 'r', expires_in: 300, token_type: 'Bearer' }),
+  );
+  await expect(
+    client(fetchImpl).exchangeCode('c', 'http://127.0.0.1:1/callback', 'v'),
+  ).resolves.toMatchObject({ access_token: 'a', refresh_token: 'r' });
+});
+
+it('rejects a token response without a refresh token', async () => {
+  const fetchImpl = vi.fn(async (u: string) =>
+    u.endsWith('openid-configuration')
+      ? json(discovery)
+      : json({ access_token: 'a', expires_in: 300, scope: 'openid offline_access' }),
+  );
+  await expect(
+    client(fetchImpl).exchangeCode('c', 'http://127.0.0.1:1/callback', 'v'),
+  ).rejects.toThrow(/refresh token/);
+});
+
 it('maps refresh errors: invalid_grant vs transient', async () => {
   const respond = (r: Response) =>
     vi.fn(async (u: string) => (u.endsWith('openid-configuration') ? json(discovery) : r));

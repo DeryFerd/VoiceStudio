@@ -398,6 +398,9 @@ hard rules from the first prompt.
 
 ## Quality gates your PR must pass
 
+- **First CI run from a fork:** a pull request from a fork waits for a
+  maintainer to approve it (the `external-pr` environment) before CI starts.
+  Branches in this repository start at once.
 - **CI scope:** the Electron-only jobs (UI crawler, Desktop UI, Linux native
   package, and `Tests (Electron)` plus `Electron renderer smokes`, the Electron halves of `Tests (backend + frontend)`) are skipped on a
   pull request whose every changed file is an *edit or addition* under `backend/`

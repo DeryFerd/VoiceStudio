@@ -54,12 +54,17 @@ suspend fun fitTiming(audio: LocalAudio, frames: Int): LocalAudio = withContext(
 }
 
 /** Rebuilt from immutable segment files on resume, so a segment is never mixed twice. */
-suspend fun mixTimeline(file: File, frames: Long, segments: List<Pair<Long,PcmFile>>): PcmFile = withContext(Dispatchers.IO) {
+suspend fun mixTimeline(file: File, frames: Long, segments: List<Pair<Long,PcmFile>>, gains: List<Double> = emptyList()): PcmFile = withContext(Dispatchers.IO) {
     require(frames in 1..345_600_000L)
     file.parentFile!!.mkdirs();file.delete()
     RandomAccessFile(file,"rw").use {out ->
         out.setLength(frames*4)
-        for((start,segment) in segments) {
+        require(gains.isEmpty()||gains.size==segments.size)
+        for((piece,value) in segments.withIndex()) {
+            val (start,segment)=value
+            val gain=if(gains.isEmpty()) 1.0 else gains[piece]
+            require(gain.isFinite()&&gain in 0.0..2.0)
+            if(gain==0.0) continue
             require(start>=0&&start<frames&&segment.sampleRate==24000)
             var offset=0L
             val count=minOf(segment.frames,frames-start)
@@ -70,7 +75,7 @@ suspend fun mixTimeline(file: File, frames: Long, segments: List<Pair<Long,PcmFi
                 val previous=ByteArray(size*4);out.seek((start+offset)*4);out.readFully(previous)
                 val input=ByteBuffer.wrap(previous).order(ByteOrder.LITTLE_ENDIAN)
                 val result=ByteBuffer.allocate(previous.size).order(ByteOrder.LITTLE_ENDIAN)
-                samples.forEach {sample ->result.putFloat((input.float+sample).coerceIn(-1f,1f))}
+                samples.forEach {sample ->result.putFloat((input.float+sample*gain.toFloat()).coerceIn(-1f,1f))}
                 out.seek((start+offset)*4);out.write(result.array());offset+=size
             }
         }

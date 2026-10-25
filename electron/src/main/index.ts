@@ -1,4 +1,5 @@
 import { createTrayIcon } from './tray-icon';
+import { MAC_TRAFFIC_LIGHTS } from '../shared/utils/windowChrome';
 import { installWatchFolders } from './watch-folders';
 import { installNativeCapture } from './native-capture';
 import { isTrustedRenderer } from './trusted-renderer';
@@ -145,7 +146,7 @@ function createWindow(): BrowserWindow {
     backgroundColor: BACKGROUND,
     titleBarStyle: 'hidden',
     ...(process.platform === 'darwin'
-      ? { trafficLightPosition: { x: 12, y: 10 } }
+      ? { trafficLightPosition: MAC_TRAFFIC_LIGHTS }
       : { titleBarOverlay: OVERLAY }),
     webPreferences: {
       preload: PRELOAD_PATH,

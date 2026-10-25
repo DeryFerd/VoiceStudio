@@ -28,7 +28,9 @@ vi.mock('@/lib/store/workspace', () => ({
   useWorkspace: () => ({ libraryOpen: true, libraryTab: 'voices' }),
   setWorkspace: vi.fn(),
 }));
-vi.mock('@/components/bridge', () => ({ appVersion: () => '0.5.7', isMac: () => false }));
+const platform = vi.hoisted(() => ({ mac: false }));
+vi.mock('@/components/bridge', () => ({ appVersion: () => '0.5.7', isMac: () => platform.mac }));
+vi.mock('@/hooks/use-window-fullscreen', () => ({ useWindowFullscreen: () => false }));
 vi.mock('@/lib/brand', () => ({ brandIcon: 'icon.png', brandArtwork: 'art.png' }));
 vi.mock('@/hooks/use-pane-resize', () => ({
   usePaneResize: () => ({ host: { current: null }, width: 280, separatorProps: {} }),
@@ -52,6 +54,7 @@ vi.mock('./use-workspace-sidebar', () => ({
     setOpen: sidebar.setOpen,
   }),
 }));
+import { MAC_TRAFFIC_LIGHTS_BAND } from '@shared/utils/windowChrome';
 import { versionTranslationKey, WorkspaceSidebar } from './workspace-sidebar';
 
 beforeEach(() => {
@@ -95,3 +98,13 @@ it('uses the plain version label outside development builds', () => {
   expect(versionTranslationKey(false)).toBe('app.version');
 });
 
+it('starts the brand row below the macOS traffic lights, never beside them', () => {
+  platform.mac = true;
+  try {
+    const { container } = render(<WorkspaceSidebar />);
+    const row = container.querySelector('[data-slot="titlebar-row"]') as HTMLElement;
+    expect(row.style.paddingTop).toBe(`${MAC_TRAFFIC_LIGHTS_BAND}px`);
+  } finally {
+    platform.mac = false;
+  }
+});

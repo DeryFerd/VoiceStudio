@@ -102,7 +102,11 @@
     "dub": "Translate and dub audio or video.",
     "stories": "Create scenes with multiple voices.",
     "audiobook": "Build audiobooks with chapters.",
-    "transcribe": "Turn recordings into text."
+    "transcribe": "Turn recordings into text.",
+    "creatorCoreTeam": "Creator and Core Team",
+    "coreTeam": "Core Team",
+    "follow": "Follow",
+    "website": "Website"
   },
   "twilioIntegration": {
     "exposureWarning": "Turning this on opens a separate local port that your tunnel publishes to the internet. Only requests signed with your Twilio Auth Token are accepted; the rest of VoiceStudio stays private.",
@@ -333,12 +337,29 @@
     "setup_access": "Allow write access to the app’s data folder, then retry.",
     "setup_unsupported_platform": "This Intel Mac can't run the local AI backend — PyTorch ships no macOS Intel wheels. Connect a remote backend below instead; no local install is needed.",
     "setup_wrong_architecture": "This is the Intel (x64) build of VoiceStudio running through Rosetta on an Apple Silicon Mac, so the local AI backend can't install. Quit, install the Apple Silicon (arm64) DMG over this app, and reopen — your voices and projects are kept.",
+    "setup_missing_system_library": "This Windows system is missing the Microsoft Visual C++ 2015-2022 Redistributable (x64), which the PyTorch audio extension needs. Install it from Microsoft, then press Retry.",
     "download_apple_silicon": "Download the Apple Silicon build",
     "proxy_bypass_help": "Fully quit VoiceStudio, set HTTP_PROXY/HTTPS_PROXY to your proxy URL and NO_PROXY to excluded hosts in a terminal, then launch VoiceStudio from that terminal. Retrying in the current app cannot load new environment variables.",
     "hint_spawn_blocked": "Your operating system or security software refused to launch the local engine. Add VoiceStudio’s runtime folder to your antivirus exclusions (Windows: Windows Security → Virus & threat protection → Manage settings → Exclusions), make sure it is not inside a cloud-synced folder such as OneDrive, then retry.",
     "hint_smart_app_control": "Windows Smart App Control blocked the local engine. It has no per-app exceptions, so an antivirus exclusion will not help. Turn it off in Windows Security → App & browser control → Smart App Control settings (Windows cannot turn it back on without a reset), or connect VoiceStudio to an engine running on another computer, then retry.",
     "hint_slow_start": "The engine was still starting when the wait ran out. Slow computers — especially ones without a dedicated GPU — and the first launch after an install (antivirus scans every new file) can need several minutes. Close memory-heavy apps and retry; later starts are much faster.",
-    "hint_synced_folder": "This location is inside a cloud-synced folder (OneDrive, Dropbox, iCloud Drive, Google Drive). Online-only placeholders and file locking break the Python environment. Move VoiceStudio to a plain local folder (for example C:\\VoiceStudio on Windows or ~/VoiceStudio on macOS and Linux) and set it up again."
+    "hint_synced_folder": "This location is inside a cloud-synced folder (OneDrive, Dropbox, iCloud Drive, Google Drive). Online-only placeholders and file locking break the Python environment. Move VoiceStudio to a plain local folder (for example C:\\VoiceStudio on Windows or ~/VoiceStudio on macOS and Linux) and set it up again.",
+    "cause_smart_app_control": "Windows Smart App Control blocked the engine",
+    "cause_spawn_blocked": "Security software blocked the engine from starting",
+    "cause_native_crash": "The engine crashed while starting (native fault)",
+    "cause_missing_env": "The Python environment is missing or incomplete",
+    "cause_permission": "No permission to write to the engine folder",
+    "cause_synced_folder": "The engine folder is inside a cloud-synced folder",
+    "cause_slow_start": "The engine is still starting on a slow computer",
+    "choose_folder": "Choose another folder",
+    "copy_diagnostics": "Copy diagnostics",
+    "diagnostics_copied": "Diagnostics copied",
+    "details": "Details",
+    "pill_starting": "Starting",
+    "pill_recovering": "Recovering",
+    "pill_failed": "Failed",
+    "pill_repeats": "{{count}} times in a row",
+    "offline_bar": "Engine busy, reconnecting automatically"
   },
   "engines": {
     "selectCpuFallback": "{{engine}}: running on CPU — {{reason}}",
@@ -586,7 +607,8 @@
     "unmute": "Unmute",
     "volume": "Volume",
     "exit_fullscreen": "Exit full screen",
-    "unavailable": "Playback unavailable"
+    "unavailable": "Playback unavailable",
+    "now_playing": "Now playing"
   },
   "common": {
     "close": "Close",
@@ -719,7 +741,8 @@
   },
   "paneActions": {
     "collapse": "Collapse pane",
-    "edit": "Edit voice profile"
+    "edit": "Edit voice profile",
+    "expand": "Expand pane"
   },
   "modelSettings": {
     "models": "Models",
@@ -1991,7 +2014,9 @@
     "deepl_base_url_help": "Custom DeepL API endpoint (default: https://api.deepl.com/v2). Change for proxy/self-hosted.",
     "microsoft_base_url_help": "Custom Azure Translator endpoint (default: https://api.cognitive.microsofttranslator.com).",
     "region": "Region",
-    "aws_profile": "AWS profile"
+    "aws_profile": "AWS profile",
+    "deepl_key_placeholder": "DeepL API key",
+    "microsoft_key_placeholder": "Microsoft API key"
   },
   "about": {
     "architecture": "Architecture",
@@ -2436,7 +2461,8 @@
     "storage_temp": "Temp files",
     "change": "Change…",
     "reset_default": "Reset to default",
-    "region_label": "Download region"
+    "region_label": "Download region",
+    "free_space": "{{free}} GB free on this drive, about {{needed}} GB needed"
   },
   "asr_missing": {
     "message": "No speech-to-text model is installed — this feature needs one to transcribe audio.",
@@ -2578,7 +2604,18 @@
     "staleTitle": "Update available",
     "staleMessage": "You're running VoiceStudio {{current}}, but {{latest}} is already out — this bug may be fixed there. See the latest release before filing?",
     "staleView": "View update",
-    "staleFileAnyway": "File anyway"
+    "staleFileAnyway": "File anyway",
+    "summary_label": "What went wrong?",
+    "summary_placeholder": "One line, for example: Dubbing stops at 40%",
+    "summary_required": "Add a one-line description first.",
+    "sent_title": "What will be sent",
+    "sent_app": "App version and build",
+    "sent_system": "Operating system, GPU, memory and free disk space",
+    "sent_engines": "Which engines are active",
+    "sent_logs": "Recent engine log lines, with your home folder path and tokens removed",
+    "sent_pages": "Names of recently visited pages",
+    "not_sent": "Never sent: your audio, text or voices. File names can appear in logs or your description, so review the GitHub preview before submitting.",
+    "submit": "Open GitHub issue"
   },
   "crash": {
     "notice": "The voice backend crashed ({{exit}}) {{ago}} ago and is being restarted automatically.",
@@ -3889,6 +3926,164 @@
       "retry": "Try again",
       "rate_limited": "Too many reports from this network. Try again later.",
       "invalid": "This report couldn't be sent. Update the app and try again."
+    },
+    "production": {
+      "new": "New project",
+      "script_hint": "Use # Chapter title for chapters and [voice:Name] at the start of a line to switch character. Plain text only; other markup is read aloud.",
+      "conversion_hint": "Choose an audio clip up to 30 seconds. Conversion transcribes it and speaks it in the selected voice; it does not preserve the original performance.",
+      "normalize_text": "Clean up text"
+    },
+    "calls": {
+      "remote_control": "Allow paired call control",
+      "remote_control_hint": "Allow API-key-authenticated phones to place and manage calls. Call settings stay on this computer.",
+      "hint": "Calls run through your paired computer and its configured Twilio number. Enable paired call control on that computer first.",
+      "authentication": "Pair using the computer’s API key to control calls. A sharing PIN cannot authorize calls.",
+      "billing": "Twilio call charges apply.",
+      "clone_hint": "Whisper transcribes your sample. A separate cloning model generates a cloned preview before saving; both models are required."
+    },
+    "host": {
+      "title": "Phone speech API",
+      "hint": "Serve the selected installed voice through an OpenAI-style speech endpoint and MCP (2025-11-25). Runs only while this screen is open and the app is active.",
+      "lan": "Allow local network",
+      "lan_hint": "Off: this phone only. On: devices on your network can connect using the temporary bearer token. Keep the token private.",
+      "start": "Start server",
+      "copy": "Copy bearer token",
+      "running": "Server running",
+      "capabilities_hint": "Expose only the installed models and voice you choose. Speech, transcription and translation run on this phone while this screen stays open.",
+      "allow_speech": "Allow speech generation",
+      "allow_transcription": "Allow transcription",
+      "allow_translation": "Allow translation",
+      "voice_source": "Voice source",
+      "preset": "Preset voices",
+      "saved": "Saved voices",
+      "audio_hint": "Transcription accepts base64 PCM16 mono WAV, 8–24 kHz, up to 30 seconds."
+    },
+    "books": {
+      "import_failed": "Couldn't import this book. Use an unencrypted EPUB, text PDF, or UTF-8 text file (up to 64 MB).",
+      "no_text": "No readable text found. Scanned PDFs need text recognition before import.",
+      "export_failed": "Couldn't export audio. M4B supports up to 255 chapters.",
+      "invalid_controls": "Use speeds from 0.5 to 2, pauses up to 30 seconds, and nonempty pronunciation entries.",
+      "controls_hint": "Import EPUB, text PDF, or TXT. Add [pause:0.5] for seconds of silence; start a line with [speed:1.25] to change its speed. Unchanged lines reuse saved audio.",
+      "line_speed": "Line speed",
+      "restore_recipe": "Edit saved voice recipe",
+      "save_recipe_copy": "Save as a new voice"
+    },
+    "editing": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "subtitles": "Subtitles",
+      "import_subtitles": "Import SRT / VTT",
+      "export_srt": "Export SRT",
+      "export_vtt": "Export VTT",
+      "source_text": "Source text",
+      "original": "Original audio",
+      "generated": "Generated audio",
+      "split_at": "Split at",
+      "split": "Split segment",
+      "merge": "Merge with next",
+      "replace_subtitles": "Replace subtitle timeline?",
+      "replace": "Replace",
+      "replace_subtitles_detail": "This replaces the segment timeline for this language. Other languages may need translation again. You can undo before generating.",
+      "preview_unavailable": "Generate this segment before previewing its audio.",
+      "subtitle_invalid": "Choose a valid SRT or VTT file with cues of 30 seconds or less.",
+      "subtitle_missing": "Translate every segment before exporting subtitles.",
+      "split_invalid": "Choose a split point inside a segment with enough text on both sides.",
+      "merge_invalid": "Merge adjacent segments with the same voice and a combined duration of 30 seconds or less.",
+      "waveform": "Audio waveform"
+    },
+    "jobs": {
+      "title": "Phone processing",
+      "checkpointed": "Completed steps are saved. Cancel and resume when needed.",
+      "power_paused": "Processing paused to protect the battery or cool the phone. Resume when conditions improve.",
+      "background_paused": "Paused in the background. Reopen this task and resume from the saved steps.",
+      "requesting_gpu": "Requesting background GPU access…",
+      "requesting_cpu": "Requesting background CPU time…",
+      "continued_gpu": "GPU continuation granted; iOS can still pause or end this task.",
+      "continued_cpu": "CPU continuation granted; iOS can still pause or end this task.",
+      "switching_cpu": "Saving progress and releasing the GPU before continuing on CPU…",
+      "background_limited": "Background time is limited by iOS. Completed steps are saved if time expires.",
+      "background_requestable": "This phone supports background GPU requests. Each task still needs iOS approval.",
+      "gpu_unavailable": "Background GPU is unavailable here. Use CPU continuation or reopen to resume saved steps.",
+      "cpu_fallback": "Allow CPU continuation when background GPU is unavailable",
+      "cpu_tradeoff": "CPU continuation is slower and may use more battery. Foreground work normally uses the GPU.",
+      "cpu_unavailable": "CPU continuation is unavailable for this model in the installed build. Saved steps can still resume in the foreground.",
+      "resume_checkpoint": "Resume saved task",
+      "foreground_service": "A foreground service keeps this task running while Android allows it."
+    },
+    "flow": {
+      "import_media": "Import audio or video",
+      "template_clean": "Clean and speak",
+      "template_translate": "Translate and speak",
+      "template_transcribe": "Transcribe and translate",
+      "contains": "Continue if text contains (case-sensitive)",
+      "skip": "When absent, skip {{count}} steps",
+      "skip_label": "Steps to skip when absent",
+      "retries": "Retries: {{count}}",
+      "retries_label": "Retries after an error",
+      "step_transcribe": "Transcribe media",
+      "step_condition": "Condition"
+    },
+    "integration": {
+      "received": "Received content",
+      "review": "Review the shared content before running a task. Nothing starts automatically.",
+      "shortcut_speak": "Open speech",
+      "shortcut_dictate": "Open dictation",
+      "widget_description": "Open speech or dictation. Recording starts only when you tap Start.",
+      "text": "Text"
+    },
+    "export": {
+      "failed": "Couldn't export audio. Check free storage and try again."
+    },
+    "processing": {
+      "audio_editor": "Audio editor",
+      "hint": "Offline speech editing: 24 kHz mono. Your source stays unchanged.",
+      "select_audio": "Choose audio",
+      "fade_in": "Fade in (seconds)",
+      "fade_out": "Fade out (seconds)",
+      "gain_db": "Gain (dB)",
+      "normalize": "Normalize peak",
+      "target_peak": "Target peak (dBFS)",
+      "noise_gate": "Noise gate",
+      "gate_threshold": "Gate threshold (dBFS)",
+      "process": "Apply edits",
+      "result": "Processed audio",
+      "peak": "Peak",
+      "changed_settings": "Settings changed. Apply edits to preview or export the updated audio.",
+      "preview_hint": "Source preview plays up to 30 seconds from the trim start.",
+      "invalid": "Check the trim times, fade lengths, and audio levels.",
+      "segment_gain": "Segment volume",
+      "mute": "Mute segment",
+      "record_consent": "I have permission to use this recording for voice conversion.",
+      "merge_levels": "Use the same volume and mute settings before combining segments."
+    }
+  },
+  "failureCause": {
+    "details": "Details",
+    "fixes": "Suggested fixes",
+    "vram": {
+      "title": "The GPU ran out of memory",
+      "fix1": "Close other GPU apps",
+      "fix2": "Choose CPU or a smaller engine"
+    },
+    "model_missing": {
+      "title": "The model is not downloaded",
+      "fix1": "Download it in Model Catalogue",
+      "fix2": "Use Fix to install it"
+    },
+    "busy": {
+      "title": "The engine is busy",
+      "fix1": "Wait for the current job",
+      "fix2": "Try again in a moment"
+    },
+    "timeout": {
+      "title": "Generation timed out",
+      "fix1": "Try a shorter passage",
+      "fix2": "Raise the proxy timeout"
+    },
+    "bad_response": {
+      "title": "Unexpected response from the server",
+      "fix1": "Check the backend in Settings > Logs",
+      "fix2": "Restart VoiceStudio and retry"
     }
   }
 }

@@ -7,6 +7,7 @@ import os
 import pathlib
 import plistlib
 import re
+import runpy
 import shutil
 import subprocess
 
@@ -84,6 +85,13 @@ def validate_native_notices(directory, pins):
         raise ValueError("Missing GPL corresponding sources")
 
 
+def copy_native_notices(current, cached, output):
+    # Build caches may predate a checked-in licence update. Current notices win.
+    if cached.is_dir():
+        shutil.copytree(cached, output, dirs_exist_ok=True)
+    shutil.copytree(current, output, dirs_exist_ok=True)
+
+
 def marketing_version(version):
     # App Store Connect accepts only X.Y.Z, so a beta uploads as its X.Y.Z under a new build number.
     match = re.fullmatch(r"(\d+\.\d+\.\d+)(?:-beta\.\d+)?", version)
@@ -101,12 +109,13 @@ def build_number(value):
 
 def prepare(output, info):
     output.mkdir(parents=True, exist_ok=True)
+    # Load the sibling by location: release checks also import this script by file path.
+    workspace = runpy.run_path(str(IOS / "scripts/prepare_workspace_resources.py"))
+    workspace["prepare"](output)
     legal = IOS / "VoiceStudio/Resources/NativeLicences"
     validate_native_notices(legal,json.loads((ROOT / "mobile/native/pins.json").read_text(encoding="utf-8")))
-    shutil.copytree(legal,output / "NativeLicences",dirs_exist_ok=True)
     notices = ROOT / "mobile/native/ios/build/xcframeworks/Notices"
-    if notices.is_dir():
-        shutil.copytree(notices, output / "NativeLicences", dirs_exist_ok=True)
+    copy_native_notices(legal, notices, output / "NativeLicences")
     catalogs = output / "Catalogs"
     catalogs.mkdir(exist_ok=True)
     source = ROOT / "electron/src/renderer/src/i18n/locales"
@@ -120,6 +129,7 @@ def prepare(output, info):
     if not model_catalogue.is_file():
         raise ValueError("Generate mobile/contract/models.json before building the app")
     shutil.copy2(model_catalogue, catalogs / "models.json")
+    shutil.copy2(ROOT / "mobile/contract/design.json", catalogs / "design.json")
     english = json.loads((source / "en.json").read_text(encoding="utf-8"))
     additions = sorted((ROOT / "mobile/contract").glob("strings*.en.json"))
     for path in additions:

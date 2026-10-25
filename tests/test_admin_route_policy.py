@@ -85,7 +85,6 @@ def _mutating_route_functions(
 @pytest.mark.parametrize(
     "filename",
     [
-        "calls.py",
         "mcp_bindings.py",
         "media_tools.py",
         "pronunciation.py",
@@ -135,3 +134,10 @@ def test_managed_sidecar_install_stays_desktop_only():
 def test_side_effectful_get_requires_strict_admin_action(filename, function_name):
     dependencies = _dependency_names(_route_decorators(_tree(filename), function_name))
     assert "require_admin_action" in dependencies
+
+
+def test_calls_pairing_exception_does_not_expose_settings():
+    tree = _tree("calls.py")
+    assert "require_call_control" in _dependency_names(_router_assignment(tree))
+    for function in ("get_settings", "put_settings"):
+        assert "require_admin" in _dependency_names(_route_decorators(tree, function))

@@ -1,9 +1,51 @@
-import { useId, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { PanelLeftCloseIcon, PanelLeftOpenIcon, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { usePaneResize } from '@/hooks/use-pane-resize';
 import { cn } from '@/lib/utils';
+import { isMac } from '@/components/bridge';
+import { useWindowFullscreen } from '@/hooks/use-window-fullscreen';
+
+/**
+ * How far a titlebar row must inset its content to clear the macOS traffic
+ * lights. Measured, not assumed: the lights reach past the slim rail into a
+ * column beside it, but never into one further right.
+ */
+function useTrafficLightInset(enabled: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inset, setInset] = useState(0);
+  useLayoutEffect(() => {
+    const row = ref.current;
+    if (!enabled || !row) return setInset(0);
+    const measure = () =>
+      setInset(
+        Math.max(0, Math.ceil(MAC_TRAFFIC_LIGHTS_INLINE_END - row.getBoundingClientRect().left)),
+      );
+    measure();
+    // The row moves when a column before it resizes (rail collapse, pane drag).
+    const observer = new ResizeObserver(measure);
+    const column = row.parentElement;
+    for (let node = column?.previousElementSibling; node; node = node.previousElementSibling) {
+      observer.observe(node);
+    }
+    observer.observe(row);
+    window.addEventListener('resize', measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [enabled]);
+  return [ref, inset] as const;
+}
+import { MAC_TRAFFIC_LIGHTS_INLINE_END } from '@shared/utils/windowChrome';
 
 const WIDTHS = {
   default: { minimum: 248, initial: 280, maximum: 515, reserve: 480 },
@@ -53,8 +95,11 @@ export function SecondarySidebar({
   onCollapsedChange?: (collapsed: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const fullscreen = useWindowFullscreen();
   const [uncontrolledCollapsed, setUncontrolledCollapsed] = useState(false);
   const collapsed = controlledCollapsed ?? uncontrolledCollapsed;
+  // Collapsed, the header row is an empty drag strip, so nothing needs to clear the lights.
+  const [headerRef, lightsInset] = useTrafficLightInset(isMac() && !fullscreen && !collapsed);
   const [view, setView] = useState<'controls' | 'library'>('controls');
   const [libraryVisited, setLibraryVisited] = useState(false);
   const tabsId = useId();
@@ -108,10 +153,12 @@ export function SecondarySidebar({
         </div>
       )}
       <div
+        ref={headerRef}
         data-slot="secondary-sidebar-header"
+        style={lightsInset ? { paddingInlineStart: lightsInset + 12 } : undefined}
         className={cn(
           'workspace-titlebar flex h-12 shrink-0 items-center gap-2.5 border-b border-border/45 bg-background/30 shadow-[0_1px_0_color-mix(in_oklab,var(--foreground)_2%,transparent)] backdrop-blur-xl',
-          collapsed ? 'justify-center px-1' : 'px-3',
+          collapsed ? 'px-1' : 'px-3',
         )}
       >
         {!collapsed && (
@@ -132,17 +179,19 @@ export function SecondarySidebar({
             )}
           </>
         )}
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={t(collapsed ? 'paneActions.expand' : 'paneActions.collapse')}
-          title={t(collapsed ? 'paneActions.expand' : 'paneActions.collapse')}
-          aria-expanded={!collapsed}
-          onClick={() => setCollapsed((value) => !value)}
-          className="text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-        >
-          {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-        </Button>
+        {!collapsed && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t('paneActions.collapse')}
+            title={t('paneActions.collapse')}
+            aria-expanded
+            onClick={() => setCollapsed(true)}
+            className="text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+          >
+            <PanelLeftCloseIcon />
+          </Button>
+        )}
       </div>
       {library != null && !collapsed && (
         <div
@@ -244,10 +293,12 @@ export function SecondarySidebar({
       {collapsed && (
         <button
           type="button"
-          title={title}
+          title={`${t('paneActions.expand')} · ${title}`}
           aria-label={title}
+          aria-expanded={false}
+          data-slot="secondary-sidebar-expand"
           onClick={() => setCollapsed(false)}
-          className="group mx-auto my-2 flex min-h-0 flex-1 flex-col items-center gap-2 rounded-lg px-1.5 py-2 text-muted-foreground outline-none transition-[color,background-color,border-color] hover:bg-accent/65 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="group mx-1 my-2 flex min-h-0 flex-1 flex-col items-center gap-2.5 rounded-lg px-1 py-2 text-muted-foreground outline-none transition-[color,background-color,border-color] hover:bg-accent/65 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border/45 bg-background/45 text-primary">
             <Icon aria-hidden="true" className="size-4" />
@@ -255,6 +306,10 @@ export function SecondarySidebar({
           <span className="min-h-0 truncate text-[11px] font-semibold tracking-[0.01em] [writing-mode:vertical-rl] [text-orientation:mixed]">
             {title}
           </span>
+          <PanelLeftOpenIcon
+            aria-hidden="true"
+            className="mt-auto size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          />
         </button>
       )}
     </aside>

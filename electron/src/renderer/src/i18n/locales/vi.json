@@ -102,7 +102,11 @@
     "dub": "Dịch và lồng tiếng âm thanh hoặc video.",
     "stories": "Tạo cảnh với nhiều giọng nói.",
     "audiobook": "Tạo sách nói có chương.",
-    "transcribe": "Chuyển bản ghi âm thành văn bản."
+    "transcribe": "Chuyển bản ghi âm thành văn bản.",
+    "creatorCoreTeam": "Người tạo và nhóm cốt lõi",
+    "coreTeam": "Nhóm cốt lõi",
+    "follow": "Theo dõi",
+    "website": "Trang web"
   },
   "twilioIntegration": {
     "exposureWarning": "Bật tính năng này sẽ mở một cổng cục bộ riêng mà đường hầm của bạn công bố ra internet. Chỉ các yêu cầu được ký bằng Auth Token Twilio của bạn mới được chấp nhận; phần còn lại của VoiceStudio vẫn riêng tư.",
@@ -370,7 +374,8 @@
   },
   "paneActions": {
     "collapse": "Thu gọn bảng",
-    "edit": "Chỉnh sửa hồ sơ giọng nói"
+    "edit": "Chỉnh sửa hồ sơ giọng nói",
+    "expand": "Mở rộng ngăn"
   },
   "modelSettings": {
     "models": "Mô hình",
@@ -989,7 +994,8 @@
     "play": "Phát",
     "pause": "Tạm dừng",
     "seek": "Vị trí phát",
-    "missing": "Không tìm thấy tệp âm thanh."
+    "missing": "Không tìm thấy tệp âm thanh.",
+    "now_playing": "Đang phát"
   },
   "logs": {
     "no_tauri_log": "Chưa có bản đăng nhập Tauri nào trên đĩa - khởi chạy thông qua bản dựng máy tính để bàn để tạo một bản ghi",
@@ -1874,7 +1880,9 @@
     "deepl_base_url_help": "Điểm cuối API DeepL tùy chỉnh (mặc định: https://api.deepl.com/v2). Thay đổi cho proxy/tự lưu trữ.",
     "microsoft_base_url_help": "Điểm cuối Azure Translator tùy chỉnh (mặc định: https://api.cognitive.microsofttranslator.com).",
     "region": "Khu vực",
-    "aws_profile": "Hồ sơ AWS"
+    "aws_profile": "Hồ sơ AWS",
+    "deepl_key_placeholder": "DeepL khóa API",
+    "microsoft_key_placeholder": "Microsoft khóa API"
   },
   "about": {
     "architecture": "Kiến trúc",
@@ -2054,6 +2062,7 @@
     "setup_access": "Cho phép ghi vào thư mục dữ liệu của ứng dụng rồi thử lại.",
     "setup_unsupported_platform": "Máy Mac Intel này không thể chạy backend AI cục bộ — PyTorch không có wheel cho macOS Intel. Hãy kết nối backend từ xa bên dưới; không cần cài đặt cục bộ.",
     "setup_wrong_architecture": "Đây là bản VoiceStudio cho Intel (x64) đang chạy qua Rosetta trên máy Mac Apple Silicon, nên không thể cài backend AI cục bộ. Hãy thoát ứng dụng, cài đè bản DMG Apple Silicon (arm64) rồi mở lại — giọng nói và dự án của bạn vẫn được giữ nguyên.",
+    "setup_missing_system_library": "Hệ thống Windows này thiếu Microsoft Visual C++ 2015-2022 Redistributable (x64), thành phần mà tiện ích âm thanh của PyTorch cần đến. Hãy cài từ Microsoft rồi nhấn Thử lại.",
     "download_apple_silicon": "Tải bản Apple Silicon",
     "retry": "Thử lại",
     "ready": "Bộ máy sẵn sàng",
@@ -2077,7 +2086,23 @@
     "hint_spawn_blocked": "Hệ điều hành hoặc phần mềm bảo mật của bạn đã từ chối khởi chạy engine cục bộ. Hãy thêm thư mục runtime của VoiceStudio vào danh sách loại trừ của phần mềm diệt virus (Windows: Bảo mật Windows → Bảo vệ khỏi virus và mối đe dọa → Quản lý cài đặt → Loại trừ), đảm bảo thư mục này không nằm trong thư mục đồng bộ đám mây như OneDrive, rồi thử lại.",
     "hint_smart_app_control": "Smart App Control của Windows đã chặn công cụ cục bộ. Tính năng này không có ngoại lệ cho từng ứng dụng nên loại trừ trong phần mềm diệt virus sẽ không giúp được. Hãy tắt nó trong Bảo mật Windows → Kiểm soát ứng dụng và trình duyệt → Cài đặt Smart App Control (Windows không thể bật lại nếu không đặt lại máy), hoặc kết nối VoiceStudio với công cụ chạy trên máy tính khác, rồi thử lại.",
     "hint_slow_start": "Engine vẫn đang khởi động thì hết thời gian chờ. Máy chậm, nhất là máy không có GPU rời, và lần khởi chạy đầu tiên sau khi cài đặt (phần mềm diệt virus quét mọi tệp mới) có thể mất vài phút. Hãy đóng các ứng dụng tốn nhiều bộ nhớ rồi thử lại; những lần khởi động sau nhanh hơn nhiều.",
-    "hint_synced_folder": "Vị trí này nằm trong thư mục đồng bộ đám mây (OneDrive, Dropbox, iCloud Drive, Google Drive). Các tệp giữ chỗ chỉ có trên mạng và việc khóa tệp làm hỏng môi trường Python. Hãy chuyển VoiceStudio sang một thư mục cục bộ thông thường (ví dụ C:\\VoiceStudio trên Windows hoặc ~/VoiceStudio trên macOS và Linux) rồi thiết lập lại."
+    "hint_synced_folder": "Vị trí này nằm trong thư mục đồng bộ đám mây (OneDrive, Dropbox, iCloud Drive, Google Drive). Các tệp giữ chỗ chỉ có trên mạng và việc khóa tệp làm hỏng môi trường Python. Hãy chuyển VoiceStudio sang một thư mục cục bộ thông thường (ví dụ C:\\VoiceStudio trên Windows hoặc ~/VoiceStudio trên macOS và Linux) rồi thiết lập lại.",
+    "cause_smart_app_control": "Smart App Control của Windows đã chặn công cụ",
+    "cause_spawn_blocked": "Phần mềm bảo mật đã chặn công cụ khởi động",
+    "cause_native_crash": "Công cụ bị sập khi khởi động (lỗi gốc)",
+    "cause_missing_env": "Môi trường Python bị thiếu hoặc chưa đầy đủ",
+    "cause_permission": "Không có quyền ghi vào thư mục của công cụ",
+    "cause_synced_folder": "Thư mục của công cụ nằm trong thư mục đồng bộ đám mây",
+    "cause_slow_start": "Công cụ vẫn đang khởi động trên máy chậm",
+    "choose_folder": "Chọn thư mục khác",
+    "copy_diagnostics": "Sao chép chẩn đoán",
+    "diagnostics_copied": "Đã sao chép chẩn đoán",
+    "details": "Chi tiết",
+    "pill_starting": "Đang khởi động",
+    "pill_recovering": "Đang khôi phục",
+    "pill_failed": "Thất bại",
+    "pill_repeats": "{{count}} lần liên tiếp",
+    "offline_bar": "Công cụ đang bận, tự động kết nối lại"
   },
   "bootstrap": {
     "checking": "Đang kiểm tra môi trường…",
@@ -2372,7 +2397,8 @@
     "storage_temp": "Tệp tạm",
     "change": "Thay đổi…",
     "reset_default": "Đặt lại về mặc định",
-    "region_label": "Khu vực tải xuống"
+    "region_label": "Khu vực tải xuống",
+    "free_space": "Ổ đĩa này còn trống {{free}} GB, cần khoảng {{needed}} GB"
   },
   "asr_missing": {
     "message": "Chưa cài đặt mô hình chuyển giọng nói thành văn bản — tính năng này cần một mô hình để phiên âm.",
@@ -2514,7 +2540,18 @@
     "staleTitle": "Có bản cập nhật",
     "staleMessage": "Bạn đang dùng VoiceStudio {{current}}, nhưng {{latest}} đã ra mắt — lỗi này có thể đã được sửa ở đó. Xem bản phát hành mới nhất trước khi báo cáo?",
     "staleView": "Xem bản cập nhật",
-    "staleFileAnyway": "Vẫn báo cáo"
+    "staleFileAnyway": "Vẫn báo cáo",
+    "summary_label": "Đã xảy ra sự cố gì?",
+    "summary_placeholder": "Một dòng, ví dụ: Lồng tiếng dừng ở 40%",
+    "summary_required": "Hãy thêm mô tả một dòng trước.",
+    "sent_title": "Những gì sẽ được gửi",
+    "sent_app": "Phiên bản và bản dựng của ứng dụng",
+    "sent_system": "Hệ điều hành, GPU, bộ nhớ và dung lượng ổ đĩa trống",
+    "sent_engines": "Các công cụ đang hoạt động",
+    "sent_logs": "Các dòng nhật ký công cụ gần đây, đã xóa đường dẫn thư mục chính và mã thông báo",
+    "sent_pages": "Tên các trang đã xem gần đây",
+    "not_sent": "Không bao giờ gửi: âm thanh, văn bản hoặc giọng nói của bạn. Tên tệp có thể xuất hiện trong nhật ký hoặc mô tả của bạn, vì vậy hãy xem lại bản xem trước trên GitHub trước khi gửi.",
+    "submit": "Mở issue trên GitHub"
   },
   "crash": {
     "notice_unclean": "Phiên trước đã kết thúc mà không tắt đúng cách {{ago}} trước. Điều này thường vô hại — máy ngủ, ứng dụng bị buộc đóng, hoặc VM/container bị dừng.",
@@ -3889,6 +3926,164 @@
       "retry": "Thử lại",
       "rate_limited": "Quá nhiều báo cáo từ mạng này. Hãy thử lại sau.",
       "invalid": "Không thể gửi báo cáo này. Hãy cập nhật ứng dụng và thử lại."
+    },
+    "production": {
+      "new": "Dự án mới",
+      "script_hint": "Dùng # Tên chương cho chương và [voice:Name] ở đầu dòng để đổi nhân vật. Chỉ hỗ trợ văn bản thuần; các ký hiệu khác sẽ được đọc thành lời.",
+      "conversion_hint": "Chọn đoạn âm thanh dài tối đa 30 giây. Chuyển đổi sẽ chép lời rồi đọc bằng giọng đã chọn; không giữ nguyên cách thể hiện ban đầu.",
+      "normalize_text": "Làm sạch văn bản"
+    },
+    "calls": {
+      "remote_control": "Cho phép thiết bị đã ghép đôi điều khiển cuộc gọi",
+      "remote_control_hint": "Cho phép điện thoại xác thực bằng khóa API bắt đầu và quản lý cuộc gọi. Cài đặt cuộc gọi vẫn nằm trên máy tính này.",
+      "hint": "Cuộc gọi dùng máy tính đã ghép đôi và số Twilio được cấu hình trên đó. Hãy bật điều khiển cuộc gọi trên máy tính trước.",
+      "authentication": "Ghép đôi bằng khóa API của máy tính để điều khiển cuộc gọi. Mã PIN chia sẻ không cấp quyền gọi.",
+      "billing": "Áp dụng cước gọi của Twilio.",
+      "clone_hint": "Whisper chép lời mẫu âm thanh. Mô hình nhân bản riêng tạo bản nghe thử giọng nhân bản trước khi lưu; cần cả hai mô hình."
+    },
+    "host": {
+      "title": "API giọng nói trên điện thoại",
+      "hint": "Cung cấp giọng đã cài được chọn qua điểm cuối giọng nói kiểu OpenAI và MCP (2025-11-25). Chỉ chạy khi màn hình này mở và ứng dụng đang hoạt động.",
+      "lan": "Cho phép mạng nội bộ",
+      "lan_hint": "Tắt: chỉ điện thoại này. Bật: thiết bị trong mạng có thể kết nối bằng mã Bearer tạm thời. Giữ bí mật mã này.",
+      "start": "Khởi động máy chủ",
+      "copy": "Sao chép mã Bearer",
+      "running": "Máy chủ đang chạy",
+      "capabilities_hint": "Chỉ cung cấp các mô hình đã cài và giọng bạn chọn. Tạo giọng nói, chép lời và dịch chạy trên điện thoại này khi màn hình này vẫn mở.",
+      "allow_speech": "Cho phép tạo giọng nói",
+      "allow_transcription": "Cho phép chép lời",
+      "allow_translation": "Cho phép dịch",
+      "voice_source": "Nguồn giọng",
+      "preset": "Giọng có sẵn",
+      "saved": "Giọng đã lưu",
+      "audio_hint": "Chép lời nhận WAV mono PCM16 dạng base64, 8–24 kHz, tối đa 30 giây."
+    },
+    "books": {
+      "import_failed": "Không thể nhập sách. Dùng EPUB không mã hóa, PDF văn bản hoặc văn bản UTF-8 (tối đa 64 MB).",
+      "no_text": "Không tìm thấy văn bản đọc được. PDF quét cần nhận dạng văn bản trước khi nhập.",
+      "export_failed": "Không thể xuất âm thanh. M4B hỗ trợ tối đa 255 chương.",
+      "invalid_controls": "Dùng tốc độ từ 0,5 đến 2, khoảng nghỉ tối đa 30 giây và các mục phát âm không trống.",
+      "controls_hint": "Nhập EPUB, PDF văn bản hoặc TXT. Thêm [pause:0.5] để chèn im lặng theo giây; bắt đầu dòng bằng [speed:1.25] để đổi tốc độ. Các dòng không đổi dùng lại âm thanh đã lưu.",
+      "line_speed": "Tốc độ dòng",
+      "restore_recipe": "Sửa công thức giọng đã lưu",
+      "save_recipe_copy": "Lưu thành giọng mới"
+    },
+    "editing": {
+      "undo": "Hoàn tác",
+      "redo": "Làm lại",
+      "subtitles": "Phụ đề",
+      "import_subtitles": "Nhập SRT / VTT",
+      "export_srt": "Xuất SRT",
+      "export_vtt": "Xuất VTT",
+      "source_text": "Văn bản nguồn",
+      "original": "Âm thanh gốc",
+      "generated": "Âm thanh đã tạo",
+      "split_at": "Tách tại",
+      "split": "Tách đoạn",
+      "merge": "Gộp với đoạn tiếp theo",
+      "replace_subtitles": "Thay thế dòng thời gian phụ đề?",
+      "replace": "Thay thế",
+      "replace_subtitles_detail": "Thao tác này thay thế dòng thời gian các đoạn của ngôn ngữ này. Các ngôn ngữ khác có thể cần dịch lại. Bạn có thể hoàn tác trước khi tạo.",
+      "preview_unavailable": "Hãy tạo đoạn này trước khi nghe thử âm thanh.",
+      "subtitle_invalid": "Chọn tệp SRT hoặc VTT hợp lệ có các đoạn dài tối đa 30 giây.",
+      "subtitle_missing": "Dịch tất cả các đoạn trước khi xuất phụ đề.",
+      "split_invalid": "Chọn điểm tách bên trong đoạn sao cho cả hai bên đều có đủ văn bản.",
+      "merge_invalid": "Gộp các đoạn liền kề có cùng giọng và tổng thời lượng tối đa 30 giây.",
+      "waveform": "Dạng sóng âm thanh"
+    },
+    "jobs": {
+      "title": "Xử lý trên điện thoại",
+      "checkpointed": "Các bước đã hoàn thành được lưu lại. Hủy và tiếp tục khi cần.",
+      "power_paused": "Đã tạm dừng xử lý để bảo vệ pin hoặc làm mát điện thoại. Tiếp tục khi điều kiện tốt hơn.",
+      "background_paused": "Đã tạm dừng trong nền. Mở lại tác vụ này và tiếp tục từ các bước đã lưu.",
+      "requesting_gpu": "Đang yêu cầu quyền dùng GPU trong nền…",
+      "requesting_cpu": "Đang yêu cầu thời gian CPU trong nền…",
+      "continued_gpu": "Đã được phép tiếp tục bằng GPU; iOS vẫn có thể tạm dừng hoặc kết thúc tác vụ.",
+      "continued_cpu": "Đã được phép tiếp tục bằng CPU; iOS vẫn có thể tạm dừng hoặc kết thúc tác vụ.",
+      "switching_cpu": "Đang lưu tiến độ và giải phóng GPU trước khi tiếp tục bằng CPU…",
+      "background_limited": "iOS giới hạn thời gian chạy nền. Các bước hoàn thành vẫn được lưu khi hết thời gian.",
+      "background_requestable": "Điện thoại này hỗ trợ yêu cầu GPU trong nền. Mỗi tác vụ vẫn cần iOS chấp thuận.",
+      "gpu_unavailable": "GPU trong nền không khả dụng ở đây. Dùng CPU hoặc mở lại để tiếp tục từ bước đã lưu.",
+      "cpu_fallback": "Cho phép tiếp tục bằng CPU khi GPU trong nền không khả dụng",
+      "cpu_tradeoff": "CPU chậm hơn và có thể tốn pin hơn. Công việc ở tiền cảnh thường dùng GPU.",
+      "cpu_unavailable": "Bản đã cài không thể tiếp tục mô hình này bằng CPU. Các bước đã lưu vẫn có thể tiếp tục ở tiền cảnh.",
+      "resume_checkpoint": "Tiếp tục tác vụ đã lưu",
+      "foreground_service": "Dịch vụ tiền cảnh duy trì tác vụ này trong khi Android cho phép."
+    },
+    "flow": {
+      "import_media": "Nhập âm thanh hoặc video",
+      "template_clean": "Chuẩn hóa và đọc",
+      "template_translate": "Dịch và đọc",
+      "template_transcribe": "Chép lời và dịch",
+      "contains": "Tiếp tục nếu văn bản chứa (phân biệt hoa thường)",
+      "skip": "Nếu không có, bỏ qua {{count}} bước",
+      "skip_label": "Số bước bỏ qua nếu không có",
+      "retries": "Số lần thử lại: {{count}}",
+      "retries_label": "Số lần thử lại sau lỗi",
+      "step_transcribe": "Chép lời nội dung đa phương tiện",
+      "step_condition": "Điều kiện"
+    },
+    "integration": {
+      "received": "Nội dung đã nhận",
+      "review": "Xem lại nội dung được chia sẻ trước khi chạy tác vụ. Không có gì tự động bắt đầu.",
+      "shortcut_speak": "Mở đọc văn bản",
+      "shortcut_dictate": "Mở đọc chính tả",
+      "widget_description": "Mở đọc văn bản hoặc đọc chính tả. Chỉ bắt đầu ghi âm khi bạn chạm Bắt đầu.",
+      "text": "Văn bản"
+    },
+    "export": {
+      "failed": "Không thể xuất âm thanh. Kiểm tra dung lượng trống rồi thử lại."
+    },
+    "processing": {
+      "audio_editor": "Trình sửa âm thanh",
+      "hint": "Chỉnh sửa giọng nói ngoại tuyến: mono 24 kHz. Tệp gốc không thay đổi.",
+      "select_audio": "Chọn âm thanh",
+      "fade_in": "Tăng âm dần (giây)",
+      "fade_out": "Giảm âm dần (giây)",
+      "gain_db": "Độ khuếch đại (dB)",
+      "normalize": "Chuẩn hóa đỉnh",
+      "target_peak": "Đỉnh mục tiêu (dBFS)",
+      "noise_gate": "Cổng nhiễu",
+      "gate_threshold": "Ngưỡng cổng (dBFS)",
+      "process": "Áp dụng chỉnh sửa",
+      "result": "Âm thanh đã xử lý",
+      "peak": "Đỉnh",
+      "changed_settings": "Cài đặt đã thay đổi. Áp dụng chỉnh sửa để nghe thử hoặc xuất âm thanh mới.",
+      "preview_hint": "Bản nghe thử nguồn phát tối đa 30 giây từ điểm bắt đầu cắt.",
+      "invalid": "Kiểm tra thời gian cắt, độ dài tăng giảm âm và mức âm thanh.",
+      "segment_gain": "Âm lượng đoạn",
+      "mute": "Tắt tiếng đoạn",
+      "record_consent": "Tôi có quyền sử dụng bản ghi này để chuyển đổi giọng nói.",
+      "merge_levels": "Dùng cùng cài đặt âm lượng và tắt tiếng trước khi gộp các đoạn."
+    }
+  },
+  "failureCause": {
+    "details": "Chi tiết",
+    "fixes": "Cách khắc phục gợi ý",
+    "vram": {
+      "title": "GPU đã hết bộ nhớ",
+      "fix1": "Đóng các ứng dụng khác dùng GPU",
+      "fix2": "Chọn CPU hoặc engine nhỏ hơn"
+    },
+    "model_missing": {
+      "title": "Chưa tải mô hình",
+      "fix1": "Tải về trong Danh mục mô hình",
+      "fix2": "Dùng Sửa để cài đặt"
+    },
+    "busy": {
+      "title": "Engine đang bận",
+      "fix1": "Chờ tác vụ hiện tại hoàn tất",
+      "fix2": "Thử lại sau giây lát"
+    },
+    "timeout": {
+      "title": "Quá thời gian tạo",
+      "fix1": "Thử đoạn ngắn hơn",
+      "fix2": "Tăng thời gian chờ của proxy"
+    },
+    "bad_response": {
+      "title": "Phản hồi bất thường từ máy chủ",
+      "fix1": "Kiểm tra backend trong Cài đặt > Nhật ký",
+      "fix2": "Khởi động lại VoiceStudio rồi thử lại"
     }
   }
 }

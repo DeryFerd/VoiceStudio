@@ -31,7 +31,12 @@ export interface NativeCrashRecord {
 export interface BackendStatus {
   lastCrash?: NativeCrashRecord;
   stage: BackendStage;
-  setupIssue?: 'space' | 'access' | 'unsupported_platform' | 'wrong_architecture';
+  setupIssue?:
+    | 'space'
+    | 'access'
+    | 'unsupported_platform'
+    | 'wrong_architecture'
+    | 'missing_system_library';
   /** Free disk (GiB) the failed install needed; the CPU-only install needs less than the CUDA one. */
   setupRequiredGib?: number;
   /** A prior explicit install stopped after creating its resumable project/cache. */
@@ -79,6 +84,8 @@ export interface BackendStatus {
   /** Managed Python environment root shown during first-run setup. */
   runtimePath?: string;
   runtimeCustom?: boolean;
+  /** Free GiB on the drive that will hold the runtime, while setup is required. */
+  runtimeFreeGib?: number;
   runtimeRegion?: RuntimeRegion;
   /** Where data, models and temp files go when the location was chosen during setup. */
   runtimeStorage?: { data: string; models: string; temp: string };

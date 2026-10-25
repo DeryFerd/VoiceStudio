@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { AudioPreviewButton } from '@/components/audio-preview-button';
+import { PlayInDockButton } from '@/components/now-playing-dock';
 import { ProfileAvatar } from '@/components/profile-avatar';
 import { setWorkspace } from '@/lib/store/workspace';
 import { openTake, reuseTake, useSelectedTake } from '@/lib/store/takes';
@@ -452,7 +453,12 @@ function TakeRow({ item, onStar, onReuse, onDelete }: TakeRowProps) {
       </button>
       <div className="pointer-events-none absolute right-1 z-10 flex items-center gap-0.5 rounded-md bg-sidebar bg-[linear-gradient(var(--sidebar-accent),var(--sidebar-accent))] p-0.5 opacity-0 shadow-sm ring-1 ring-sidebar-border/50 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
         {item.audio_path && (
-          <AudioPreviewButton src={audioUrl(item.audio_path)} source={'take-' + item.id} />
+          <PlayInDockButton
+            src={audioUrl(item.audio_path)}
+            source={'take-' + item.id}
+            title={displayTitle(item.text)}
+            subtitle={workspaceLabel}
+          />
         )}
         <Button
           variant="ghost"

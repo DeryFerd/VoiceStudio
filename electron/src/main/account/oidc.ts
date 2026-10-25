@@ -12,7 +12,8 @@ export interface TokenResponse {
   access_token: string;
   expires_in: number;
   refresh_token: string;
-  scope: string;
+  /** Absent when it equals the requested scope (RFC 6749 section 5.1). */
+  scope?: string;
 }
 
 export class InvalidGrantError extends Error {
@@ -136,12 +137,13 @@ export class OidcClient {
     };
     if (res.status === 400 && body.error === 'invalid_grant') throw new InvalidGrantError();
     if (!res.ok) throw new TransientAuthError(res.status);
-    if (
-      !String(body.scope ?? '')
-        .split(' ')
-        .includes('offline_access')
-    )
+    // An absent scope means the requested scopes were granted (RFC 6749
+    // section 5.1; Zitadel never sends it). A present one that dropped
+    // offline_access means no lasting session was granted.
+    if (body.scope !== undefined && !String(body.scope).split(' ').includes('offline_access'))
       throw new Error('Token response lacks offline_access');
+    if (typeof body.refresh_token !== 'string' || body.refresh_token === '')
+      throw new Error('Token response lacks a refresh token');
     return body as TokenResponse;
   }
 }

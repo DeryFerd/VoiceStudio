@@ -102,7 +102,11 @@
     "dub": "Översätt och dubba ljud eller video.",
     "stories": "Skapa scener med flera röster.",
     "audiobook": "Skapa ljudböcker med kapitel.",
-    "transcribe": "Omvandla inspelningar till text."
+    "transcribe": "Omvandla inspelningar till text.",
+    "creatorCoreTeam": "Skapare och kärnteam",
+    "coreTeam": "Kärnteam",
+    "follow": "Följ",
+    "website": "Webbplats"
   },
   "twilioIntegration": {
     "exposureWarning": "När detta slås på öppnas en separat lokal port som din tunnel publicerar på internet. Endast förfrågningar signerade med din Twilio Auth Token accepteras; resten av VoiceStudio förblir privat.",
@@ -370,7 +374,8 @@
   },
   "paneActions": {
     "collapse": "Fäll ihop panelen",
-    "edit": "Redigera röstprofil"
+    "edit": "Redigera röstprofil",
+    "expand": "Expandera panel"
   },
   "modelSettings": {
     "models": "Modeller",
@@ -989,7 +994,8 @@
     "play": "Spela upp",
     "pause": "Pausa",
     "seek": "Uppspelningsposition",
-    "missing": "Ljudfilen saknas."
+    "missing": "Ljudfilen saknas.",
+    "now_playing": "Spelas nu"
   },
   "logs": {
     "no_tauri_log": "Ingen Tauri-inloggningsskiva än - starta via skrivbordsbygget för att skapa en",
@@ -1874,7 +1880,9 @@
     "deepl_base_url_help": "Anpassad DeepL API-slutpunkt (standard: https://api.deepl.com/v2). Ändra för proxy/självvärd.",
     "microsoft_base_url_help": "Anpassad Azure Translator-slutpunkt (standard: https://api.cognitive.microsofttranslator.com).",
     "region": "Region",
-    "aws_profile": "AWS-profil"
+    "aws_profile": "AWS-profil",
+    "deepl_key_placeholder": "DeepL API-nyckel",
+    "microsoft_key_placeholder": "Microsoft API-nyckel"
   },
   "about": {
     "architecture": "Arkitektur",
@@ -2054,6 +2062,7 @@
     "setup_access": "Tillåt skrivåtkomst till appens datamapp och försök igen.",
     "setup_unsupported_platform": "Den här Intel-Macen kan inte köra den lokala AI-backendservern — PyTorch saknar macOS Intel-hjul. Anslut en fjärrbackend nedan istället; ingen lokal installation behövs.",
     "setup_wrong_architecture": "Det här är Intel-versionen (x64) av VoiceStudio som körs via Rosetta på en Mac med Apple Silicon, så den lokala AI-backenden kan inte installeras. Avsluta appen, installera Apple Silicon-DMG:n (arm64) ovanpå och öppna den igen – dina röster och projekt finns kvar.",
+    "setup_missing_system_library": "Det här Windows-systemet saknar Microsoft Visual C++ 2015-2022 Redistributable (x64), som PyTorch ljudextensionen behöver. Installera det från Microsoft och tryck sedan på Försök igen.",
     "download_apple_silicon": "Ladda ned Apple Silicon-versionen",
     "retry": "Försök igen",
     "ready": "Motorn är redo",
@@ -2077,7 +2086,23 @@
     "hint_spawn_blocked": "Operativsystemet eller säkerhetsprogramvaran vägrade starta den lokala motorn. Lägg till VoiceStudios körtidsmapp bland undantagen i ditt antivirusprogram (Windows: Windows-säkerhet → Virus- och hotskydd → Hantera inställningar → Undantag), kontrollera att den inte ligger i en molnsynkad mapp som OneDrive och försök igen.",
     "hint_smart_app_control": "Windows Smart appkontroll blockerade den lokala motorn. Den saknar undantag per app, så ett undantag i antivirusprogrammet hjälper inte. Stäng av den i Windows-säkerhet → App- och webbläsarkontroll → Inställningar för Smart appkontroll (Windows kan inte slå på den igen utan en återställning), eller anslut VoiceStudio till en motor på en annan dator och försök igen.",
     "hint_slow_start": "Motorn höll fortfarande på att starta när väntetiden tog slut. Långsamma datorer, särskilt utan dedikerat grafikkort, och den första starten efter en installation (antivirusprogrammet skannar varje ny fil) kan ta flera minuter. Stäng minneskrävande appar och försök igen; senare starter går mycket snabbare.",
-    "hint_synced_folder": "Den här platsen ligger i en molnsynkad mapp (OneDrive, Dropbox, iCloud Drive, Google Drive). Platshållare som bara finns online och fillåsning förstör Python-miljön. Flytta VoiceStudio till en vanlig lokal mapp (till exempel C:\\VoiceStudio i Windows eller ~/VoiceStudio i macOS och Linux) och konfigurera den på nytt."
+    "hint_synced_folder": "Den här platsen ligger i en molnsynkad mapp (OneDrive, Dropbox, iCloud Drive, Google Drive). Platshållare som bara finns online och fillåsning förstör Python-miljön. Flytta VoiceStudio till en vanlig lokal mapp (till exempel C:\\VoiceStudio i Windows eller ~/VoiceStudio i macOS och Linux) och konfigurera den på nytt.",
+    "cause_smart_app_control": "Windows Smart App Control blockerade motorn",
+    "cause_spawn_blocked": "Säkerhetsprogram blockerade att motorn startade",
+    "cause_native_crash": "Motorn kraschade vid start (inbyggt fel)",
+    "cause_missing_env": "Python-miljön saknas eller är ofullständig",
+    "cause_permission": "Ingen behörighet att skriva till motormappen",
+    "cause_synced_folder": "Motormappen ligger i en molnsynkad mapp",
+    "cause_slow_start": "Motorn startar fortfarande på en långsam dator",
+    "choose_folder": "Välj en annan mapp",
+    "copy_diagnostics": "Kopiera diagnostik",
+    "diagnostics_copied": "Diagnostik kopierad",
+    "details": "Detaljer",
+    "pill_starting": "Startar",
+    "pill_recovering": "Återhämtar",
+    "pill_failed": "Misslyckades",
+    "pill_repeats": "{{count}} gånger i rad",
+    "offline_bar": "Motorn är upptagen, återansluter automatiskt"
   },
   "bootstrap": {
     "checking": "Kontrollerar miljö…",
@@ -2372,7 +2397,8 @@
     "storage_temp": "Tillfälliga filer",
     "change": "Ändra…",
     "reset_default": "Återställ till standard",
-    "region_label": "Nedladdningsregion"
+    "region_label": "Nedladdningsregion",
+    "free_space": "{{free}} GB ledigt på den här enheten, cirka {{needed}} GB behövs"
   },
   "asr_missing": {
     "message": "Ingen tal-till-text-modell är installerad — den här funktionen behöver en för att transkribera ljud.",
@@ -2514,7 +2540,18 @@
     "staleTitle": "Uppdatering tillgänglig",
     "staleMessage": "Du använder VoiceStudio {{current}}, men {{latest}} är redan ute — det här felet kan redan vara åtgärdat där. Se den senaste versionen innan du rapporterar?",
     "staleView": "Visa uppdatering",
-    "staleFileAnyway": "Rapportera ändå"
+    "staleFileAnyway": "Rapportera ändå",
+    "summary_label": "Vad gick fel?",
+    "summary_placeholder": "En rad, till exempel: Dubbningen stannar vid 40 %",
+    "summary_required": "Lägg först till en beskrivning på en rad.",
+    "sent_title": "Detta skickas",
+    "sent_app": "Appversion och bygge",
+    "sent_system": "Operativsystem, GPU, minne och ledigt diskutrymme",
+    "sent_engines": "Vilka motorer som är aktiva",
+    "sent_logs": "Senaste raderna i motorloggen, utan sökvägen till din hemmapp och token",
+    "sent_pages": "Namn på nyligen besökta sidor",
+    "not_sent": "Skickas aldrig: ditt ljud, din text eller dina röster. Filnamn kan förekomma i loggar eller din beskrivning, så granska GitHub-förhandsvisningen innan du skickar.",
+    "submit": "Öppna GitHub-ärende"
   },
   "crash": {
     "notice_unclean": "Föregående session avslutades utan en ren avstängning för {{ago}} sedan. Det är ofta ofarligt — datorn sov, appen tvångsavslutades eller en VM/container stoppades.",
@@ -3889,6 +3926,164 @@
       "retry": "Försök igen",
       "rate_limited": "För många rapporter från det här nätverket. Försök igen senare.",
       "invalid": "Rapporten kunde inte skickas. Uppdatera appen och försök igen."
+    },
+    "production": {
+      "new": "Nytt projekt",
+      "script_hint": "Använd # Kapitelrubrik för kapitel och [voice:Name] i början av en rad för att byta karaktär. Endast vanlig text; annan formatering läses upp.",
+      "conversion_hint": "Välj ett ljudklipp på högst 30 sekunder. Konverteringen transkriberar det och läser upp texten med vald röst; det ursprungliga framförandet bevaras inte.",
+      "normalize_text": "Rensa text"
+    },
+    "calls": {
+      "remote_control": "Tillåt samtalsstyrning från parkopplade enheter",
+      "remote_control_hint": "Låt telefoner som autentiserats med API-nyckel ringa och hantera samtal. Samtalsinställningarna stannar på den här datorn.",
+      "hint": "Samtal går via din parkopplade dator och dess konfigurerade Twilio-nummer. Aktivera först samtalsstyrning på datorn.",
+      "authentication": "Parkoppla med datorns API-nyckel. En delnings-PIN ger inte rätt att ringa.",
+      "billing": "Twilios samtalsavgifter tillkommer.",
+      "clone_hint": "Whisper transkriberar ditt prov. En separat kloningsmodell skapar ett klonat ljudprov före sparandet; båda modellerna krävs."
+    },
+    "host": {
+      "title": "Telefonens tal-API",
+      "hint": "Dela den valda installerade rösten via en OpenAI-kompatibel taländpunkt och MCP (2025-11-25). Körs endast när den här skärmen är öppen och appen är aktiv.",
+      "lan": "Tillåt lokalt nätverk",
+      "lan_hint": "Av: bara den här telefonen. På: enheter i nätverket kan ansluta med en tillfällig Bearer-token. Håll token hemlig.",
+      "start": "Starta server",
+      "copy": "Kopiera Bearer-token",
+      "running": "Servern körs",
+      "capabilities_hint": "Dela endast de installerade modeller och den röst du väljer. Tal, transkription och översättning körs på telefonen så länge den här skärmen är öppen.",
+      "allow_speech": "Tillåt talgenerering",
+      "allow_transcription": "Tillåt transkription",
+      "allow_translation": "Tillåt översättning",
+      "voice_source": "Röstkälla",
+      "preset": "Förinställda röster",
+      "saved": "Sparade röster",
+      "audio_hint": "Transkription accepterar base64-kodad PCM16 mono-WAV, 8–24 kHz, upp till 30 sekunder."
+    },
+    "books": {
+      "import_failed": "Boken kunde inte importeras. Använd okrypterad EPUB, text-PDF eller UTF-8-text (upp till 64 MB).",
+      "no_text": "Ingen läsbar text hittades. Skannade PDF-filer behöver textigenkänning före import.",
+      "export_failed": "Ljudet kunde inte exporteras. M4B stöder upp till 255 kapitel.",
+      "invalid_controls": "Använd hastigheter från 0,5 till 2, pauser upp till 30 sekunder och uttalsposter som inte är tomma.",
+      "controls_hint": "Importera EPUB, text-PDF eller TXT. Lägg till [pause:0.5] för tystnad i sekunder; börja en rad med [speed:1.25] för att ändra hastigheten. Oförändrade rader återanvänder sparat ljud.",
+      "line_speed": "Radhastighet",
+      "restore_recipe": "Redigera sparat röst­recept",
+      "save_recipe_copy": "Spara som ny röst"
+    },
+    "editing": {
+      "undo": "Ångra",
+      "redo": "Gör om",
+      "subtitles": "Undertexter",
+      "import_subtitles": "Importera SRT / VTT",
+      "export_srt": "Exportera SRT",
+      "export_vtt": "Exportera VTT",
+      "source_text": "Källtext",
+      "original": "Ursprungligt ljud",
+      "generated": "Genererat ljud",
+      "split_at": "Dela vid",
+      "split": "Dela segment",
+      "merge": "Slå ihop med nästa",
+      "replace_subtitles": "Ersätta undertexternas tidslinje?",
+      "replace": "Ersätt",
+      "replace_subtitles_detail": "Detta ersätter segmentens tidslinje för det här språket. Andra språk kan behöva översättas igen. Du kan ångra innan du genererar.",
+      "preview_unavailable": "Generera segmentet innan du förhandslyssnar på ljudet.",
+      "subtitle_invalid": "Välj en giltig SRT- eller VTT-fil med segment på högst 30 sekunder.",
+      "subtitle_missing": "Översätt alla segment innan du exporterar undertexter.",
+      "split_invalid": "Välj en delningspunkt inne i segmentet med tillräckligt med text på båda sidor.",
+      "merge_invalid": "Slå ihop intilliggande segment med samma röst och en sammanlagd längd på högst 30 sekunder.",
+      "waveform": "Ljudvågform"
+    },
+    "jobs": {
+      "title": "Bearbetning på telefonen",
+      "checkpointed": "Slutförda steg sparas. Avbryt och återuppta vid behov.",
+      "power_paused": "Bearbetningen pausades för att skydda batteriet eller kyla telefonen. Återuppta när förhållandena förbättrats.",
+      "background_paused": "Pausad i bakgrunden. Öppna uppgiften igen och återuppta från de sparade stegen.",
+      "requesting_gpu": "Begär GPU-åtkomst i bakgrunden…",
+      "requesting_cpu": "Begär CPU-tid i bakgrunden…",
+      "continued_gpu": "Fortsättning med GPU beviljad; iOS kan fortfarande pausa eller avsluta uppgiften.",
+      "continued_cpu": "Fortsättning med CPU beviljad; iOS kan fortfarande pausa eller avsluta uppgiften.",
+      "switching_cpu": "Sparar förloppet och frigör GPU:n före fortsatt körning på CPU…",
+      "background_limited": "iOS begränsar bakgrundstiden. Slutförda steg sparas om tiden löper ut.",
+      "background_requestable": "Telefonen stöder begäran om GPU i bakgrunden. Varje uppgift behöver fortfarande godkännas av iOS.",
+      "gpu_unavailable": "GPU i bakgrunden är inte tillgänglig här. Använd CPU:n eller öppna igen för att återuppta sparade steg.",
+      "cpu_fallback": "Tillåt fortsatt körning på CPU när GPU i bakgrunden inte är tillgänglig",
+      "cpu_tradeoff": "CPU:n är långsammare och kan använda mer batteri. Arbete i förgrunden använder normalt GPU:n.",
+      "cpu_unavailable": "Den installerade versionen kan inte fortsätta den här modellen på CPU:n. Sparade steg kan återupptas i förgrunden.",
+      "resume_checkpoint": "Återuppta sparad uppgift",
+      "foreground_service": "En förgrundstjänst håller uppgiften igång så länge Android tillåter det."
+    },
+    "flow": {
+      "import_media": "Importera ljud eller video",
+      "template_clean": "Rensa och läs upp",
+      "template_translate": "Översätt och läs upp",
+      "template_transcribe": "Transkribera och översätt",
+      "contains": "Fortsätt om texten innehåller (skiftlägeskänsligt)",
+      "skip": "Om det saknas, hoppa över {{count}} steg",
+      "skip_label": "Steg att hoppa över om det saknas",
+      "retries": "Nya försök: {{count}}",
+      "retries_label": "Nya försök efter ett fel",
+      "step_transcribe": "Transkribera media",
+      "step_condition": "Villkor"
+    },
+    "integration": {
+      "received": "Mottaget innehåll",
+      "review": "Granska det delade innehållet innan du kör en uppgift. Inget startar automatiskt.",
+      "shortcut_speak": "Öppna uppläsning",
+      "shortcut_dictate": "Öppna diktering",
+      "widget_description": "Öppnar uppläsning eller diktering. Inspelningen börjar först när du trycker på Start.",
+      "text": "Text"
+    },
+    "export": {
+      "failed": "Ljudet kunde inte exporteras. Kontrollera ledigt lagringsutrymme och försök igen."
+    },
+    "processing": {
+      "audio_editor": "Ljudredigerare",
+      "hint": "Talredigering offline: 24 kHz mono. Källan lämnas oförändrad.",
+      "select_audio": "Välj ljud",
+      "fade_in": "Tona in (sekunder)",
+      "fade_out": "Tona ut (sekunder)",
+      "gain_db": "Förstärkning (dB)",
+      "normalize": "Normalisera toppnivå",
+      "target_peak": "Måltoppnivå (dBFS)",
+      "noise_gate": "Brusgrind",
+      "gate_threshold": "Grindtröskel (dBFS)",
+      "process": "Tillämpa ändringar",
+      "result": "Bearbetat ljud",
+      "peak": "Toppnivå",
+      "changed_settings": "Inställningarna har ändrats. Tillämpa ändringarna för att lyssna på eller exportera det uppdaterade ljudet.",
+      "preview_hint": "Källförhandslyssningen spelar upp till 30 sekunder från klippets början.",
+      "invalid": "Kontrollera klipptider, toningslängder och ljudnivåer.",
+      "segment_gain": "Segmentvolym",
+      "mute": "Stäng av segmentljud",
+      "record_consent": "Jag har tillstånd att använda inspelningen för röstomvandling.",
+      "merge_levels": "Använd samma volym- och ljudavstängningsinställningar innan du slår ihop segment."
+    }
+  },
+  "failureCause": {
+    "details": "Detaljer",
+    "fixes": "Föreslagna åtgärder",
+    "vram": {
+      "title": "GPU:n fick slut på minne",
+      "fix1": "Stäng andra GPU-appar",
+      "fix2": "Välj CPU eller en mindre motor"
+    },
+    "model_missing": {
+      "title": "Modellen är inte nedladdad",
+      "fix1": "Ladda ned den i Modellkatalogen",
+      "fix2": "Använd Åtgärda för att installera den"
+    },
+    "busy": {
+      "title": "Motorn är upptagen",
+      "fix1": "Vänta tills pågående jobb är klart",
+      "fix2": "Försök igen om en stund"
+    },
+    "timeout": {
+      "title": "Genereringen översteg tidsgränsen",
+      "fix1": "Prova ett kortare stycke",
+      "fix2": "Höj proxyns tidsgräns"
+    },
+    "bad_response": {
+      "title": "Oväntat svar från servern",
+      "fix1": "Kontrollera backend i Inställningar > Loggar",
+      "fix2": "Starta om VoiceStudio och försök igen"
     }
   }
 }

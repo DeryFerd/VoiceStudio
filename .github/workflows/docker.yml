@@ -96,6 +96,11 @@ env:
   LEGACY_IMAGE_NAME: debpalash/omnivoice-studio
   DOCKERHUB_IMAGE: palashdeb/omnivoice-studio
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # BuildKit layer cache. It lives in GHCR, not the Actions cache: the GHA cache is
+  # capped at 10 GB per repository and these layers (one is 4 GB, 5+ GB in total)
+  # evicted the iOS native-runtime, Gradle and bun caches, so mobile CI kept paying
+  # a 17 minute rebuild. A separate package keeps the cache out of the image's tags.
+  BUILDCACHE_IMAGE: ghcr.io/debpalash/voicestudio-buildcache
 
 jobs:
   build-and-push:
@@ -212,8 +217,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.BUILDCACHE_IMAGE }}:buildkit
+          # A failed cache export must never fail (or skip) the image publish.
+          cache-to: type=registry,ref=${{ env.BUILDCACHE_IMAGE }}:buildkit,mode=max,ignore-error=true
 
       # One-time migration path for releases that predate the canonical GHCR
       # coordinate. The explicit ref is validated against package.json before
@@ -371,9 +377,8 @@ jobs:
             type=raw,value=sha-${{ steps.source.outputs.short_sha }}-rocm
 
       # cache-from only: reading the CUDA job's exported cache reuses the
-      # identical frontend-builder stage. Deliberately NO cache-to — the
-      # multi-GB ROCm runtime layers would blow GitHub's 10 GB per-repo
-      # Actions cache budget and evict the CUDA job's cache.
+      # identical frontend-builder stage. Deliberately NO cache-to — the ROCm
+      # runtime layers would overwrite the CUDA job's cache image.
       - name: Build and push (ROCm)
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
@@ -386,7 +391,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
+          cache-from: type=registry,ref=${{ env.BUILDCACHE_IMAGE }}:buildkit
 
       - name: Backfill canonical GHCR release tags (ROCm)
         if: inputs.backfill_release

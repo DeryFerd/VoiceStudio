@@ -27,7 +27,7 @@ import java.io.File
     PhoneDubScreen(vm,phone.models.firstOrNull {it.capability=="clone"},projectId,libraryOnly=true)
 }
 
-@Composable internal fun PhoneDubScreen(vm: StudioViewModel,clone: PhoneModel?, projectId: String? = null, libraryOnly: Boolean = false) {
+@Composable internal fun PhoneDubScreen(vm: StudioViewModel,clone: PhoneModel?, projectId: String? = null, libraryOnly: Boolean = false,batchMode: Boolean = false) {
     val context=LocalContext.current
     val phone by vm.phone.state.collectAsState()
     val prefs by vm.preferences.collectAsState()
@@ -37,6 +37,8 @@ import java.io.File
     val flow=remember(work) {work.getWorkInfosByTagFlow(PhoneDubWorker.TAG)}
     val works by flow.collectAsState(emptyList())
     LaunchedEffect(works) {vm.phone.refreshDubs()}
+    var batchPaths by rememberSaveable {mutableStateOf(emptyList<String>())}
+    var batchNames by rememberSaveable {mutableStateOf(emptyList<String>())}
     var path by rememberSaveable {mutableStateOf<String?>(null)}
     var sourceName by rememberSaveable {mutableStateOf<String?>(null)}
     var targets by rememberSaveable {mutableStateOf(emptyList<String>())}
@@ -45,6 +47,7 @@ import java.io.File
     var audioOnly by rememberSaveable {mutableStateOf(false)}
     var copying by remember {mutableStateOf(false)}
     var more by rememberSaveable {mutableStateOf(false)}
+    var editing by remember {mutableStateOf<String?>(null)}
     var playing by rememberSaveable {mutableStateOf<String?>(null)}
     var savePath by rememberSaveable {mutableStateOf<String?>(null)}
     val catalog=rememberLanguageCatalog(vm::fail)
@@ -65,6 +68,15 @@ import java.io.File
             } catch(e:CancellationException) {throw e} catch(e:Exception) {vm.fail(e)} finally {copying=false}
         }
     }
+    val batchPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {uris ->
+        scope.launch {
+            copying=true
+            try {for(uri in uris) {
+                val selected=copyMedia(context,uri,"media")
+                batchPaths=batchPaths+selected.path;batchNames=batchNames+(mediaDisplayName(context,uri) ?: selected.name)
+            }} catch(e:CancellationException) {throw e} catch(e:Exception) {vm.fail(e)} finally {copying=false}
+        }
+    }
     val save=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) {uri ->
         val file=savePath?.let(::File);savePath=null
         if(file!=null&&uri!=null) scope.launch {
@@ -73,9 +85,12 @@ import java.io.File
         }
     }
     Screen {
-        ScreenTitle(if(libraryOnly) "projects.title" else "mobile.tabs.dub")
+        ScreenTitle(if(libraryOnly) "projects.title" else if(batchMode) "batch.title" else "mobile.tabs.dub")
         if(projectId==null && !libraryOnly) {
-        DubSourceCard(!copying&&!state.busy) {picker.launch(arrayOf("audio/*","video/*"))}
+        DubSourceCard(!copying&&!state.busy) {if(batchMode) batchPicker.launch(arrayOf("audio/*","video/*")) else picker.launch(arrayOf("audio/*","video/*"))}
+        batchPaths.forEachIndexed {index,source ->SelectedDubSource(batchNames.getOrNull(index) ?: File(source).name) {
+            File(source).delete();batchPaths=batchPaths.filterIndexed {i,_->i!=index};batchNames=batchNames.filterIndexed {i,_->i!=index}
+        }}
         path?.let {source ->SelectedDubSource(sourceName ?: File(source).name) {File(source).delete();path=null;sourceName=null}}
         if(copying||catalog==null) InlineLoading()
         MultiPicker("mobile.dub.target_languages",targets,languages,tile=true) {targets=it}
@@ -92,18 +107,22 @@ import java.io.File
             TaskModelPicker(vm,"dub",setOf("clone"),clone)
         }
         MissingModelsCard(vm,"mobile.tabs.dub",missing)
-        Action("mobile.simple.dub",ready&&consent&&path!=null&&targets.isNotEmpty()&&!copying&&!state.busy) {
-            val source=path?.let(::File) ?: return@Action
-            val title=sourceName ?: source.name
+        Action("mobile.simple.dub",ready&&consent&&(if(batchMode) batchPaths.isNotEmpty() else path!=null)&&targets.isNotEmpty()&&!copying&&!state.busy) {
+            val sources=if(batchMode) batchPaths.mapIndexed {index,path->File(path) to (batchNames.getOrNull(index) ?: File(path).name)} else path?.let {listOf(File(it) to (sourceName ?: File(it).name))}.orEmpty()
             val chosenVoice=phone.voices.firstOrNull {it.id==voice}
             val chosenTargets=languages.filter {it.first in targets}.map {DubTarget(it.first,it.second)}
             val selectedModels=models.toList()
             val exportAudio=audioOnly
             vm.run {
                 val reference=chosenVoice?.let {vm.phone.voices.reference(it)}
-                val request=vm.phone.dubs.create(source,title,chosenTargets,selectedModels,true,reference,chosenVoice?.transcript,exportAudio)
-                PhoneDubWorker.enqueue(context,request.id)
-                source.delete();path=null;sourceName=null;consent=false
+                for((source,title) in sources) {
+                    val request=vm.phone.dubs.create(source,title,chosenTargets,selectedModels,true,reference,chosenVoice?.transcript,exportAudio)
+                    PhoneDubWorker.enqueue(context,request.id)
+                    source.delete()
+                    if(batchMode) {val index=batchPaths.indexOf(source.path);batchPaths=batchPaths.filterIndexed {i,_->i!=index};batchNames=batchNames.filterIndexed {i,_->i!=index}}
+                    else {path=null;sourceName=null}
+                }
+                consent=false
                 vm.phone.refreshDubs()
             }
         }
@@ -123,6 +142,7 @@ import java.io.File
                         Text(tr("mobile.simple.percent",mapOf("percent" to percent)))
                     }
                     LinearProgressIndicator(progress={percent/100f},modifier=Modifier.fillMaxWidth())
+                    PhoneJobStatus(running=active!=null)
                     if(active!=null) Secondary("common.cancel") {work.cancelUniqueWork("phone-dub:${record.request.id}")}
                     else Row {
                         Secondary("mobile.simple.resume") {PhoneDubWorker.enqueue(context,record.request.id)}
@@ -144,9 +164,22 @@ import java.io.File
                 IconAction("mobile.speak.share",Icons.Default.Share) {scope.launch {try {shareLocalFile(context,file,if(file.extension=="mp4") "video/mp4" else "audio/wav")} catch(e:Exception) {vm.fail(e)}}}
                 IconAction("common.save",VSIcons.Download) {savePath=file.path;save.launch(record.request.title.substringBeforeLast('.').ifBlank {record.request.id}+"-${output.language}.${file.extension}")}
                 ReportAction(vm) {ReportSubjects.phoneDub(record.request,phone.models)}
+                if(record.checkpoint.done && vm.phone.dubs.file(record.request.id,"original.pcm").isFile) IconAction("clone.edit",Icons.Default.Edit) {editing=record.request.id}
                 if(record.checkpoint.done) IconAction("mobile.simple.remove_job",Icons.Default.Delete) {vm.run {if(playing==file.path) playing=null;vm.phone.dubs.delete(record.request.id);vm.phone.refreshDubs()}}
             }
         }}
         playing?.let {LocalAudioPlayer(File(it),vm::fail)}
+        editing?.let {id ->
+            androidx.compose.ui.window.Dialog(onDismissRequest={editing=null},properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false)) {
+                Surface(Modifier.fillMaxSize(),color=role("canvas")) {DubEditorScreen(vm,id) {editing=null}}
+            }
+        }
     }
+}
+
+@Composable fun BatchDubScreen(vm: StudioViewModel) {
+    val phone by vm.phone.state.collectAsState();val prefs by vm.preferences.collectAsState()
+    val models=phone.models.filter {it.capability=="clone"}
+    val clone=models.firstOrNull {it.id==prefs.phoneModels["dub"]} ?: models.firstOrNull {it.id in phone.installed} ?: models.firstOrNull()
+    PhoneDubScreen(vm,clone,batchMode=true)
 }

@@ -68,7 +68,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: mobile/native/android/build
-          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**') }}
+          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**', 'mobile/native/mp3/**', 'mobile/ios/VoiceStudioKit/Sources/VSNative/Lame/**', 'mobile/ios/VoiceStudioKit/Sources/VSNative/Mp3Encoder.c', 'mobile/ios/VoiceStudioKit/Sources/VSNative/include/Mp3Encoder.h') }}
 
       - name: Build, unit tests, lint
         run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest testDebugUnitTest lint
@@ -104,7 +104,12 @@ jobs:
 
       - name: VoiceStudioKit tests
         working-directory: mobile/ios/VoiceStudioKit
-        run: swift test
+        # Serial on purpose. In parallel the suite hangs on the 3-core runner (the step
+        # sat for the whole 60 minute job timeout on three runs); run one at a time all
+        # 201 tests pass in about 155 s, the same time the parallel run used to take.
+        # A 15 minute cap turns any new hang into a fast, named failure.
+        timeout-minutes: 15
+        run: swift test --no-parallel
 
       # iOS xcframeworks for the pinned on-device runtimes (sherpa-onnx, onnxruntime,
       # llama.cpp, omnivoice.cpp); needs Xcode, so it only runs here.
@@ -259,7 +264,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: mobile/native/android/build
-          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**') }}
+          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**', 'mobile/native/mp3/**', 'mobile/ios/VoiceStudioKit/Sources/VSNative/Lame/**', 'mobile/ios/VoiceStudioKit/Sources/VSNative/Mp3Encoder.c', 'mobile/ios/VoiceStudioKit/Sources/VSNative/include/Mp3Encoder.h') }}
 
       - name: Enable KVM
         run: |
@@ -309,7 +314,7 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: mobile/native/android/build
-          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**') }}
+          key: android-native-${{ hashFiles('mobile/native/pins.json', 'mobile/native/android/**', '!mobile/native/android/build/**', 'mobile/native/mp3/**', 'mobile/ios/VoiceStudioKit/Sources/VSNative/Lame/**', 'mobile/ios/VoiceStudioKit/Sources/VSNative/Mp3Encoder.c', 'mobile/ios/VoiceStudioKit/Sources/VSNative/include/Mp3Encoder.h') }}
 
       - name: Enable KVM
         run: |

@@ -537,7 +537,7 @@ def test_call_settings_validate_and_disclosure_may_be_emptied(api):
     assert ok.status_code == 200, ok.text
     assert ok.json() | {} == {
         "from_number": FROM, "disclosure_template": "", "user_name": "", "inbound_mode": "agent",
-        "inbound_brief": "", "max_concurrent": 2, "record_calls": False,
+        "inbound_brief": "", "max_concurrent": 2, "record_calls": False, "allow_remote_control": False,
     }
     assert api.get("/calls/settings").json()["disclosure_template"] == ""
 

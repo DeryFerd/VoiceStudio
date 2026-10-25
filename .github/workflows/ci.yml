@@ -29,6 +29,20 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # A pull request from a fork waits here for a maintainer to approve the
+  # `external-pr` environment (Settings -> Environments -> required reviewers)
+  # before any other job gets a runner. Same-repository branches skip this job
+  # and start at once. Without reviewers configured the environment approves
+  # itself, so the gate is inert until the owner sets them.
+  approve-external:
+    name: Approve external pull request
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: external-pr
+    steps:
+      - run: echo "Approved by a maintainer"
+
   # A pull request whose every changed file is on this allowlist cannot affect the
   # Electron jobs: they run against fake JavaScript backends, not the Python one.
   # Those jobs (UI crawler, Desktop UI, native package, and the Electron steps of
@@ -41,6 +55,9 @@ jobs:
   # (the renderer smokes play its sample WAV).
   changes:
     name: Changed paths
+    needs: approve-external
+    # A rejected approval skips this job; every job below treats that as "stop".
+    if: ${{ !cancelled() && needs.approve-external.result != 'failure' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -94,6 +111,8 @@ jobs:
 
   installer:
     name: Electron installer contracts
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -122,8 +141,9 @@ jobs:
   test-python:
     name: Tests (Python)
     needs: changes
-    # Must report even if `changes` failed, so a detection error never skips the gate.
-    if: ${{ !cancelled() }}
+    # Must report even if `changes` failed, so a detection error never skips the gate;
+    # only a rejected external approval (changes skipped) stops it.
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' }}
     runs-on: ubuntu-22.04
     env:
       # Same restricted-network resilience the smoke matrix already sets. This
@@ -233,7 +253,7 @@ jobs:
   test-electron:
     name: Tests (Electron)
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.electron != 'false' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -290,7 +310,7 @@ jobs:
   electron-smokes:
     name: Electron renderer smokes
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.electron != 'false' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -391,7 +411,7 @@ jobs:
   ui-crawler:
     name: UI crawler (${{ matrix.shard }}/3)
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.electron != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -449,7 +469,7 @@ jobs:
   linux-native-package:
     name: Linux native package
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.electron != 'false' }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -480,7 +500,7 @@ jobs:
   electron-ui:
     name: Desktop UI (${{ matrix.label }})
     needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.electron != 'false' }}
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.electron != 'false' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
