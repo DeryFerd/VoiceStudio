@@ -91,7 +91,7 @@ class DownloadAggregator:
 
         The entry is promoted out of ``_byte_bars`` so the key is free for the
         next file without erasing what this one earned. Re-crediting the same
-        key is a no-op beyond its high-water mark.
+        key is a no-op.
         """
         with self._lock:
             t = int(total or 0)
@@ -104,10 +104,7 @@ class DownloadAggregator:
                 return
             if key in self._completed_keys:
                 # The same bar closed twice (tqdm can call close() again on
-                # teardown). Its bytes are already credited; only raise the
-                # high-water mark if this close reports more.
-                if credited > t:
-                    self._completed_bytes += credited - t
+                # teardown). Its bytes are already credited.
                 return
             self._completed_keys.add(key)
             self._completed_bytes += credited
