@@ -116,8 +116,10 @@ class ModelDownloads internal constructor(
             } finally {synchronized(reservations) {reservations.remove(model.id)}}
         }
     }
-    private fun allowed(url: HttpUrl): Boolean = allowTestHttp || (url.scheme=="https" && url.username.isEmpty() && url.password.isEmpty() &&
-        (url.host in setOf("huggingface.co","hf-mirror.com","hf.co") || url.host.endsWith(".huggingface.co") || url.host.endsWith(".hf.co")))
+    // Keep in step with iOS ModelRedirectDelegate.allowed (SPEC M2): mirror CDN
+    // subdomains must download like the apex host on every platform.
+    internal fun allowed(url: HttpUrl): Boolean = allowTestHttp || (url.scheme=="https" && url.username.isEmpty() && url.password.isEmpty() &&
+        (url.host in setOf("huggingface.co","hf-mirror.com","hf.co") || url.host.endsWith(".huggingface.co") || url.host.endsWith(".hf.co") || url.host.endsWith(".hf-mirror.com")))
     private suspend fun transfer(endpoint: String, model: PhoneModel, file: ModelFile, partial: File, allowMobile: Boolean, report: (Long)->Unit) {
         if(partial.length()==file.size) return
         var url=endpoint.toHttpUrl().newBuilder().addPathSegments(model.repo).addPathSegment("resolve").addPathSegment(model.revision).addPathSegments(file.path).build()

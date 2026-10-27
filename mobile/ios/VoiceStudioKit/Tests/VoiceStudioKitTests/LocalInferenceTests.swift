@@ -210,7 +210,7 @@ private actor RangeServer: HTTPTransport {
     #expect(LocalRouting.route(preference: .computer, installed: false, paired: false) == .download)
 }
 @Test func localRedirectsStayWithinModelDeliveryOrigins() {
-    for url in ["https://huggingface.co/resolve", "https://cdn-lfs.hf.co/model", "https://cas-bridge.xethub.hf.co/model", "https://hf-mirror.com/model"] { #expect(ModelRedirectDelegate.allowed(URL(string: url)!)) }
+    for url in ["https://huggingface.co/resolve", "https://cdn-lfs.hf.co/model", "https://cas-bridge.xethub.hf.co/model", "https://hf-mirror.com/model", "https://cdn-lfs.hf-mirror.com/model"] { #expect(ModelRedirectDelegate.allowed(URL(string: url)!)) }
     for url in ["http://huggingface.co/model", "https://huggingface.co.evil.test/model", "https://example.org/model"] { #expect(!ModelRedirectDelegate.allowed(URL(string: url)!)) }
     var credentials = URLComponents()
     credentials.scheme = "https"; credentials.host = "huggingface.co"; credentials.path = "/model"
