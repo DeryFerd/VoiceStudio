@@ -4346,8 +4346,10 @@ def get_capture_asr_backend(*, skip_sherpa: bool = False) -> ASRBackend:
                                  dictation-grade fast on the GPU.
       2. mlx-whisper Turbo     — Apple Silicon, ~5× faster than large-v3
       3. mlx-whisper large     — still native Metal, faster than CPU int8
-      4. faster-whisper        — cross-platform CTranslate2 fallback
-      5. pytorch-whisper       — last resort
+      4. pytorch-whisper       — on a ROCm/HIP torch host only, where stock
+                                 CTranslate2 has no GPU path (#1529, #4317)
+      5. faster-whisper        — cross-platform CTranslate2 fallback
+      6. pytorch-whisper       — last resort
 
     The caller should also pass ``word_timestamps=False`` to the returned
     backend to skip per-word timing and shave another ~30% latency.
@@ -4428,6 +4430,22 @@ def _select_capture_asr_backend(*, skip_sherpa: bool) -> ASRBackend:
             return _capture_backend
 
         # Fall back to faster-whisper (CPU int8 on non-Apple)
+        #
+        # …except on a ROCm/HIP torch host, where stock CTranslate2 is the
+        # CUDA-only wheel (#1529): faster-whisper would silently transcribe on
+        # the CPU while the HIP GPU sat idle (#4317). _auto_detect() already
+        # prefers the torch-native pipeline on exactly this host, so the capture
+        # picker agrees with it instead of contradicting it. NVIDIA (CTranslate2
+        # owns the GPU), the qualified Windows HIP CT2 and plain CPU hosts all
+        # keep the fallback below: _ctranslate2_cuda_ok() is True on the first
+        # two, and _rocm_torch() is False on the third.
+        if (_rocm_torch() and _cuda_reported_available()
+                and not _ctranslate2_cuda_ok()
+                and _probe_available(PyTorchWhisperBackend)):
+            _capture_backend = PyTorchWhisperBackend()
+            _capture_backend_key = auto_key
+            return _capture_backend
+
         ok, _ = FasterWhisperBackend.is_available()
         if ok:
             _capture_backend = FasterWhisperBackend()
@@ -4597,6 +4615,13 @@ def _capture_whisper_repo() -> str | None:
     ok, _ = MLXWhisperBackend.is_available()
     if ok:
         return _MLX_MODEL_TURBO
+    # Mirrors the picker's ROCm/HIP step: stock CTranslate2 has no GPU path
+    # there (#1529), so the preflight must name the torch-native repo the
+    # picker will actually load (#4317) instead of the CTranslate2 one.
+    if (_rocm_torch() and _cuda_reported_available()
+            and not _ctranslate2_cuda_ok()
+            and _probe_available(PyTorchWhisperBackend)):
+        return os.environ.get("OMNIVOICE_PYTORCH_ASR_MODEL", _PYTORCH_ASR_DEFAULT)
     ok, _ = FasterWhisperBackend.is_available()
     if ok:
         # An unrecognized-but-valid alias (a name faster_whisper itself can

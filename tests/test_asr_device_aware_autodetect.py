@@ -520,3 +520,82 @@ def test_ctranslate2_gate_fails_safe_when_the_probe_breaks(monkeypatch):
     monkeypatch.setattr(ab, "_cuda_reported_available", lambda: True)
     monkeypatch.setattr(ab, "_rocm_torch", lambda: False)
     assert ab._ctranslate2_cuda_ok() is False
+
+
+# ── capture / dictation picker on the same hosts (#4317) ──────────────────────
+#
+# _auto_detect() has preferred the torch-native pipeline on ROCm since #1529, but
+# the capture/dictation picker below it did not consult the device at all: it
+# fell through to "faster-whisper (CPU int8 on non-Apple)" unconditionally. On a
+# Linux ROCm host that is the CUDA-only CTranslate2 wheel, so dictation ran on
+# the CPU while the HIP GPU sat idle — the picker disagreed with _auto_detect()
+# about the same machine. These tests hold the two in step.
+
+
+def _no_mlx(monkeypatch):
+    """A non-Apple host: the MLX tiers must not claim to be installable."""
+    monkeypatch.setattr(ab.MLXWhisperBackend, "is_available",
+                        classmethod(lambda cls: (False, "needs Apple Silicon")))
+
+
+def test_rocm_capture_picks_pytorch_whisper_not_cpu_ctranslate2(
+        _fresh_capture_singleton, monkeypatch):
+    """The #4317 regression: before the fix the picker returned
+    FasterWhisperBackend, i.e. CTranslate2 on the CPU, on a host where torch
+    rides the HIP GPU."""
+    _no_mlx(monkeypatch)
+    monkeypatch.setattr(ab, "_ctranslate2_cuda_ok", lambda: False)
+    monkeypatch.setattr(ab, "_rocm_torch", lambda: True)
+    monkeypatch.setattr(ab, "_cuda_reported_available", lambda: True)
+    monkeypatch.setattr(
+        ab, "_probe_available", _probe({"pytorch-whisper", "faster-whisper"})
+    )
+    backend = ab._select_capture_asr_backend(skip_sherpa=True)
+    assert isinstance(backend, ab.PyTorchWhisperBackend)
+    # The dictation preflight mirror must name the repo the picker will load,
+    # or the 409 download CTA would demand the CTranslate2 model instead.
+    assert ab._capture_whisper_repo() == os.environ.get(
+        "OMNIVOICE_PYTORCH_ASR_MODEL", ab._PYTORCH_ASR_DEFAULT
+    )
+
+
+def test_cuda_capture_still_prefers_ctranslate2(_fresh_capture_singleton, monkeypatch):
+    """No regression on NVIDIA, where CTranslate2 owns the GPU and is the
+    fastest tier: the ROCm rule must not steal the pick there."""
+    _no_mlx(monkeypatch)
+    monkeypatch.setattr(ab, "_ctranslate2_cuda_ok", lambda: True)
+    monkeypatch.setattr(ab, "_rocm_torch", lambda: False)
+    monkeypatch.setattr(ab, "_cuda_reported_available", lambda: True)
+    monkeypatch.setattr(
+        ab, "_probe_available", _probe({"pytorch-whisper", "faster-whisper"})
+    )
+    backend = ab._select_capture_asr_backend(skip_sherpa=True)
+    assert isinstance(backend, ab.FasterWhisperBackend)
+
+
+def test_cpu_only_capture_still_falls_back_to_faster_whisper(
+        _fresh_capture_singleton, monkeypatch):
+    """A plain CPU box has no HIP GPU to prefer, so the cross-platform
+    CTranslate2 fallback stays the pick — the fix is not a blanket swap."""
+    _no_mlx(monkeypatch)
+    monkeypatch.setattr(ab, "_ctranslate2_cuda_ok", lambda: False)
+    monkeypatch.setattr(ab, "_rocm_torch", lambda: False)
+    monkeypatch.setattr(ab, "_cuda_reported_available", lambda: False)
+    monkeypatch.setattr(
+        ab, "_probe_available", _probe({"pytorch-whisper", "faster-whisper"})
+    )
+    backend = ab._select_capture_asr_backend(skip_sherpa=True)
+    assert isinstance(backend, ab.FasterWhisperBackend)
+
+
+def test_rocm_capture_without_transformers_degrades_to_faster_whisper(
+        _fresh_capture_singleton, monkeypatch):
+    """pytorch-whisper not installed → the previous pick stands. Never strand a
+    ROCm user whose environment lacks transformers."""
+    _no_mlx(monkeypatch)
+    monkeypatch.setattr(ab, "_ctranslate2_cuda_ok", lambda: False)
+    monkeypatch.setattr(ab, "_rocm_torch", lambda: True)
+    monkeypatch.setattr(ab, "_cuda_reported_available", lambda: True)
+    monkeypatch.setattr(ab, "_probe_available", _probe({"faster-whisper"}))
+    backend = ab._select_capture_asr_backend(skip_sherpa=True)
+    assert isinstance(backend, ab.FasterWhisperBackend)
